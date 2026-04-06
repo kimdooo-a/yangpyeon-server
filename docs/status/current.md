@@ -56,6 +56,7 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 4 | 2026-04-06 | 프론트엔드 디자인 전면 개선 + ypserver 배포 스킬 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session4-frontend-design.md) |
 | 5 | 2026-04-06 | kdywave 종합 분석 + 마스터 개발 계획서 작성 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session5-master-plan.md) |
 | 6 | 2026-04-06 | ypserver 배포 + Zod 검증 + SPIKE 3건 검증 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session6-spike-zod.md) |
+| 7 | 2026-04-06 | 파일박스 v1→v2 (DB 기반 폴더 관리 + 회원 통합) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session7-filebox-v2.md) |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수
