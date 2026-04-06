@@ -37,8 +37,8 @@ export NODE_OPTIONS=--openssl-legacy-provider
 docs/MASTER-DEV-PLAN.md                            — ⭐ 세션별 개발 마스터 계획서 (단일 진실 소스)
 CLAUDE.md                                          — 프로젝트 규칙 + 문서 트리
 docs/status/current.md                             — 현재 상태 + 세션 요약표
-docs/handover/260406-session5-master-plan.md       — 최신 인수인계서 (마스터 계획서)
-docs/handover/260406-session4-frontend-design.md   — 디자인 개선 인수인계서
+docs/handover/260406-session7-filebox-v2.md         — 최신 인수인계서 (파일박스 v2)
+docs/handover/260406-session5-master-plan.md       — 마스터 계획서 인수인계서
 docs/guides/server-boot-manual.md                  — 서버 부팅 매뉴얼
 ```
 
@@ -50,6 +50,7 @@ docs/guides/server-boot-manual.md                  — 서버 부팅 매뉴얼
 - 세션 4 (2026-04-06): 프론트엔드 디자인 전면 개선 + ypserver 배포 스킬
 - 세션 5 (2026-04-06): kdywave 종합 분석 + 마스터 개발 계획서 작성
 - 세션 6 (2026-04-06): ypserver 배포 + Zod 검증 + SPIKE 3건 (SQLite/shadcn/SSE) 전부 Go
+- 세션 7 (2026-04-06): 파일박스 v1→v2 (DB 기반 폴더 관리 + 회원 통합, Prisma Folder/File 모델)
 
 ## 현재 Git 상태
 
@@ -69,6 +70,12 @@ docs/guides/server-boot-manual.md                  — 서버 부팅 매뉴얼
 
 ### ~~Phase 11a: Zod~~ — 세션 6에서 완료
 - [x] 전체 API route에 Zod 스키마 적용 (`src/lib/schemas.ts`)
+
+### 파일박스 실사용 테스트 (세션 7에서 구현 완료)
+- [ ] 회원 가입 → 파일박스 접근 → 루트 폴더 자동 생성 확인
+- [ ] 폴더 생성/탐색/이름변경/삭제 테스트
+- [ ] 파일 업로드/다운로드/삭제 테스트
+- [ ] ADMIN 관리 뷰 (`/filebox?userId=xxx`) — 미구현, 추후 추가
 
 ### 다음: Phase 11b — Sonner 토스트
 - [ ] Sonner 설치 + `<Toaster />` 레이아웃 추가

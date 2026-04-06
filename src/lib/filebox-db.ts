@@ -8,7 +8,13 @@ import { prisma } from "@/lib/prisma";
 const FILEBOX_DIR = process.env.FILEBOX_DIR || path.join(process.env.HOME || "/tmp", "filebox");
 const FILES_DIR = path.join(FILEBOX_DIR, "files");
 const MAX_FILE_SIZE = Number(process.env.FILEBOX_MAX_SIZE) || 50 * 1024 * 1024;
-const USER_STORAGE_LIMIT = Number(process.env.FILEBOX_USER_LIMIT) || 500 * 1024 * 1024;
+const DEFAULT_STORAGE_LIMIT = Number(process.env.FILEBOX_USER_LIMIT) || 500 * 1024 * 1024; // 500MB
+const ADMIN_STORAGE_LIMIT = Number(process.env.FILEBOX_ADMIN_LIMIT) || 100 * 1024 * 1024 * 1024; // 100GB
+
+async function getUserStorageLimit(userId: string): Promise<number> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  return user?.role === "ADMIN" ? ADMIN_STORAGE_LIMIT : DEFAULT_STORAGE_LIMIT;
+}
 const MAX_FOLDER_DEPTH = 10;
 
 // MIME 타입 화이트리스트
@@ -216,8 +222,9 @@ export async function uploadFile(file: File, folderId: string, userId: string) {
 
   // 용량 확인
   const usage = await getUserStorageUsage(userId);
-  if (usage + file.size > USER_STORAGE_LIMIT) {
-    throw new Error(`저장 용량 초과 (${formatBytes(usage)}/${formatBytes(USER_STORAGE_LIMIT)} 사용 중)`);
+  const limit = await getUserStorageLimit(userId);
+  if (usage + file.size > limit) {
+    throw new Error(`저장 용량 초과 (${formatBytes(usage)}/${formatBytes(limit)} 사용 중)`);
   }
 
   await initFilesDir();
@@ -287,8 +294,11 @@ export async function getUserStorageUsage(userId: string): Promise<number> {
 
 // 유저 사용량 + 한도
 export async function getUserStorageInfo(userId: string) {
-  const used = await getUserStorageUsage(userId);
-  return { used, limit: USER_STORAGE_LIMIT };
+  const [used, limit] = await Promise.all([
+    getUserStorageUsage(userId),
+    getUserStorageLimit(userId),
+  ]);
+  return { used, limit };
 }
 
 // 파일명 새니타이즈
