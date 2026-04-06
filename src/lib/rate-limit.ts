@@ -76,4 +76,10 @@ export const RATE_LIMITS = {
   pm2Action: { maxRequests: 10, windowMs: 60 * 1000 },
   // 로그인: 분당 5회 (브루트포스 방지는 login API 자체에도 있음)
   login: { maxRequests: 5, windowMs: 60 * 1000 },
+  // 파일 업로드: 분당 10회
+  fileUpload: { maxRequests: 10, windowMs: 60 * 1000 },
+  // v1 API
+  v1Register: { maxRequests: 5, windowMs: 60 * 1000 },
+  v1Login: { maxRequests: 5, windowMs: 60 * 1000 },
+  v1Api: { maxRequests: 60, windowMs: 60 * 1000 },
 } as const;

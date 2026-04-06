@@ -3,7 +3,13 @@ import { jwtVerify } from "jose";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
 
-const PUBLIC_PATHS = ["/login", "/api/auth/login"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/api/auth/login",
+  "/api/v1/auth/register",
+  "/api/v1/auth/login",
+  "/api/v1/auth/logout",
+];
 const COOKIE_NAME = "dashboard_session";
 
 function getClientIp(request: NextRequest): string {
@@ -12,7 +18,11 @@ function getClientIp(request: NextRequest): string {
 
 function getRateLimitConfig(pathname: string, method: string) {
   if (pathname === "/api/auth/login") return RATE_LIMITS.login;
+  if (pathname === "/api/v1/auth/register") return RATE_LIMITS.v1Register;
+  if (pathname === "/api/v1/auth/login") return RATE_LIMITS.v1Login;
+  if (pathname.startsWith("/api/v1/")) return RATE_LIMITS.v1Api;
   if (pathname.match(/^\/api\/pm2\/\w+$/) && method === "POST") return RATE_LIMITS.pm2Action;
+  if (pathname.startsWith("/api/filebox") && method === "POST") return RATE_LIMITS.fileUpload;
   if (pathname.startsWith("/api/")) return RATE_LIMITS.api;
   return null;
 }
@@ -33,19 +43,22 @@ export async function middleware(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p);
 
   if (!isPublic) {
-    // 세션 토큰 확인
-    const token = request.cookies.get(COOKIE_NAME)?.value;
+    // v1 API는 각 Route에서 Bearer Token 인증 처리 (쿠키 인증 스킵)
+    if (!pathname.startsWith("/api/v1/")) {
+      // 기존 대시보드 쿠키 인증
+      const token = request.cookies.get(COOKIE_NAME)?.value;
 
-    if (!token) {
-      return redirectToLogin(request);
-    }
+      if (!token) {
+        return redirectToLogin(request);
+      }
 
-    try {
-      const secret = process.env.AUTH_SECRET;
-      if (!secret) return redirectToLogin(request);
-      await jwtVerify(token, new TextEncoder().encode(secret));
-    } catch {
-      return redirectToLogin(request);
+      try {
+        const secret = process.env.AUTH_SECRET;
+        if (!secret) return redirectToLogin(request);
+        await jwtVerify(token, new TextEncoder().encode(secret));
+      } catch {
+        return redirectToLogin(request);
+      }
     }
   }
 
@@ -116,14 +129,17 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // 감사 로그: POST 요청 (상태 변경 작업)
-    if (request.method === "POST" && !pathname.includes("/auth/")) {
+    // 감사 로그: POST/DELETE 요청 (상태 변경 작업)
+    if ((request.method === "POST" || request.method === "DELETE") && !pathname.includes("/auth/")) {
+      const action = pathname.startsWith("/api/filebox")
+        ? (request.method === "POST" ? "FILEBOX_UPLOAD" : "FILEBOX_DELETE")
+        : "PM2_CONTROL";
       writeAuditLog({
         timestamp: new Date().toISOString(),
         method: request.method,
         path: pathname,
         ip,
-        action: "PM2_CONTROL",
+        action,
       });
     }
   }
