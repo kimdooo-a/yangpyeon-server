@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { IconRefresh } from "@/components/ui/icons";
 
 interface Member {
   id: string;
@@ -62,7 +62,11 @@ export default function MembersPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <PageHeader title="회원 관리" onRefresh={fetchMembers} />
+      <PageHeader title="회원 관리">
+        <button onClick={fetchMembers} className="p-2 hover:bg-surface-300 rounded-lg transition-colors text-gray-400 hover:text-gray-200">
+          <IconRefresh size={16} />
+        </button>
+      </PageHeader>
 
       {/* 검색 */}
       <div className="mb-4">
@@ -124,10 +128,14 @@ export default function MembersPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <StatusBadge
-                      status={m.isActive ? "online" : "stopped"}
-                      label={m.isActive ? "활성" : "비활성"}
-                    />
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      m.isActive
+                        ? "bg-emerald-900/30 text-emerald-400"
+                        : "bg-gray-800/50 text-gray-400"
+                    }`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${m.isActive ? "bg-emerald-400" : "bg-gray-500"}`} />
+                      {m.isActive ? "활성" : "비활성"}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-gray-400">
                     {new Date(m.createdAt).toLocaleDateString("ko-KR")}

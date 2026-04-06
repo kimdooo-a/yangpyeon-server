@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
+import { IconRefresh } from "@/components/ui/icons";
 
 interface MemberDetail {
   id: string;
@@ -89,7 +90,11 @@ export default function MemberDetailPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <PageHeader title="회원 상세" onRefresh={fetchMember} />
+      <PageHeader title="회원 상세">
+        <button onClick={fetchMember} className="p-2 hover:bg-surface-300 rounded-lg transition-colors text-gray-400 hover:text-gray-200">
+          <IconRefresh size={16} />
+        </button>
+      </PageHeader>
 
       <div className="bg-surface-200 border border-border rounded-lg p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
