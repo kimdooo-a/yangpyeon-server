@@ -3,13 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ReactNode, useState } from "react";
-import { IconDashboard, IconProcess, IconLog, IconNetwork, IconLogout, IconServer } from "@/components/ui/icons";
+import { IconDashboard, IconProcess, IconLog, IconNetwork, IconFilebox, IconLogout, IconServer, IconMembers } from "@/components/ui/icons";
 
 const navItems: { href: string; label: string; icon: ReactNode }[] = [
   { href: "/", label: "대시보드", icon: <IconDashboard size={18} /> },
   { href: "/processes", label: "프로세스", icon: <IconProcess size={18} /> },
   { href: "/logs", label: "로그", icon: <IconLog size={18} /> },
   { href: "/network", label: "네트워크", icon: <IconNetwork size={18} /> },
+  { href: "/filebox", label: "파일박스", icon: <IconFilebox size={18} /> },
+  { href: "/members", label: "회원 관리", icon: <IconMembers size={18} /> },
 ];
 
 export function Sidebar() {
