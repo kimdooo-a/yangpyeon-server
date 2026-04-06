@@ -3,8 +3,29 @@
 
 import { getDb } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, sql, and, like, gte, lte } from "drizzle-orm";
 import { buffer, type AuditEntry } from "./audit-log";
+
+/** 페이지네이션 조회 옵션 */
+export interface AuditPaginatedOptions {
+  page: number;
+  limit: number;
+  action?: string;
+  ip?: string;
+  from?: string;
+  to?: string;
+}
+
+/** 페이지네이션 응답 */
+export interface AuditPaginatedResult {
+  logs: AuditEntry[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
 
 /**
  * 인메모리 버퍼를 SQLite로 flush
@@ -72,4 +93,64 @@ export function getAuditLogs(limit = 100): AuditEntry[] {
     userAgent: r.userAgent ?? undefined,
     detail: r.detail ?? undefined,
   }));
+}
+
+/**
+ * 감사 로그 페이지네이션 + 필터 조회
+ */
+export function getAuditLogsPaginated(options: AuditPaginatedOptions): AuditPaginatedResult {
+  // 먼저 인메모리 버퍼를 DB로 flush
+  flushBufferToDb();
+
+  const db = getDb();
+  const { page, limit, action, ip, from, to } = options;
+
+  // 필터 조건 구성
+  const conditions = [];
+  if (action) conditions.push(like(auditLogs.action, `%${action}%`));
+  if (ip) conditions.push(like(auditLogs.ip, `%${ip}%`));
+  if (from) conditions.push(gte(auditLogs.timestamp, new Date(from)));
+  if (to) {
+    // to 날짜의 끝(23:59:59)까지 포함
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+    conditions.push(lte(auditLogs.timestamp, toEnd));
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  // 총 개수 조회
+  const countResult = db
+    .select({ count: sql<number>`count(*)` })
+    .from(auditLogs)
+    .where(where)
+    .all();
+  const total = Number(countResult[0]?.count ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  // 데이터 조회
+  const rows = db
+    .select()
+    .from(auditLogs)
+    .where(where)
+    .orderBy(desc(auditLogs.id))
+    .limit(limit)
+    .offset((page - 1) * limit)
+    .all();
+
+  const logs: AuditEntry[] = rows.map((r) => ({
+    timestamp: r.timestamp ? r.timestamp.toISOString() : new Date().toISOString(),
+    method: r.method ?? "",
+    path: r.path ?? "",
+    ip: r.ip,
+    status: r.statusCode ?? undefined,
+    action: r.action,
+    userAgent: r.userAgent ?? undefined,
+    detail: r.detail ?? undefined,
+  }));
+
+  return {
+    logs,
+    pagination: { page, limit, total, totalPages },
+  };
 }

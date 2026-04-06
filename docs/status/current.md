@@ -8,7 +8,7 @@
 |------|-----|
 | 프로젝트명 | 양평 부엌 서버 대시보드 |
 | 스택 | Next.js 16 + TypeScript + Tailwind CSS 4 |
-| 최종 수정 | 2026-04-06 (세션 4) |
+| 최종 수정 | 2026-04-06 (세션 12) |
 
 ## 현재 진행 상태
 
@@ -23,8 +23,21 @@
 - [x] Phase 9: 대시보드 기능 개선 (그래프, 프로세스 모달, 로그 검색, 반응형 사이드바)
 - [x] Phase 9b: 프론트엔드 디자인 전면 개선 (5개 페이지 + 공통 컴포넌트 + 사이드바)
 - [ ] Phase 9c: 추가 개선 (네트워크 트래픽, 알림 페이지)
-- [x] Phase 10: 보안 Wave 2 (Rate Limiting, 감사 로그) — Zod는 다음 세션
-- [ ] Phase 11~15: **마스터 계획서 작성 완료** → [docs/MASTER-DEV-PLAN.md](../MASTER-DEV-PLAN.md) ← **다음: 세션 5(SPIKE 검증)부터**
+- [x] Phase 10: 보안 Wave 2 (Rate Limiting, 감사 로그)
+- [x] Phase 11a: Zod 입력 검증 (전체 API Route)
+- [x] Phase 11b: Sonner 토스트 알림
+- [x] Phase 11d: SQLite + Drizzle 도입 (3 테이블)
+- [x] Phase 11e: 감사 로그 인메모리 → DB 영속화
+- [x] Phase 11f: IP 화이트리스트 CRUD + 미들웨어 검사
+- [x] Phase 12a: 메트릭 히스토리 Recharts 차트
+- [x] Phase 12b: SSE 실시간 스트리밍 (폴링 → SSE 전환)
+- [x] Phase 12c: 감사 로그 전용 페이지 (TanStack Table)
+- [x] Phase 12d: 환경변수 관리 UI
+- [x] Phase 13a: DB 인증 통합 (하드코딩 → PostgreSQL User)
+- [x] Phase 13b: 역할 기반 접근 제어 + 사용자 관리
+- [x] Phase 13c: Cmd+K 커맨드 팔레트
+- [ ] Phase 13d: 스켈레톤 UI + 빈 상태 컴포넌트 ← **다음**
+- [ ] Phase 14~15: 데이터 관리 + 자율 운영 → [docs/MASTER-DEV-PLAN.md](../MASTER-DEV-PLAN.md)
 
 ## 실행 방법
 
@@ -57,6 +70,11 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 5 | 2026-04-06 | kdywave 종합 분석 + 마스터 개발 계획서 작성 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session5-master-plan.md) |
 | 6 | 2026-04-06 | ypserver 배포 + Zod 검증 + SPIKE 3건 검증 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session6-spike-zod.md) |
 | 7 | 2026-04-06 | 파일박스 v1→v2 (DB 기반 폴더 관리 + 회원 통합) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session7-filebox-v2.md) |
+| 8 | 2026-04-06 | Sonner 토스트 + 감사 로그 DB + IP 화이트리스트 + 메트릭 차트 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session8-12-massive-feature.md) |
+| 9 | 2026-04-06 | SSE 실시간 스트리밍 (폴링→SSE 전환) | [2026-04](../logs/2026-04.md) | ↑ 통합 |
+| 10 | 2026-04-06 | 감사 로그 UI + 환경변수 관리 | [2026-04](../logs/2026-04.md) | ↑ 통합 |
+| 11 | 2026-04-06 | DB 인증 통합 + 역할 기반 접근 제어 | [2026-04](../logs/2026-04.md) | ↑ 통합 |
+| 12 | 2026-04-06 | Cmd+K 커맨드 팔레트 (스켈레톤 UI 보류) | [2026-04](../logs/2026-04.md) | ↑ 통합 |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수

@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconSearch } from "@/components/ui/icons";
+import { SseIndicator } from "@/components/ui/sse-indicator";
+import { useSse } from "@/hooks/use-sse";
 
 type LogLevel = "all" | "error" | "warn";
 
@@ -19,9 +21,9 @@ function parseLine(line: string): ParsedLine {
 }
 
 const LEVEL_BADGE: Record<string, string> = {
-  error: "bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-medium",
-  warn: "bg-yellow-900/30 text-yellow-400 px-1.5 py-0.5 rounded text-[10px] font-medium",
-  info: "bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded text-[10px] font-medium",
+  error: "bg-red-50 text-red-600 px-1.5 py-0.5 rounded text-[10px] font-medium",
+  warn: "bg-yellow-50 text-yellow-600 px-1.5 py-0.5 rounded text-[10px] font-medium",
+  info: "bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded text-[10px] font-medium",
 };
 
 const LEVEL_LABEL: Record<string, string> = {
@@ -49,6 +51,7 @@ export default function LogsPage() {
       .catch(() => {});
   }, []);
 
+  // 폴백용 fetch 함수 (SSE 연결 실패 시 사용)
   const fetchLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/pm2/logs?process=${process}&lines=200`);
@@ -59,11 +62,15 @@ export default function LogsPage() {
     }
   }, [process]);
 
-  useEffect(() => {
-    fetchLogs();
-    const interval = setInterval(fetchLogs, 3000);
-    return () => clearInterval(interval);
-  }, [fetchLogs]);
+  // 로그 SSE 구독 — process 변경 시 URL이 바뀌어 자동 재연결
+  const { status: sseStatus } = useSse<{ logs: string[] }>({
+    url: `/api/sse/logs?process=${process}`,
+    onMessage: (data) => {
+      setLogs(data.logs ?? []);
+    },
+    fallbackFn: fetchLogs,
+    fallbackInterval: 3000,
+  });
 
   useEffect(() => {
     if (autoScroll && containerRef.current) {
@@ -88,7 +95,9 @@ export default function LogsPage() {
 
   return (
     <div className="p-6 space-y-4 h-full flex flex-col">
-      <PageHeader title="로그 뷰어" description="PM2 프로세스 로그" />
+      <PageHeader title="로그 뷰어" description="PM2 프로세스 로그">
+        <SseIndicator status={sseStatus} />
+      </PageHeader>
 
       {/* 툴바 */}
       <div className="bg-surface-200 border border-border rounded-lg px-4 py-3">
@@ -96,7 +105,7 @@ export default function LogsPage() {
           <select
             value={process}
             onChange={(e) => setProcess(e.target.value)}
-            className="bg-surface-300 border border-border rounded px-3 py-1.5 text-sm text-gray-200 outline-none focus:border-brand"
+            className="bg-surface-300 border border-border rounded px-3 py-1.5 text-sm text-gray-800 outline-none focus:border-brand"
           >
             <option value="all">전체 로그</option>
             {processList.map((name) => (
@@ -106,7 +115,7 @@ export default function LogsPage() {
           <select
             value={level}
             onChange={(e) => setLevel(e.target.value as LogLevel)}
-            className="bg-surface-300 border border-border rounded px-3 py-1.5 text-sm text-gray-200 outline-none focus:border-brand"
+            className="bg-surface-300 border border-border rounded px-3 py-1.5 text-sm text-gray-800 outline-none focus:border-brand"
           >
             <option value="all">전체 레벨</option>
             <option value="warn">경고 이상</option>
@@ -119,10 +128,10 @@ export default function LogsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="검색..."
-              className="bg-surface-300 border border-border rounded pl-8 pr-3 py-1.5 text-sm text-gray-200 outline-none focus:border-brand w-44"
+              className="bg-surface-300 border border-border rounded pl-8 pr-3 py-1.5 text-sm text-gray-800 outline-none focus:border-brand w-44"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-400">
+          <label className="flex items-center gap-2 text-sm text-gray-500">
             <input
               type="checkbox"
               checked={autoScroll}
@@ -149,8 +158,8 @@ export default function LogsPage() {
           filteredLogs.map((line, i) => {
             const parsed = parseLine(line);
             return (
-              <div key={i} className="flex hover:bg-surface-300/50">
-                <span className="text-gray-600 w-10 text-right border-r border-border/50 mr-3 pr-3 shrink-0 select-none">
+              <div key={i} className="flex hover:bg-surface-300">
+                <span className="text-gray-400 w-10 text-right border-r border-border mr-3 pr-3 shrink-0 select-none">
                   {i + 1}
                 </span>
                 {parsed.level && (
@@ -161,10 +170,10 @@ export default function LogsPage() {
                 <span
                   className={`whitespace-pre-wrap break-all ${
                     parsed.level === "error"
-                      ? "text-red-400"
+                      ? "text-red-600"
                       : parsed.level === "warn"
-                        ? "text-yellow-400"
-                        : "text-gray-300"
+                        ? "text-yellow-600"
+                        : "text-gray-700"
                   }`}
                 >
                   {parsed.content}
@@ -180,23 +189,20 @@ export default function LogsPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={scrollToTop}
-            className="text-xs text-gray-400 hover:text-gray-200 bg-surface-300 px-2 py-1 rounded border border-border hover:border-gray-500 transition-colors"
+            className="text-xs text-gray-500 hover:text-gray-800 bg-surface-300 px-2 py-1 rounded border border-border hover:border-gray-500 transition-colors"
           >
             처음
           </button>
           <button
             onClick={scrollToBottom}
-            className="text-xs text-gray-400 hover:text-gray-200 bg-surface-300 px-2 py-1 rounded border border-border hover:border-gray-500 transition-colors"
+            className="text-xs text-gray-500 hover:text-gray-800 bg-surface-300 px-2 py-1 rounded border border-border hover:border-gray-500 transition-colors"
           >
             끝
           </button>
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500">
           <span>라인 {filteredLogs.length}/{logs.length}</span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            실시간
-          </span>
+          <SseIndicator status={sseStatus} />
         </div>
       </div>
     </div>

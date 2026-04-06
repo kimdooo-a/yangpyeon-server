@@ -158,14 +158,14 @@ export default function FileboxPage() {
           <div className="flex items-center gap-2 text-xs">
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-300 border border-border rounded-md">
               <span className="text-gray-500">사용량</span>
-              <span className="text-gray-300 font-medium">
+              <span className="text-gray-700 font-medium">
                 {formatBytes(usage.used)} / {formatBytes(usage.limit)}
               </span>
             </div>
             <div className="w-16 h-1.5 bg-surface-300 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
-                  usage.used / usage.limit > 0.8 ? "bg-red-400" : "bg-brand"
+                  usage.used / usage.limit > 0.8 ? "bg-red-500" : "bg-brand"
                 }`}
                 style={{ width: `${Math.min((usage.used / usage.limit) * 100, 100)}%` }}
               />
@@ -179,7 +179,7 @@ export default function FileboxPage() {
         <Breadcrumb items={breadcrumb} onNavigate={navigateTo} />
         <button
           onClick={() => setShowNewFolder(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-surface-300 border border-border rounded-md text-gray-300 hover:text-brand hover:border-brand/30 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-surface-300 border border-border rounded-md text-gray-700 hover:text-brand hover:border-brand/30 transition-colors"
         >
           <IconNewFolder size={14} />
           <span>새 폴더</span>

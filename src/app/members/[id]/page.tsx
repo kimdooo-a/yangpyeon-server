@@ -108,7 +108,7 @@ export default function MemberDetailPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <PageHeader title="회원 상세">
-        <button onClick={fetchMember} className="p-2 hover:bg-surface-300 rounded-lg transition-colors text-gray-400 hover:text-gray-200">
+        <button onClick={fetchMember} className="p-2 hover:bg-surface-300 rounded-lg transition-colors text-gray-500 hover:text-gray-800">
           <IconRefresh size={16} />
         </button>
       </PageHeader>
@@ -117,15 +117,15 @@ export default function MemberDetailPage() {
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <span className="text-gray-500">이메일</span>
-            <p className="text-gray-200 mt-1">{member.email}</p>
+            <p className="text-gray-800 mt-1">{member.email}</p>
           </div>
           <div>
             <span className="text-gray-500">이름</span>
-            <p className="text-gray-200 mt-1">{member.name ?? "-"}</p>
+            <p className="text-gray-800 mt-1">{member.name ?? "-"}</p>
           </div>
           <div>
             <span className="text-gray-500">전화번호</span>
-            <p className="text-gray-200 mt-1">{member.phone ?? "-"}</p>
+            <p className="text-gray-800 mt-1">{member.phone ?? "-"}</p>
           </div>
           <div>
             <span className="text-gray-500">역할</span>
@@ -133,7 +133,7 @@ export default function MemberDetailPage() {
               <select
                 value={member.role}
                 onChange={(e) => handleRoleChange(e.target.value)}
-                className="bg-surface-300 border border-border rounded px-2 py-1 text-gray-200 text-sm"
+                className="bg-surface-300 border border-border rounded px-2 py-1 text-gray-800 text-sm"
               >
                 {Object.entries(roleLabel).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -145,13 +145,13 @@ export default function MemberDetailPage() {
           </div>
           <div>
             <span className="text-gray-500">상태</span>
-            <p className={`mt-1 ${member.isActive ? "text-green-400" : "text-red-400"}`}>
+            <p className={`mt-1 ${member.isActive ? "text-green-600" : "text-red-600"}`}>
               {member.isActive ? "활성" : "비활성"}
             </p>
           </div>
           <div>
             <span className="text-gray-500">마지막 로그인</span>
-            <p className="text-gray-200 mt-1">
+            <p className="text-gray-800 mt-1">
               {member.lastLoginAt
                 ? new Date(member.lastLoginAt).toLocaleString("ko-KR")
                 : "없음"}
@@ -159,13 +159,13 @@ export default function MemberDetailPage() {
           </div>
           <div>
             <span className="text-gray-500">가입일</span>
-            <p className="text-gray-200 mt-1">
+            <p className="text-gray-800 mt-1">
               {new Date(member.createdAt).toLocaleString("ko-KR")}
             </p>
           </div>
           <div>
             <span className="text-gray-500">수정일</span>
-            <p className="text-gray-200 mt-1">
+            <p className="text-gray-800 mt-1">
               {new Date(member.updatedAt).toLocaleString("ko-KR")}
             </p>
           </div>
@@ -174,7 +174,7 @@ export default function MemberDetailPage() {
         <div className="flex gap-3 pt-4 border-t border-border">
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 text-sm bg-surface-300 border border-border rounded-lg text-gray-300 hover:text-gray-100"
+            className="px-4 py-2 text-sm bg-surface-300 border border-border rounded-lg text-gray-700 hover:text-gray-900"
           >
             목록으로
           </button>
@@ -182,8 +182,8 @@ export default function MemberDetailPage() {
             onClick={handleToggleActive}
             className={`px-4 py-2 text-sm rounded-lg ${
               member.isActive
-                ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                : "bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                ? "bg-red-50 text-red-600 hover:bg-red-100"
+                : "bg-green-50 text-green-600 hover:bg-green-100"
             }`}
           >
             {member.isActive ? "비활성화" : "활성화"}

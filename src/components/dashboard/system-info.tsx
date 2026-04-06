@@ -23,8 +23,8 @@ export function SystemInfo({ data }: SystemInfoProps) {
       <div className="divide-y divide-border">
         {rows.map((row) => (
           <div key={row.label} className="flex justify-between px-5 py-3 text-sm">
-            <span className="text-gray-400">{row.label}</span>
-            <span className="text-gray-200">{row.value}</span>
+            <span className="text-gray-500">{row.label}</span>
+            <span className="text-gray-800">{row.value}</span>
           </div>
         ))}
       </div>

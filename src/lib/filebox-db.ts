@@ -11,7 +11,8 @@ const MAX_FILE_SIZE = Number(process.env.FILEBOX_MAX_SIZE) || 50 * 1024 * 1024;
 const DEFAULT_STORAGE_LIMIT = Number(process.env.FILEBOX_USER_LIMIT) || 500 * 1024 * 1024; // 500MB
 const ADMIN_STORAGE_LIMIT = Number(process.env.FILEBOX_ADMIN_LIMIT) || 100 * 1024 * 1024 * 1024; // 100GB
 
-async function getUserStorageLimit(userId: string): Promise<number> {
+async function getUserStorageLimit(userId: string, role?: string): Promise<number> {
+  if (role === "ADMIN") return ADMIN_STORAGE_LIMIT;
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   return user?.role === "ADMIN" ? ADMIN_STORAGE_LIMIT : DEFAULT_STORAGE_LIMIT;
 }
@@ -213,7 +214,7 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
 }
 
 // 파일 업로드
-export async function uploadFile(file: File, folderId: string, userId: string) {
+export async function uploadFile(file: File, folderId: string, userId: string, role?: string) {
   // 폴더 소유권 확인
   const folder = await prisma.folder.findUnique({ where: { id: folderId } });
   if (!folder || folder.ownerId !== userId) {
@@ -222,7 +223,7 @@ export async function uploadFile(file: File, folderId: string, userId: string) {
 
   // 용량 확인
   const usage = await getUserStorageUsage(userId);
-  const limit = await getUserStorageLimit(userId);
+  const limit = await getUserStorageLimit(userId, role);
   if (usage + file.size > limit) {
     throw new Error(`저장 용량 초과 (${formatBytes(usage)}/${formatBytes(limit)} 사용 중)`);
   }
@@ -293,10 +294,10 @@ export async function getUserStorageUsage(userId: string): Promise<number> {
 }
 
 // 유저 사용량 + 한도
-export async function getUserStorageInfo(userId: string) {
+export async function getUserStorageInfo(userId: string, role?: string) {
   const [used, limit] = await Promise.all([
     getUserStorageUsage(userId),
-    getUserStorageLimit(userId),
+    getUserStorageLimit(userId, role),
   ]);
   return { used, limit };
 }

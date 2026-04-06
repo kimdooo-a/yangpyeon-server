@@ -21,8 +21,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "유효하지 않은 토큰" }, { status: 401 });
   }
 
-  // 대시보드 세션 쿠키 발급
-  const sessionToken = await createSession();
+  // v1 accessToken에서 사용자 정보 추출하여 대시보드 세션 쿠키 발급
+  const sessionToken = await createSession({
+    sub: (payload.sub as string) ?? "unknown",
+    email: (payload.email as string) ?? "unknown",
+    role: (payload.role as string) ?? "VIEWER",
+  });
   const response = NextResponse.json({ success: true });
   response.cookies.set(COOKIE_NAME, sessionToken, {
     httpOnly: true,

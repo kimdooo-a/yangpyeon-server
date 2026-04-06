@@ -71,7 +71,7 @@ export function FileUploadZone({ folderId, onUploadComplete }: FileUploadZonePro
         relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all
         ${isDragOver
           ? "border-brand bg-brand/5 scale-[1.01]"
-          : "border-border hover:border-gray-500 hover:bg-surface-300/50"
+          : "border-border hover:border-gray-500 hover:bg-surface-300"
         }
         ${uploading ? "pointer-events-none opacity-60" : ""}
       `}
@@ -86,7 +86,7 @@ export function FileUploadZone({ folderId, onUploadComplete }: FileUploadZonePro
 
       {uploading ? (
         <div>
-          <p className="text-gray-300 text-sm font-medium">{progress}</p>
+          <p className="text-gray-700 text-sm font-medium">{progress}</p>
           <div className="mt-2 h-1 w-48 mx-auto bg-surface-300 rounded-full overflow-hidden">
             <div className="h-full bg-brand rounded-full animate-pulse" style={{ width: "60%" }} />
           </div>
@@ -99,15 +99,15 @@ export function FileUploadZone({ folderId, onUploadComplete }: FileUploadZonePro
             <line x1="12" y1="3" x2="12" y2="15" />
           </svg>
           <div className="text-left">
-            <p className="text-gray-300 text-sm">
+            <p className="text-gray-700 text-sm">
               {isDragOver ? "여기에 놓으세요" : "파일을 드래그하거나 클릭하여 업로드"}
             </p>
-            <p className="text-gray-600 text-xs mt-0.5">PDF, 이미지, 문서, ZIP 등 · 최대 50MB</p>
+            <p className="text-gray-400 text-xs mt-0.5">PDF, 이미지, 문서, ZIP 등 · 최대 50MB</p>
           </div>
         </div>
       )}
 
-      {error && <p className="text-red-400 text-sm mt-2">{error}</p>}
+      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
     </div>
   );
 }

@@ -38,28 +38,28 @@ export function NewFolderDialog({ open, onClose, onConfirm }: NewFolderDialogPro
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/50" onClick={handleClose} />
+      <div className="fixed inset-0 z-40 bg-black/20" onClick={handleClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <form
           onSubmit={handleSubmit}
           className="bg-surface-200 border border-border rounded-lg p-6 w-full max-w-sm shadow-xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <h3 className="text-lg font-semibold text-gray-200 mb-4">새 폴더</h3>
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">새 폴더</h3>
           <input
             type="text"
             value={name}
             onChange={(e) => { setName(e.target.value); setError(""); }}
             placeholder="폴더 이름"
             autoFocus
-            className="w-full px-3 py-2.5 bg-surface-300 border border-border rounded-md text-sm text-gray-200 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
+            className="w-full px-3 py-2.5 bg-surface-300 border border-border rounded-md text-sm text-gray-800 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
           />
-          {error && <p className="text-red-400 text-xs mt-2">{error}</p>}
+          {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
           <div className="flex justify-end gap-2 mt-4">
             <button
               type="button"
               onClick={handleClose}
-              className="px-3 py-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+              className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
             >
               취소
             </button>

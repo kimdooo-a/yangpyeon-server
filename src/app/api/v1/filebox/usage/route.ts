@@ -7,6 +7,6 @@ export const runtime = "nodejs";
 
 // 내 사용량 조회
 export const GET = withAuth(async (_request: NextRequest, user) => {
-  const info = await getUserStorageInfo(user.sub);
+  const info = await getUserStorageInfo(user.sub, user.role);
   return successResponse(info);
 });

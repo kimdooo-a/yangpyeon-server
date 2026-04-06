@@ -29,9 +29,41 @@ export const pm2DetailQuerySchema = z.object({
   name: pm2Name,
 });
 
-// /api/audit — query
+// /api/audit — query (페이지네이션 + 필터)
 export const auditQuerySchema = z.object({
-  limit: z.coerce.number().int().min(1).max(500).default(100),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
+  action: z.string().max(50).optional(),
+  ip: z.string().max(45).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+});
+
+// IP 화이트리스트 — 추가
+export const ipWhitelistAddSchema = z.object({
+  ip: z.string().min(1).max(45).regex(/^[\d.:a-fA-F]+$/, "유효하지 않은 IP"),
+  description: z.string().max(200).optional(),
+});
+
+// IP 화이트리스트 — 삭제
+export const ipWhitelistDeleteSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
+
+// /api/metrics/history — query
+export const metricsHistoryQuerySchema = z.object({
+  range: z.enum(["1h", "24h", "7d", "30d"]).default("1h"),
+});
+
+// 환경변수 — 추가/수정
+export const envAddSchema = z.object({
+  key: z.string().min(1).max(100).regex(/^[A-Z][A-Z0-9_]*$/, "대문자+언더스코어만 허용"),
+  value: z.string().max(2000),
+});
+
+// 환경변수 — 삭제
+export const envDeleteSchema = z.object({
+  key: z.string().min(1).max(100),
 });
 
 // 파일박스 스키마 → src/lib/schemas/filebox.ts로 이동됨
