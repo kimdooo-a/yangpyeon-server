@@ -3,21 +3,30 @@
 import { useState, useEffect, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
-import { IconFilebox, IconSearch } from "@/components/ui/icons";
-import { FileUploadZone } from "@/components/filebox/file-upload-zone";
+import { IconFilebox, IconNewFolder } from "@/components/ui/icons";
+import { Breadcrumb } from "@/components/filebox/breadcrumb";
+import { FolderList } from "@/components/filebox/folder-list";
 import { FileList } from "@/components/filebox/file-list";
+import { FileUploadZone } from "@/components/filebox/file-upload-zone";
+import { NewFolderDialog } from "@/components/filebox/new-folder-dialog";
 
-interface FileMetadata {
+interface FolderItem {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+interface FileItem {
   id: string;
   originalName: string;
   size: number;
   mimeType: string;
-  uploadedAt: string;
+  createdAt: string;
 }
 
-interface StorageUsage {
-  used: number;
-  limit: number;
+interface BreadcrumbItem {
+  id: string;
+  name: string;
 }
 
 function formatBytes(bytes: number): string {
@@ -29,44 +38,122 @@ function formatBytes(bytes: number): string {
 }
 
 export default function FileboxPage() {
-  const [files, setFiles] = useState<FileMetadata[]>([]);
-  const [usage, setUsage] = useState<StorageUsage | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
+  const [currentFolderName, setCurrentFolderName] = useState("");
+  const [breadcrumb, setBreadcrumb] = useState<BreadcrumbItem[]>([]);
+  const [folders, setFolders] = useState<FolderItem[]>([]);
+  const [files, setFiles] = useState<FileItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState<"date" | "name" | "size">("date");
+  const [usage, setUsage] = useState<{ used: number; limit: number } | null>(null);
+  const [showNewFolder, setShowNewFolder] = useState(false);
 
-  const fetchFiles = useCallback(async () => {
+  // 폴더 내용 조회
+  const fetchContents = useCallback(async (folderId?: string) => {
+    setLoading(true);
     try {
-      const res = await fetch(`/api/filebox?sort=${sort}&order=desc`);
+      const query = folderId ? `?parentId=${folderId}` : "";
+      const res = await fetch(`/api/v1/filebox/folders${query}`);
       if (res.ok) {
-        const data = await res.json();
+        const { data } = await res.json();
+        setCurrentFolderId(data.currentFolder.id);
+        setCurrentFolderName(data.currentFolder.name);
+        setBreadcrumb(data.breadcrumb);
+        setFolders(data.folders);
         setFiles(data.files);
-        setUsage(data.usage);
       }
     } catch {
-      // 네트워크 오류 무시
+      // 네트워크 오류
     } finally {
       setLoading(false);
     }
-  }, [sort]);
+  }, []);
+
+  // 사용량 조회
+  const fetchUsage = useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/filebox/usage");
+      if (res.ok) {
+        const { data } = await res.json();
+        setUsage(data);
+      }
+    } catch { /* 무시 */ }
+  }, []);
 
   useEffect(() => {
-    fetchFiles();
-  }, [fetchFiles]);
+    fetchContents();
+    fetchUsage();
+  }, [fetchContents, fetchUsage]);
 
-  const handleDelete = async (id: string) => {
-    const res = await fetch(`/api/filebox/${id}`, { method: "DELETE" });
-    if (res.ok) fetchFiles();
+  // 폴더 탐색
+  const navigateTo = (folderId: string) => {
+    fetchContents(folderId);
   };
 
-  // 검색 필터
-  const filtered = search
-    ? files.filter((f) => f.originalName.toLowerCase().includes(search.toLowerCase()))
-    : files;
+  // 새 폴더 생성
+  const handleCreateFolder = async (name: string) => {
+    const res = await fetch("/api/v1/filebox/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, parentId: currentFolderId }),
+    });
+    if (res.ok) {
+      setShowNewFolder(false);
+      fetchContents(currentFolderId ?? undefined);
+    } else {
+      const { error } = await res.json();
+      alert(error?.message || "폴더 생성 실패");
+    }
+  };
+
+  // 폴더 이름 변경
+  const handleRenameFolder = async (folderId: string, currentName: string) => {
+    const newName = prompt("새 이름을 입력하세요", currentName);
+    if (!newName || newName === currentName) return;
+
+    const res = await fetch(`/api/v1/filebox/folders/${folderId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName }),
+    });
+    if (res.ok) {
+      fetchContents(currentFolderId ?? undefined);
+    } else {
+      const { error } = await res.json();
+      alert(error?.message || "이름 변경 실패");
+    }
+  };
+
+  // 폴더 삭제
+  const handleDeleteFolder = async (folderId: string, name: string) => {
+    if (!confirm(`"${name}" 폴더와 내부 파일을 모두 삭제하시겠습니까?`)) return;
+
+    const res = await fetch(`/api/v1/filebox/folders/${folderId}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchContents(currentFolderId ?? undefined);
+      fetchUsage();
+    }
+  };
+
+  // 파일 삭제
+  const handleDeleteFile = async (fileId: string) => {
+    const res = await fetch(`/api/v1/filebox/files/${fileId}`, { method: "DELETE" });
+    if (res.ok) {
+      fetchContents(currentFolderId ?? undefined);
+      fetchUsage();
+    }
+  };
+
+  // 업로드 완료
+  const handleUploadComplete = () => {
+    fetchContents(currentFolderId ?? undefined);
+    fetchUsage();
+  };
+
+  const isEmpty = !loading && folders.length === 0 && files.length === 0;
 
   return (
-    <div className="space-y-6">
-      <PageHeader title="파일박스" description="파일 업로드 및 관리">
+    <div className="space-y-5">
+      <PageHeader title="파일박스" description="파일 업로드 및 폴더 관리">
         {usage && (
           <div className="flex items-center gap-2 text-xs">
             <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-300 border border-border rounded-md">
@@ -75,7 +162,6 @@ export default function FileboxPage() {
                 {formatBytes(usage.used)} / {formatBytes(usage.limit)}
               </span>
             </div>
-            {/* 사용량 바 */}
             <div className="w-16 h-1.5 bg-surface-300 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${
@@ -88,58 +174,65 @@ export default function FileboxPage() {
         )}
       </PageHeader>
 
-      {/* 업로드 영역 */}
-      <FileUploadZone onUploadComplete={fetchFiles} />
+      {/* 브레드크럼 + 액션 */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <Breadcrumb items={breadcrumb} onNavigate={navigateTo} />
+        <button
+          onClick={() => setShowNewFolder(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-surface-300 border border-border rounded-md text-gray-300 hover:text-brand hover:border-brand/30 transition-colors"
+        >
+          <IconNewFolder size={14} />
+          <span>새 폴더</span>
+        </button>
+      </div>
 
-      {/* 검색 + 정렬 툴바 */}
-      {files.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* 검색 */}
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-            <input
-              type="text"
-              placeholder="파일명 검색..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-2 bg-surface-300 border border-border rounded-md text-sm text-gray-200 outline-none focus:border-brand focus:ring-1 focus:ring-brand/20"
-            />
-          </div>
+      {/* 폴더 목록 */}
+      <FolderList
+        folders={folders}
+        onNavigate={navigateTo}
+        onRename={handleRenameFolder}
+        onDelete={handleDeleteFolder}
+      />
 
-          {/* 정렬 */}
-          <div className="flex items-center gap-1 text-xs">
-            {(["date", "name", "size"] as const).map((s) => (
-              <button
-                key={s}
-                onClick={() => setSort(s)}
-                className={`px-2.5 py-1.5 rounded-md transition-colors ${
-                  sort === s
-                    ? "bg-brand/10 text-brand"
-                    : "text-gray-500 hover:text-gray-300 hover:bg-surface-300"
-                }`}
-              >
-                {{ date: "날짜", name: "이름", size: "크기" }[s]}
-              </button>
-            ))}
-          </div>
+      {/* 폴더와 파일 사이 구분선 */}
+      {folders.length > 0 && files.length > 0 && (
+        <div className="border-t border-border/30" />
+      )}
 
-          {/* 파일 수 */}
-          <span className="text-xs text-gray-600">
-            {filtered.length}개 파일
-          </span>
+      {/* 파일 목록 */}
+      <FileList files={files} onDelete={handleDeleteFile} />
+
+      {/* 빈 상태 */}
+      {isEmpty && (
+        <EmptyState
+          icon={<IconFilebox size={32} />}
+          message="폴더가 비어있습니다"
+          description="파일을 업로드하거나 새 폴더를 만들어보세요"
+        />
+      )}
+
+      {/* 로딩 */}
+      {loading && (
+        <div className="flex items-center justify-center py-8 gap-2 text-gray-500">
+          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <span className="text-sm">로딩 중...</span>
         </div>
       )}
 
-      {/* 파일 목록 또는 빈 상태 */}
-      {!loading && filtered.length === 0 ? (
-        <EmptyState
-          icon={<IconFilebox size={32} />}
-          message={search ? "검색 결과가 없습니다" : "업로드된 파일이 없습니다"}
-          description={search ? "다른 검색어를 입력해보세요" : "위 영역에 파일을 드래그하여 업로드하세요"}
-        />
-      ) : (
-        <FileList files={filtered} onDelete={handleDelete} loading={loading} />
+      {/* 업로드 영역 */}
+      {currentFolderId && !loading && (
+        <FileUploadZone folderId={currentFolderId} onUploadComplete={handleUploadComplete} />
       )}
+
+      {/* 새 폴더 다이얼로그 */}
+      <NewFolderDialog
+        open={showNewFolder}
+        onClose={() => setShowNewFolder(false)}
+        onConfirm={handleCreateFolder}
+      />
     </div>
   );
 }

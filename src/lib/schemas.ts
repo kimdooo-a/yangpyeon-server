@@ -34,13 +34,4 @@ export const auditQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 
-// /api/filebox — query (목록 조회)
-export const fileboxQuerySchema = z.object({
-  sort: z.enum(["date", "name", "size"]).default("date"),
-  order: z.enum(["asc", "desc"]).default("desc"),
-});
-
-// /api/filebox/[id] — params
-export const fileboxIdSchema = z.object({
-  id: z.string().uuid("잘못된 파일 ID"),
-});
+// 파일박스 스키마 → src/lib/schemas/filebox.ts로 이동됨
