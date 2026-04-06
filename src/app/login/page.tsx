@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { IconServer } from "@/components/ui/icons";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,19 +17,27 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/login", {
+      // v1 API로 로그인
+      const res = await fetch("/api/v1/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
 
-      if (res.ok) {
+      if (res.ok && data.success) {
+        // 대시보드 세션 쿠키도 발급 (기존 미들웨어 호환)
+        await fetch("/api/auth/login-v2", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken: data.data.accessToken }),
+        });
+
         router.push("/");
         router.refresh();
       } else {
-        setError(data.error || "로그인 실패");
+        setError(data.error?.message || "이메일 또는 비밀번호가 올바르지 않습니다");
       }
     } catch {
       setError("서버 연결 오류");
@@ -58,14 +67,34 @@ export default function LoginPage() {
           {/* 로그인 폼 */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label
-                htmlFor="password"
-                className="block text-sm text-gray-400 mb-1.5"
-              >
+              <label htmlFor="email" className="block text-sm text-gray-400 mb-1.5">
+                이메일
+              </label>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                  </svg>
+                </div>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-3 py-3 bg-surface-300 border border-border rounded-md text-gray-200 placeholder-gray-600 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
+                  placeholder="이메일을 입력하세요"
+                  autoFocus
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm text-gray-400 mb-1.5">
                 비밀번호
               </label>
               <div className="relative">
-                {/* 자물쇠 아이콘 */}
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -79,7 +108,6 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-10 pr-3 py-3 bg-surface-300 border border-border rounded-md text-gray-200 placeholder-gray-600 outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                   placeholder="비밀번호를 입력하세요"
-                  autoFocus
                   required
                 />
               </div>
@@ -98,7 +126,6 @@ export default function LoginPage() {
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
-                  {/* 로딩 스피너 */}
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
@@ -111,7 +138,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* 하단 버전 정보 */}
           <div className="text-xs text-gray-600 text-center mt-6 pt-4 border-t border-border">
             양평 부엌 서버 v0.1.0
           </div>
