@@ -6,6 +6,7 @@ import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
 const PUBLIC_PATHS = [
   "/login",
   "/api/auth/login",
+  "/api/auth/login-v2",
   "/api/v1/auth/register",
   "/api/v1/auth/login",
   "/api/v1/auth/logout",
