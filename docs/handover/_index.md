@@ -14,11 +14,12 @@
 
 <!-- 날짜 그룹별로 정리합니다. 최신이 위로 올라갑니다. -->
 
-### YYYY-MM-DD
+### 2026-04-06
 
 | 세션 | 파일 | 주요 작업 |
 |------|------|-----------|
-| N | [파일명](./파일명) | 작업 요약 |
+| 1 | [250406-session1-init-security.md](./250406-session1-init-security.md) | 초기화 + 대시보드 v1 + 보안 Wave 1 |
+| 2 | [260406-session2-dashboard-improve.md](./260406-session2-dashboard-improve.md) | 대시보드 기능 개선 (그래프, 모달, 검색, 반응형) |
 
 ---
 

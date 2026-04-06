@@ -1,9 +1,12 @@
+import { ReactNode } from "react";
+
 interface StatCardProps {
   title: string;
   value: string;
   subtitle: string;
   percent?: number;
-  color?: "brand" | "blue" | "amber" | "purple";
+  color?: "brand" | "blue" | "amber" | "purple" | "red";
+  children?: ReactNode;
 }
 
 const colorMap = {
@@ -11,9 +14,10 @@ const colorMap = {
   blue: { bar: "bg-blue-500", text: "text-blue-400" },
   amber: { bar: "bg-amber-500", text: "text-amber-400" },
   purple: { bar: "bg-purple-500", text: "text-purple-400" },
+  red: { bar: "bg-red-500", text: "text-red-400" },
 };
 
-export function StatCard({ title, value, subtitle, percent, color = "brand" }: StatCardProps) {
+export function StatCard({ title, value, subtitle, percent, color = "brand", children }: StatCardProps) {
   const colors = colorMap[color];
 
   return (
@@ -32,6 +36,8 @@ export function StatCard({ title, value, subtitle, percent, color = "brand" }: S
           </div>
         </div>
       )}
+
+      {children}
     </div>
   );
 }

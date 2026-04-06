@@ -12,9 +12,29 @@ interface Pm2Process {
   restarts: number;
 }
 
+interface ProcessDetail {
+  name: string;
+  pm_id: number;
+  status: string;
+  cpu: number;
+  memory: number;
+  uptime: number;
+  restarts: number;
+  pm_exec_path: string;
+  pm_cwd: string;
+  node_version: string;
+  exec_mode: string;
+  instances: number;
+  pm_out_log_path: string;
+  pm_err_log_path: string;
+  created_at: string;
+}
+
 export default function ProcessesPage() {
   const [processes, setProcesses] = useState<Pm2Process[]>([]);
   const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState<ProcessDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const fetchProcesses = async () => {
     try {
@@ -22,7 +42,7 @@ export default function ProcessesPage() {
       const data = await res.json();
       setProcesses(data.processes);
     } catch {
-      // 에러 무시 — 다음 폴링에서 재시도
+      // 다음 폴링에서 재시도
     } finally {
       setLoading(false);
     }
@@ -49,27 +69,19 @@ export default function ProcessesPage() {
 
   const statusColor = (status: string) => {
     switch (status) {
-      case "online":
-        return "text-emerald-400";
-      case "stopped":
-        return "text-gray-500";
-      case "errored":
-        return "text-red-400";
-      default:
-        return "text-yellow-400";
+      case "online": return "text-emerald-400";
+      case "stopped": return "text-gray-500";
+      case "errored": return "text-red-400";
+      default: return "text-yellow-400";
     }
   };
 
   const statusDot = (status: string) => {
     switch (status) {
-      case "online":
-        return "bg-emerald-400";
-      case "stopped":
-        return "bg-gray-500";
-      case "errored":
-        return "bg-red-400";
-      default:
-        return "bg-yellow-400";
+      case "online": return "bg-emerald-400";
+      case "stopped": return "bg-gray-500";
+      case "errored": return "bg-red-400";
+      default: return "bg-yellow-400";
     }
   };
 
@@ -80,6 +92,19 @@ export default function ProcessesPage() {
       body: JSON.stringify({ name }),
     });
     setTimeout(fetchProcesses, 1000);
+  };
+
+  const openDetail = async (name: string) => {
+    setDetailLoading(true);
+    setDetail(null);
+    try {
+      const res = await fetch(`/api/pm2/detail?name=${encodeURIComponent(name)}`);
+      if (res.ok) setDetail(await res.json());
+    } catch {
+      // 무시
+    } finally {
+      setDetailLoading(false);
+    }
   };
 
   return (
@@ -105,20 +130,20 @@ export default function ProcessesPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
-                  로딩 중...
-                </td>
+                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">로딩 중...</td>
               </tr>
             ) : processes.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
-                  실행 중인 프로세스가 없습니다
-                </td>
+                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">실행 중인 프로세스가 없습니다</td>
               </tr>
             ) : (
               processes.map((proc) => (
                 <tr key={proc.pm_id} className="border-b border-border hover:bg-surface-300 transition-colors">
-                  <td className="px-5 py-3 font-medium">{proc.name}</td>
+                  <td className="px-5 py-3">
+                    <button onClick={() => openDetail(proc.name)} className="font-medium text-brand hover:underline">
+                      {proc.name}
+                    </button>
+                  </td>
                   <td className="px-5 py-3">
                     <span className="flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${statusDot(proc.status)}`} />
@@ -160,6 +185,49 @@ export default function ProcessesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* 상세 정보 모달 */}
+      {(detail || detailLoading) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setDetail(null); setDetailLoading(false); }}>
+          <div className="bg-surface-200 border border-border rounded-lg w-full max-w-lg mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            {detailLoading ? (
+              <div className="p-8 text-center text-gray-400">로딩 중...</div>
+            ) : detail ? (
+              <>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                  <div>
+                    <h3 className="text-lg font-bold">{detail.name}</h3>
+                    <span className={`text-xs ${statusColor(detail.status)}`}>{detail.status}</span>
+                  </div>
+                  <button onClick={() => setDetail(null)} className="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+                </div>
+                <div className="p-5 space-y-3 text-sm max-h-96 overflow-auto">
+                  {[
+                    ["PM2 ID", String(detail.pm_id)],
+                    ["CPU", `${detail.cpu}%`],
+                    ["메모리", formatMemory(detail.memory)],
+                    ["업타임", formatUptime(detail.uptime)],
+                    ["재시작 횟수", String(detail.restarts)],
+                    ["실행 모드", detail.exec_mode],
+                    ["인스턴스", String(detail.instances)],
+                    ["Node.js", detail.node_version],
+                    ["실행 경로", detail.pm_exec_path],
+                    ["작업 디렉토리", detail.pm_cwd],
+                    ["stdout 로그", detail.pm_out_log_path],
+                    ["stderr 로그", detail.pm_err_log_path],
+                    ["생성일", detail.created_at],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-4">
+                      <span className="text-gray-400 shrink-0">{label}</span>
+                      <span className="text-gray-200 text-right break-all">{value || "-"}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
