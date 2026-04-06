@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSession, verifyPassword, COOKIE_NAME, MAX_AGE } from "@/lib/auth";
+import { loginSchema } from "@/lib/schemas";
 
 // 브루트포스 방지: IP별 실패 카운터
 const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
@@ -38,17 +39,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let body: { password?: string };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청" }, { status: 400 });
   }
 
-  const password = body.password;
-  if (typeof password !== "string" || password.length === 0 || password.length > 128) {
-    return NextResponse.json({ error: "비밀번호를 입력하세요" }, { status: 400 });
+  const parsed = loginSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "잘못된 입력" }, { status: 400 });
   }
+
+  const { password } = parsed.data;
 
   if (!verifyPassword(password)) {
     // 실패 카운터 증가

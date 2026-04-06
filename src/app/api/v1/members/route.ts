@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withRole } from "@/lib/api-guard";
 import { memberListSchema } from "@/lib/schemas/member";
 import { paginatedResponse, errorResponse } from "@/lib/api-response";
-import type { Prisma } from "@/generated/prisma";
+import type { Prisma } from "@/generated/prisma/client";
 
 export const GET = withRole(["ADMIN", "MANAGER"], async (request: NextRequest) => {
   const params = Object.fromEntries(request.nextUrl.searchParams);

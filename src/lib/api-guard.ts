@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { verifyAccessToken, type AccessTokenPayload } from "@/lib/jwt-v1";
 import { errorResponse } from "@/lib/api-response";
-import type { Role } from "@/generated/prisma";
+import type { Role } from "@/generated/prisma/client";
 
 export type AuthenticatedHandler = (
   request: NextRequest,

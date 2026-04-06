@@ -48,7 +48,7 @@ export const PUT = withRole(
 
     const parsed = updateMemberSchema.safeParse(body);
     if (!parsed.success) {
-      const message = parsed.error.errors[0]?.message ?? "입력값이 올바르지 않습니다";
+      const message = parsed.error.issues[0]?.message ?? "입력값이 올바르지 않습니다";
       return errorResponse("VALIDATION_ERROR", message, 400);
     }
 
