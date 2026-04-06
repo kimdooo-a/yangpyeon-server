@@ -88,8 +88,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // CORS/CSRF (API 요청)
-  if (pathname.startsWith("/api/")) {
+  // CORS/CSRF (API 요청) — v1 API는 Bearer Token 인증이므로 CSRF 스킵
+  if (pathname.startsWith("/api/") && !pathname.startsWith("/api/v1/")) {
     const origin = request.headers.get("origin");
     const host = request.headers.get("host");
 
