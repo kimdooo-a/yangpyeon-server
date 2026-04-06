@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import type { Role } from "@/generated/prisma";
+import type { Role } from "@/generated/prisma/client";
 
 const ACCESS_MAX_AGE = 15 * 60; // 15분
 const REFRESH_MAX_AGE = 7 * 24 * 60 * 60; // 7일

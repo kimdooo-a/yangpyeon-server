@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execFileSync } from "child_process";
+import { pm2DetailQuerySchema } from "@/lib/schemas";
 
 export async function GET(request: NextRequest) {
-  const name = request.nextUrl.searchParams.get("name");
-  if (!name || !/^[\w-]+$/.test(name) || name.length > 64) {
-    return NextResponse.json({ error: "잘못된 프로세스 이름" }, { status: 400 });
+  const parsed = pm2DetailQuerySchema.safeParse({
+    name: request.nextUrl.searchParams.get("name"),
+  });
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "잘못된 프로세스 이름" }, { status: 400 });
   }
+  const { name } = parsed.data;
 
   try {
     const output = execFileSync("pm2", ["jlist"], {

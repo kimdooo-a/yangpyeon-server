@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execFileSync } from "child_process";
+import { pm2LogsQuerySchema } from "@/lib/schemas";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const processName = searchParams.get("process") || "all";
-  const linesParam = parseInt(searchParams.get("lines") || "100", 10);
-  const lines = isNaN(linesParam) ? 100 : Math.max(1, Math.min(linesParam, 500));
+  const parsed = pm2LogsQuerySchema.safeParse({
+    process: searchParams.get("process") ?? undefined,
+    lines: searchParams.get("lines") ?? undefined,
+  });
+  if (!parsed.success) {
+    return NextResponse.json({ error: "잘못된 파라미터" }, { status: 400 });
+  }
+  const { process: processName, lines } = parsed.data;
 
   try {
     const args = ["logs", "--nostream", "--lines", String(lines)];
 
     if (processName !== "all") {
-      if (!/^[\w-]+$/.test(processName) || processName.length > 64) {
-        return NextResponse.json({ error: "잘못된 프로세스 이름" }, { status: 400 });
-      }
       args.splice(1, 0, processName);
     }
 

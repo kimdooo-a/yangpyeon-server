@@ -40,6 +40,8 @@ CLAUDE.md (루트 — 지금 이 파일)
 │
 ├─→ docs/guides/README.md ················ 운영 가이드 디렉토리
 │
+├─→ docs/MASTER-DEV-PLAN.md ··············· 세션별 개발 마스터 계획서 (단일 진실 소스)
+│
 └─→ docs/commands/_index.md ·············· 명령어 모음 (복사해서 사용)
 ```
 

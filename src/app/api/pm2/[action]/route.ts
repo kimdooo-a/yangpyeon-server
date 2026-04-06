@@ -1,30 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execFileSync } from "child_process";
-
-const ALLOWED_ACTIONS = ["restart", "stop", "start"] as const;
+import { pm2ActionParamSchema, pm2ActionBodySchema } from "@/lib/schemas";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ action: string }> }
 ) {
-  const { action } = await params;
-
-  if (!ALLOWED_ACTIONS.includes(action as (typeof ALLOWED_ACTIONS)[number])) {
+  const paramParsed = pm2ActionParamSchema.safeParse(await params);
+  if (!paramParsed.success) {
     return NextResponse.json({ error: "허용되지 않는 액션" }, { status: 400 });
   }
+  const { action } = paramParsed.data;
 
-  let body: { name?: string };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청" }, { status: 400 });
   }
 
-  const name = body.name;
-
-  if (typeof name !== "string" || !/^[\w-]+$/.test(name) || name.length > 64) {
-    return NextResponse.json({ error: "잘못된 프로세스 이름" }, { status: 400 });
+  const bodyParsed = pm2ActionBodySchema.safeParse(body);
+  if (!bodyParsed.success) {
+    return NextResponse.json({ error: bodyParsed.error.issues[0]?.message ?? "잘못된 프로세스 이름" }, { status: 400 });
   }
+  const { name } = bodyParsed.data;
 
   try {
     // execFileSync: 쉘 해석 없이 직접 실행 → 명령어 주입 불가
