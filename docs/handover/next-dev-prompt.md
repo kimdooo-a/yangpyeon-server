@@ -37,8 +37,8 @@ export NODE_OPTIONS=--openssl-legacy-provider
 docs/MASTER-DEV-PLAN.md                            — ⭐ 세션별 개발 마스터 계획서 (단일 진실 소스)
 CLAUDE.md                                          — 프로젝트 규칙 + 문서 트리
 docs/status/current.md                             — 현재 상태 + 세션 요약표
-docs/handover/260406-session4-frontend-design.md   — 최신 인수인계서 (디자인 개선)
-docs/handover/260406-session3-security-wave2.md    — 보안 Wave 2 인수인계서
+docs/handover/260406-session5-master-plan.md       — 최신 인수인계서 (마스터 계획서)
+docs/handover/260406-session4-frontend-design.md   — 디자인 개선 인수인계서
 docs/guides/server-boot-manual.md                  — 서버 부팅 매뉴얼
 ```
 
@@ -48,6 +48,7 @@ docs/guides/server-boot-manual.md                  — 서버 부팅 매뉴얼
 - 세션 2 (2026-04-06): 대시보드 기능 개선 (그래프, 모달, 검색, 반응형)
 - 세션 3 (2026-04-06): 보안 Wave 2 (Rate Limiting + 감사 로그)
 - 세션 4 (2026-04-06): 프론트엔드 디자인 전면 개선 + ypserver 배포 스킬
+- 세션 5 (2026-04-06): kdywave 종합 분석 + 마스터 개발 계획서 작성
 
 ## 현재 Git 상태
 
