@@ -1,8 +1,34 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { PageHeader } from "@/components/ui/page-header";
+import { IconSearch } from "@/components/ui/icons";
 
 type LogLevel = "all" | "error" | "warn";
+
+interface ParsedLine {
+  level: "error" | "warn" | "info" | null;
+  content: string;
+}
+
+function parseLine(line: string): ParsedLine {
+  if (/error/i.test(line)) return { level: "error", content: line };
+  if (/warn/i.test(line)) return { level: "warn", content: line };
+  if (/info/i.test(line)) return { level: "info", content: line };
+  return { level: null, content: line };
+}
+
+const LEVEL_BADGE: Record<string, string> = {
+  error: "bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded text-[10px] font-medium",
+  warn: "bg-yellow-900/30 text-yellow-400 px-1.5 py-0.5 rounded text-[10px] font-medium",
+  info: "bg-gray-800 text-gray-400 px-1.5 py-0.5 rounded text-[10px] font-medium",
+};
+
+const LEVEL_LABEL: Record<string, string> = {
+  error: "ERROR",
+  warn: "WARN",
+  info: "INFO",
+};
 
 export default function LogsPage() {
   const [logs, setLogs] = useState<string[]>([]);
@@ -23,7 +49,7 @@ export default function LogsPage() {
       .catch(() => {});
   }, []);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const res = await fetch(`/api/pm2/logs?process=${process}&lines=200`);
       const data = await res.json();
@@ -31,13 +57,13 @@ export default function LogsPage() {
     } catch {
       // 다음 폴링에서 재시도
     }
-  };
+  }, [process]);
 
   useEffect(() => {
     fetchLogs();
     const interval = setInterval(fetchLogs, 3000);
     return () => clearInterval(interval);
-  }, [process]);
+  }, [fetchLogs]);
 
   useEffect(() => {
     if (autoScroll && containerRef.current) {
@@ -52,14 +78,21 @@ export default function LogsPage() {
     return true;
   });
 
+  const scrollToTop = () => {
+    if (containerRef.current) containerRef.current.scrollTop = 0;
+  };
+
+  const scrollToBottom = () => {
+    if (containerRef.current) containerRef.current.scrollTop = containerRef.current.scrollHeight;
+  };
+
   return (
     <div className="p-6 space-y-4 h-full flex flex-col">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">로그 뷰어</h1>
-          <p className="text-gray-500 text-sm mt-1">PM2 프로세스 로그</p>
-        </div>
-        <div className="flex items-center gap-3 flex-wrap">
+      <PageHeader title="로그 뷰어" description="PM2 프로세스 로그" />
+
+      {/* 툴바 */}
+      <div className="bg-surface-200 border border-border rounded-lg px-4 py-3">
+        <div className="flex items-center flex-wrap gap-3">
           <select
             value={process}
             onChange={(e) => setProcess(e.target.value)}
@@ -79,13 +112,16 @@ export default function LogsPage() {
             <option value="warn">경고 이상</option>
             <option value="error">에러만</option>
           </select>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="검색..."
-            className="bg-surface-300 border border-border rounded px-3 py-1.5 text-sm text-gray-200 outline-none focus:border-brand w-40"
-          />
+          <div className="relative">
+            <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="검색..."
+              className="bg-surface-300 border border-border rounded pl-8 pr-3 py-1.5 text-sm text-gray-200 outline-none focus:border-brand w-44"
+            />
+          </div>
           <label className="flex items-center gap-2 text-sm text-gray-400">
             <input
               type="checkbox"
@@ -95,36 +131,73 @@ export default function LogsPage() {
             />
             자동 스크롤
           </label>
+          <span className="ml-auto text-xs text-gray-500">
+            {filteredLogs.length}줄 / {logs.length}줄
+            {search && <span className="ml-2">(&quot;{search}&quot; 필터 적용됨)</span>}
+          </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-3 text-xs text-gray-500">
-        <span>{filteredLogs.length}줄</span>
-        {search && <span>(&quot;{search}&quot; 필터 적용됨)</span>}
-      </div>
-
+      {/* 로그 영역 */}
       <div
         ref={containerRef}
-        className="flex-1 bg-surface-200 border border-border rounded-lg overflow-auto font-mono text-xs leading-5 p-4 min-h-0"
+        className="flex-1 bg-surface-200 border border-border rounded-t-lg overflow-auto font-mono text-xs leading-5 p-4 min-h-0"
       >
         {filteredLogs.length === 0 ? (
           <div className="text-gray-500 text-center py-8">로그가 없습니다</div>
         ) : (
-          filteredLogs.map((line, i) => (
-            <div
-              key={i}
-              className={`whitespace-pre-wrap ${
-                /error/i.test(line)
-                  ? "text-red-400"
-                  : /warn/i.test(line)
-                    ? "text-yellow-400"
-                    : "text-gray-300"
-              }`}
-            >
-              {line}
-            </div>
-          ))
+          filteredLogs.map((line, i) => {
+            const parsed = parseLine(line);
+            return (
+              <div key={i} className="flex hover:bg-surface-300/50">
+                <span className="text-gray-600 w-10 text-right border-r border-border/50 mr-3 pr-3 shrink-0 select-none">
+                  {i + 1}
+                </span>
+                {parsed.level && (
+                  <span className={`${LEVEL_BADGE[parsed.level]} shrink-0 self-start mr-2`}>
+                    {LEVEL_LABEL[parsed.level]}
+                  </span>
+                )}
+                <span
+                  className={`whitespace-pre-wrap break-all ${
+                    parsed.level === "error"
+                      ? "text-red-400"
+                      : parsed.level === "warn"
+                        ? "text-yellow-400"
+                        : "text-gray-300"
+                  }`}
+                >
+                  {parsed.content}
+                </span>
+              </div>
+            );
+          })
         )}
+      </div>
+
+      {/* 하단 상태바 */}
+      <div className="bg-surface-200 border border-border rounded-b-lg px-4 py-2 flex items-center justify-between -mt-4">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={scrollToTop}
+            className="text-xs text-gray-400 hover:text-gray-200 bg-surface-300 px-2 py-1 rounded border border-border hover:border-gray-500 transition-colors"
+          >
+            처음
+          </button>
+          <button
+            onClick={scrollToBottom}
+            className="text-xs text-gray-400 hover:text-gray-200 bg-surface-300 px-2 py-1 rounded border border-border hover:border-gray-500 transition-colors"
+          >
+            끝
+          </button>
+        </div>
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          <span>라인 {filteredLogs.length}/{logs.length}</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            실시간
+          </span>
+        </div>
       </div>
     </div>
   );

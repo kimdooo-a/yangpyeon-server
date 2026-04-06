@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { ReactNode, useState } from "react";
+import { IconDashboard, IconProcess, IconLog, IconNetwork, IconLogout, IconServer } from "@/components/ui/icons";
 
-const navItems = [
-  { href: "/", label: "대시보드", icon: "📊" },
-  { href: "/processes", label: "프로세스", icon: "⚙️" },
-  { href: "/logs", label: "로그", icon: "📋" },
-  { href: "/network", label: "네트워크", icon: "🌐" },
+const navItems: { href: string; label: string; icon: ReactNode }[] = [
+  { href: "/", label: "대시보드", icon: <IconDashboard size={18} /> },
+  { href: "/processes", label: "프로세스", icon: <IconProcess size={18} /> },
+  { href: "/logs", label: "로그", icon: <IconLog size={18} /> },
+  { href: "/network", label: "네트워크", icon: <IconNetwork size={18} /> },
 ];
 
 export function Sidebar() {
@@ -17,7 +18,7 @@ export function Sidebar() {
 
   const nav = (
     <>
-      <nav className="flex-1 py-2">
+      <nav className="flex-1 py-3 space-y-0.5">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -27,12 +28,12 @@ export function Sidebar() {
               onClick={() => setOpen(false)}
               className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-md text-sm transition-colors ${
                 isActive
-                  ? "bg-surface-400 text-white"
-                  : "text-gray-400 hover:text-white hover:bg-surface-300"
+                  ? "bg-brand/10 text-brand border-l-2 border-brand ml-0 pl-[14px]"
+                  : "text-gray-400 hover:text-gray-200 hover:bg-surface-300 border-l-2 border-transparent ml-0 pl-[14px]"
               }`}
             >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
+              <span className={isActive ? "text-brand" : ""}>{item.icon}</span>
+              <span className="font-medium">{item.label}</span>
             </Link>
           );
         })}
@@ -47,9 +48,10 @@ export function Sidebar() {
             await fetch("/api/auth/logout", { method: "POST" });
             window.location.href = "/login";
           }}
-          className="w-full text-xs text-gray-500 hover:text-gray-300 transition-colors text-left"
+          className="flex items-center gap-2 w-full text-xs text-gray-500 hover:text-gray-300 transition-colors text-left"
         >
-          로그아웃
+          <IconLogout size={14} />
+          <span>로그아웃</span>
         </button>
       </div>
     </>
@@ -79,7 +81,8 @@ export function Sidebar() {
 
       {/* 데스크톱 사이드바 */}
       <aside className="hidden md:flex w-56 bg-surface-200 border-r border-border flex-col">
-        <div className="h-14 flex items-center px-4 border-b border-border">
+        <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
+          <IconServer className="text-brand" size={20} />
           <span className="text-brand font-bold text-lg">양평 부엌</span>
         </div>
         {nav}
@@ -91,7 +94,8 @@ export function Sidebar() {
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="h-14 flex items-center px-4 border-b border-border">
+        <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
+          <IconServer className="text-brand" size={20} />
           <span className="text-brand font-bold text-lg">양평 부엌</span>
         </div>
         {nav}

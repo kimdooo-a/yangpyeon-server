@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { SystemInfo } from "@/components/dashboard/system-info";
 import { MiniChart } from "@/components/dashboard/mini-chart";
+import { PageHeader } from "@/components/ui/page-header";
+import { IconRefresh } from "@/components/ui/icons";
 
 interface DiskInfo {
   mount: string;
@@ -24,6 +26,16 @@ interface SystemData {
   time: string;
 }
 
+interface Pm2Process {
+  name: string;
+  pm_id: number;
+  status: string;
+  cpu: number;
+  memory: number;
+  uptime: number;
+  restarts: number;
+}
+
 const MAX_HISTORY = 20;
 
 function diskColor(percent: number): "brand" | "amber" | "red" {
@@ -32,32 +44,78 @@ function diskColor(percent: number): "brand" | "amber" | "red" {
   return "red";
 }
 
+function diskBarColor(percent: number): string {
+  if (percent < 50) return "bg-brand";
+  if (percent < 80) return "bg-amber-500";
+  return "bg-red-500";
+}
+
+function formatElapsed(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 5) return "방금 전";
+  if (seconds < 60) return `${seconds}초 전`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}분 전`;
+  return `${Math.floor(minutes / 60)}시간 전`;
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<SystemData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [processes, setProcesses] = useState<Pm2Process[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
+  const [elapsed, setElapsed] = useState("—");
   const cpuHistory = useRef<number[]>([]);
   const memHistory = useRef<number[]>([]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const res = await fetch("/api/system");
       if (!res.ok) throw new Error("API 응답 오류");
       const json: SystemData = await res.json();
       setData(json);
       setError(null);
+      setLastUpdated(Date.now());
 
       cpuHistory.current = [...cpuHistory.current, json.cpu.usage].slice(-MAX_HISTORY);
       memHistory.current = [...memHistory.current, json.memory.percent].slice(-MAX_HISTORY);
     } catch (e) {
       setError(e instanceof Error ? e.message : "알 수 없는 오류");
     }
-  };
+  }, []);
 
+  const fetchPm2 = useCallback(async () => {
+    try {
+      const res = await fetch("/api/pm2");
+      if (!res.ok) return;
+      const json = await res.json();
+      setProcesses(json.processes ?? []);
+    } catch {
+      // PM2 fetch 실패는 무시 — 대시보드 주요 기능에 영향 없음
+    }
+  }, []);
+
+  // 시스템 데이터 폴링 (3초)
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]);
+
+  // PM2 데이터 폴링 (3초)
+  useEffect(() => {
+    fetchPm2();
+    const interval = setInterval(fetchPm2, 3000);
+    return () => clearInterval(interval);
+  }, [fetchPm2]);
+
+  // 경과 시간 표시 업데이트 (1초)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (lastUpdated) setElapsed(formatElapsed(Date.now() - lastUpdated));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [lastUpdated]);
 
   if (error) {
     return (
@@ -95,15 +153,27 @@ export default function DashboardPage() {
     return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / (1024 * 1024)).toFixed(0)} MB`;
   };
 
+  const onlineCount = processes.filter((p) => p.status === "online").length;
+  const totalCount = processes.length;
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">대시보드</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          {data.hostname} &middot; {data.time}
-        </p>
-      </div>
+      {/* 헤더 */}
+      <PageHeader
+        title="대시보드"
+        description={`${data.hostname} · ${data.time}`}
+      >
+        <span className="text-xs text-gray-500">{elapsed}</span>
+        <button
+          onClick={() => { fetchData(); fetchPm2(); }}
+          className="p-2 rounded-lg border border-border bg-surface-200 hover:bg-surface-300 transition-colors text-gray-400 hover:text-gray-200"
+          aria-label="새로고침"
+        >
+          <IconRefresh size={16} />
+        </button>
+      </PageHeader>
 
+      {/* 주요 지표 카드 */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           title="CPU 사용률"
@@ -129,25 +199,64 @@ export default function DashboardPage() {
           subtitle={data.platform}
           color="purple"
         />
+        <StatCard
+          title="PM2 프로세스"
+          value={totalCount > 0 ? `${onlineCount} / ${totalCount}` : "—"}
+          subtitle="online"
+          color="brand"
+        />
       </div>
 
+      {/* 디스크 — 수평 바 형태 */}
       <div>
         <h2 className="text-sm font-medium text-gray-400 mb-3">디스크</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="bg-surface-200 border border-border rounded-lg divide-y divide-border">
           {data.disks.map((disk) => (
-            <StatCard
-              key={disk.mount}
-              title={`디스크 ${disk.mount}`}
-              value={formatBytes(disk.used)}
-              subtitle={`${formatBytes(disk.total)} 중 (여유 ${formatBytes(disk.free)})`}
-              percent={disk.percent}
-              color={diskColor(disk.percent)}
-            />
+            <div key={disk.mount} className="flex items-center gap-4 px-5 py-3">
+              <span className="text-sm text-gray-300 w-24 shrink-0 truncate" title={disk.mount}>
+                {disk.mount}
+              </span>
+              <div className="flex-1 h-2 bg-surface-400 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${diskBarColor(disk.percent)}`}
+                  style={{ width: `${disk.percent}%` }}
+                />
+              </div>
+              <span className={`text-sm font-medium w-12 text-right ${
+                disk.percent >= 80 ? "text-red-400" : disk.percent >= 50 ? "text-amber-400" : "text-gray-300"
+              }`}>
+                {disk.percent.toFixed(0)}%
+              </span>
+              <span className="text-xs text-gray-500 w-32 text-right shrink-0">
+                {formatBytes(disk.used)} / {formatBytes(disk.total)}
+              </span>
+            </div>
           ))}
         </div>
       </div>
 
-      <SystemInfo data={data} />
+      {/* 시스템 정보 — 2열 그리드 */}
+      <div>
+        <h2 className="text-sm font-medium text-gray-400 mb-3">시스템 정보</h2>
+        <div className="bg-surface-200 border border-border rounded-lg grid grid-cols-1 md:grid-cols-2">
+          {[
+            { label: "호스트명", value: data.hostname },
+            { label: "플랫폼", value: data.platform },
+            { label: "Node.js", value: data.nodeVersion },
+            { label: "CPU", value: `${data.cpu.model} (${data.cpu.cores}코어)` },
+          ].map((row, idx) => (
+            <div
+              key={row.label}
+              className={`flex justify-between px-5 py-3 text-sm border-border ${
+                idx < 2 ? "md:border-b" : ""
+              } ${idx % 2 === 0 ? "md:border-r" : ""} ${idx < 3 ? "border-b md:border-b-0" : ""} ${idx < 2 ? "border-b" : ""}`}
+            >
+              <span className="text-gray-400">{row.label}</span>
+              <span className="text-gray-200">{row.value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
