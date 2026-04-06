@@ -1,5 +1,5 @@
-// 감사 로그: Edge Runtime 호환 (fs 미사용)
-// 미들웨어에서 인메모리 버퍼에 저장, API로 조회/플러시 가능
+// 감사 로그 — Edge Runtime 호환 (미들웨어에서 사용)
+// DB 관련 코드는 audit-log-db.ts에 분리 (API Route 전용)
 
 export interface AuditEntry {
   timestamp: string;
@@ -8,31 +8,25 @@ export interface AuditEntry {
   ip: string;
   status?: number;
   action?: string;
+  userAgent?: string;
+  detail?: string;
 }
 
-const MAX_ENTRIES = 500;
-const buffer: AuditEntry[] = [];
+// 인메모리 버퍼 (미들웨어에서 기록, API Route에서 flush)
+const MAX_BUFFER = 500;
+export const buffer: AuditEntry[] = [];
 
 /**
- * 감사 로그 기록 (인메모리)
+ * 감사 로그 기록 (인메모리 — 미들웨어에서 호출)
  */
 export function writeAuditLog(entry: AuditEntry): void {
   buffer.push({
     ...entry,
     timestamp: entry.timestamp || new Date().toISOString(),
   });
-
-  // 오래된 엔트리 제거
-  if (buffer.length > MAX_ENTRIES) {
-    buffer.splice(0, buffer.length - MAX_ENTRIES);
+  if (buffer.length > MAX_BUFFER) {
+    buffer.splice(0, buffer.length - MAX_BUFFER);
   }
-}
-
-/**
- * 감사 로그 조회 (최근 N건)
- */
-export function getAuditLogs(limit = 100): AuditEntry[] {
-  return buffer.slice(-limit).reverse();
 }
 
 /**

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { IconSearch, IconRestart, IconStop, IconPlay } from "@/components/ui/icons";
+import { usePm2Action } from "@/hooks/use-pm2-action";
+import { toast } from "sonner";
 
 interface Pm2Process {
   name: string;
@@ -43,7 +45,7 @@ export default function ProcessesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
-  const fetchProcesses = async () => {
+  const fetchProcesses = useCallback(async () => {
     try {
       const res = await fetch("/api/pm2");
       const data = await res.json();
@@ -53,7 +55,9 @@ export default function ProcessesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const { execute: pm2Action, isPending } = usePm2Action({ onSuccess: fetchProcesses });
 
   useEffect(() => {
     fetchProcesses();
@@ -101,18 +105,14 @@ export default function ProcessesPage() {
     }
   };
 
-  const handleAction = async (name: string, action: "restart" | "stop" | "start") => {
-    await fetch(`/api/pm2/${action}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    setTimeout(fetchProcesses, 1000);
-  };
-
   const handleRestartAll = async () => {
-    for (const proc of processes.filter((p) => p.status === "online")) {
-      await handleAction(proc.name, "restart");
+    const onlineProcs = processes.filter((p) => p.status === "online");
+    if (onlineProcs.length === 0) {
+      toast.info("재시작할 프로세스가 없습니다");
+      return;
+    }
+    for (const proc of onlineProcs) {
+      await pm2Action(proc.name, "restart");
     }
   };
 
@@ -234,7 +234,7 @@ export default function ProcessesPage() {
                   <td className="px-5 py-3 text-right">
                     <div className="flex gap-1.5 justify-end">
                       <button
-                        onClick={() => handleAction(proc.name, "restart")}
+                        onClick={() => pm2Action(proc.name, "restart")}
                         title="재시작"
                         className="bg-surface-400 hover:bg-surface-300 border border-border rounded p-1.5 transition-colors"
                       >
@@ -242,7 +242,7 @@ export default function ProcessesPage() {
                       </button>
                       {proc.status === "online" ? (
                         <button
-                          onClick={() => handleAction(proc.name, "stop")}
+                          onClick={() => pm2Action(proc.name, "stop")}
                           title="중지"
                           className="bg-red-900/20 hover:bg-red-900/40 border border-red-800/50 text-red-400 rounded p-1.5 transition-colors"
                         >
@@ -250,7 +250,7 @@ export default function ProcessesPage() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => handleAction(proc.name, "start")}
+                          onClick={() => pm2Action(proc.name, "start")}
                           title="시작"
                           className="bg-emerald-900/20 hover:bg-emerald-900/40 border border-emerald-800/50 text-emerald-400 rounded p-1.5 transition-colors"
                         >

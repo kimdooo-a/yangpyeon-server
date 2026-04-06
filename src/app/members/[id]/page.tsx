@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconRefresh } from "@/components/ui/icons";
+import { toast } from "sonner";
 
 interface MemberDetail {
   id: string;
@@ -41,29 +42,45 @@ export default function MemberDetailPage() {
 
   async function handleToggleActive() {
     if (!member) return;
-    if (member.isActive) {
-      const res = await fetch(`/api/v1/members/${member.id}`, {
-        method: "DELETE",
-      });
-      if (res.ok) fetchMember();
-    } else {
-      const res = await fetch(`/api/v1/members/${member.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: true }),
-      });
-      if (res.ok) fetchMember();
+    const action = member.isActive ? "비활성화" : "활성화";
+    try {
+      const res = member.isActive
+        ? await fetch(`/api/v1/members/${member.id}`, { method: "DELETE" })
+        : await fetch(`/api/v1/members/${member.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isActive: true }),
+          });
+      if (res.ok) {
+        toast.success(`회원 ${action} 완료`);
+        fetchMember();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ?? `${action} 실패`);
+      }
+    } catch {
+      toast.error(`${action} 요청 실패`);
     }
   }
 
   async function handleRoleChange(role: string) {
     if (!member) return;
-    const res = await fetch(`/api/v1/members/${member.id}/role`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role }),
-    });
-    if (res.ok) fetchMember();
+    try {
+      const res = await fetch(`/api/v1/members/${member.id}/role`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (res.ok) {
+        toast.success(`역할이 변경되었습니다`);
+        fetchMember();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error ?? "역할 변경 실패");
+      }
+    } catch {
+      toast.error("역할 변경 요청 실패");
+    }
   }
 
   const roleLabel: Record<string, string> = {
