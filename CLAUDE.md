@@ -42,6 +42,15 @@ CLAUDE.md (루트 — 지금 이 파일)
 │
 ├─→ docs/MASTER-DEV-PLAN.md ··············· 세션별 개발 마스터 계획서 (단일 진실 소스)
 │
+├─→ docs/research/_SPIKE_CLEARANCE.md ···· 스파이크 코딩 허가 레지스트리
+│   └─→ docs/research/decisions/ ········ ADR (Architecture Decision Records)
+│
+├─→ spikes/README.md ····················· 기술 검증 결과 색인 + Quick Reference
+│   ├─→ spike-001-frontend-design/ ······ 프론트엔드 디자인 리서치
+│   ├─→ spike-001-sqlite-drizzle-result.md SQLite+Drizzle 검증
+│   ├─→ spike-002-sse-result.md ········· SSE+Tunnel 검증
+│   └─→ spike-004-shadcn-result.md ······ shadcn/ui 호환 검증
+│
 └─→ docs/commands/_index.md ·············· 명령어 모음 (복사해서 사용)
 ```
 

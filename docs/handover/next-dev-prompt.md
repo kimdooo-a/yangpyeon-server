@@ -49,6 +49,7 @@ docs/guides/server-boot-manual.md                  — 서버 부팅 매뉴얼
 - 세션 3 (2026-04-06): 보안 Wave 2 (Rate Limiting + 감사 로그)
 - 세션 4 (2026-04-06): 프론트엔드 디자인 전면 개선 + ypserver 배포 스킬
 - 세션 5 (2026-04-06): kdywave 종합 분석 + 마스터 개발 계획서 작성
+- 세션 6 (2026-04-06): ypserver 배포 + Zod 검증 + SPIKE 3건 (SQLite/shadcn/SSE) 전부 Go
 
 ## 현재 Git 상태
 
@@ -61,18 +62,21 @@ docs/guides/server-boot-manual.md                  — 서버 부팅 매뉴얼
 
 **마스터 계획서(`docs/MASTER-DEV-PLAN.md`)의 세션 번호를 따라 진행합니다.**
 
-### 세션 5: SPIKE 기술 검증 (다음 세션)
-- [ ] SPIKE-01: SQLite + Drizzle + Next.js 빌드 검증 (2h)
-- [ ] SPIKE-04: shadcn/ui 기존 테마 호환 (1h) — SPIKE-01과 병렬
-- [ ] SPIKE-02: SSE + Cloudflare Tunnel 통과 (1h)
+### ~~세션 5: SPIKE 기술 검증~~ — 세션 6에서 완료
+- [x] SPIKE-01: SQLite + Drizzle → Go (`spikes/spike-001-sqlite-drizzle-result.md`)
+- [x] SPIKE-04: shadcn/ui → Go (`spikes/spike-004-shadcn-result.md`)
+- [x] SPIKE-02: SSE + Tunnel → Go (`spikes/spike-002-sse-result.md`)
 
-### 세션 6: Phase 11a+11b — Zod + 토스트
-- [ ] 전체 API route에 Zod 스키마 적용
-- [ ] Sonner 토스트 알림 시스템
+### ~~Phase 11a: Zod~~ — 세션 6에서 완료
+- [x] 전체 API route에 Zod 스키마 적용 (`src/lib/schemas.ts`)
 
-### 세션 7: Phase 11d+11e — SQLite + 감사 로그 영속화
-- [ ] SQLite + Drizzle 도입 (3 테이블)
-- [ ] 감사 로그 인메모리 → DB 전환
+### 다음: Phase 11b — Sonner 토스트
+- [ ] Sonner 설치 + `<Toaster />` 레이아웃 추가
+- [ ] PM2 액션 시 성공/실패 토스트
+
+### 다음: Phase 11d+11e — SQLite + 감사 로그 영속화
+- [ ] 감사 로그 인메모리 → DB 전환 (DB 스키마+연결은 SPIKE-01에서 이미 구축)
+- [ ] 메트릭 히스토리 수집 로직
 
 > 전체 로드맵: 세션 5~18, 총 14 세션 계획  
 > 상세: `docs/MASTER-DEV-PLAN.md` 참조

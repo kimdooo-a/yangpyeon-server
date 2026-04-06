@@ -23,6 +23,7 @@
 | 3 | [260406-session3-security-wave2.md](./260406-session3-security-wave2.md) | 보안 Wave 2 (Rate Limiting + 감사 로그) |
 | 4 | [260406-session4-frontend-design.md](./260406-session4-frontend-design.md) | 프론트엔드 디자인 전면 개선 + ypserver 배포 스킬 |
 | 5 | [260406-session5-master-plan.md](./260406-session5-master-plan.md) | kdywave 종합 분석 + 마스터 개발 계획서 |
+| 6 | [260406-session6-spike-zod.md](./260406-session6-spike-zod.md) | ypserver 배포 + Zod + SPIKE 3건 기술 검증 |
 
 ---
 
