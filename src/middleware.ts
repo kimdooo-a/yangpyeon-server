@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
+import { isIpAllowed } from "@/lib/ip-whitelist-cache";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -40,6 +41,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // IP 화이트리스트 검사 (캐시 기반, Edge 호환)
+  if (!isIpAllowed(ip)) {
+    writeAuditLog({
+      timestamp: new Date().toISOString(),
+      method: request.method,
+      path: pathname,
+      ip,
+      status: 403,
+      action: "IP_BLOCKED",
+    });
+    return NextResponse.json(
+      { error: "접근이 차단된 IP입니다" },
+      { status: 403 }
+    );
+  }
+
   // 공개 경로: 인증 불필요하지만 Rate Limit은 적용
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p);
 
@@ -53,12 +70,49 @@ export async function middleware(request: NextRequest) {
         return redirectToLogin(request);
       }
 
+      let jwtPayload;
       try {
         const secret = process.env.AUTH_SECRET;
         if (!secret) return redirectToLogin(request);
-        await jwtVerify(token, new TextEncoder().encode(secret));
+        const { payload } = await jwtVerify(
+          token,
+          new TextEncoder().encode(secret),
+        );
+        jwtPayload = payload;
       } catch {
         return redirectToLogin(request);
+      }
+
+      // 역할 기반 접근 제어
+      // 레거시 쿠키(role 없음)는 ADMIN으로 간주 (30일 전환 기간)
+      const role = (jwtPayload.role as string) ?? "ADMIN";
+
+      // ADMIN 전용 라우트 (POST만 제한, GET 조회는 허용)
+      const ADMIN_ONLY_PATHS = [
+        "/api/pm2/",     // PM2 액션 (POST만)
+        "/api/settings/", // 설정 API
+        "/audit",         // 감사 로그 페이지
+        "/settings/",     // 설정 페이지
+      ];
+
+      const isAdminOnlyPath = ADMIN_ONLY_PATHS.some((p) =>
+        pathname.startsWith(p),
+      );
+
+      if (isAdminOnlyPath && role !== "ADMIN") {
+        // PM2 GET 요청은 viewer도 허용 (프로세스 목록 조회 등)
+        const isPm2GetRequest =
+          pathname.startsWith("/api/pm2/") && request.method === "GET";
+
+        if (!isPm2GetRequest) {
+          if (pathname.startsWith("/api/")) {
+            return NextResponse.json(
+              { error: "관리자 권한 필요" },
+              { status: 403 },
+            );
+          }
+          return NextResponse.redirect(new URL("/", request.url));
+        }
       }
     }
   }

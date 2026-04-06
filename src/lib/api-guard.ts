@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { verifyAccessToken, type AccessTokenPayload } from "@/lib/jwt-v1";
 import { errorResponse } from "@/lib/api-response";
+import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/client";
 
 export type AuthenticatedHandler = (
@@ -28,10 +29,16 @@ async function checkDashboardSession(
 
   try {
     await jwtVerify(token, new TextEncoder().encode(secret));
+    // DB에서 실제 ADMIN 사용자 조회
+    const admin = await prisma.user.findFirst({
+      where: { role: "ADMIN", isActive: true },
+      select: { id: true, email: true, role: true },
+    });
+    if (!admin) return null;
     return {
-      sub: "dashboard-admin",
-      email: "admin@dashboard",
-      role: "ADMIN" as Role,
+      sub: admin.id,
+      email: admin.email,
+      role: admin.role as Role,
       type: "access",
     };
   } catch {

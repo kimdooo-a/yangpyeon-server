@@ -21,8 +21,8 @@ function TopoNode({
 }) {
   return (
     <div className="bg-surface-300 border border-border rounded-lg px-4 py-3 text-center min-w-[120px] shrink-0">
-      <div className="flex justify-center mb-1.5 text-gray-300">{icon}</div>
-      <p className="font-medium text-sm text-gray-200">{label}</p>
+      <div className="flex justify-center mb-1.5 text-gray-700">{icon}</div>
+      <p className="font-medium text-sm text-gray-800">{label}</p>
       {details.map((d, i) => (
         <p key={i} className="text-[11px] text-gray-500 leading-tight mt-0.5">
           {d}
@@ -90,19 +90,19 @@ export default function NetworkPage() {
               <span
                 className={`w-3 h-3 rounded-full ${
                   tunnel.running
-                    ? "bg-emerald-400 animate-pulse"
-                    : "bg-red-400"
+                    ? "bg-emerald-500 animate-pulse"
+                    : "bg-red-500"
                 }`}
               />
               <span
                 className={`text-lg font-semibold ${
-                  tunnel.running ? "text-emerald-400" : "text-red-400"
+                  tunnel.running ? "text-emerald-600" : "text-red-600"
                 }`}
               >
                 {tunnel.running ? "연결됨" : "연결 끊김"}
               </span>
             </div>
-            <p className="text-sm text-gray-400 mt-2">
+            <p className="text-sm text-gray-500 mt-2">
               프로세스: {tunnel.connections}
             </p>
           </div>
@@ -118,7 +118,7 @@ export default function NetworkPage() {
             >
               stylelucky4u.com
             </a>
-            <p className="text-sm text-emerald-400 mt-2 flex items-center gap-1">
+            <p className="text-sm text-emerald-600 mt-2 flex items-center gap-1">
               <svg
                 width="14"
                 height="14"
@@ -231,20 +231,20 @@ export default function NetworkPage() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 divide-border">
           <div className="px-5 py-3 text-sm flex justify-between md:border-r md:border-border">
-            <span className="text-gray-400">프로토콜</span>
-            <span className="text-gray-200">QUIC</span>
+            <span className="text-gray-500">프로토콜</span>
+            <span className="text-gray-800">QUIC</span>
           </div>
           <div className="px-5 py-3 text-sm flex justify-between">
-            <span className="text-gray-400">포트</span>
-            <span className="text-gray-200">3000</span>
+            <span className="text-gray-500">포트</span>
+            <span className="text-gray-800">3000</span>
           </div>
           <div className="px-5 py-3 text-sm flex justify-between md:border-r md:border-border md:border-t">
-            <span className="text-gray-400">리전</span>
-            <span className="text-gray-200">ICN (인천)</span>
+            <span className="text-gray-500">리전</span>
+            <span className="text-gray-800">ICN (인천)</span>
           </div>
           <div className="px-5 py-3 text-sm flex justify-between md:border-t md:border-border">
-            <span className="text-gray-400">TLS</span>
-            <span className="text-gray-200">Cloudflare Edge 종단</span>
+            <span className="text-gray-500">TLS</span>
+            <span className="text-gray-800">Cloudflare Edge 종단</span>
           </div>
         </div>
       </div>

@@ -148,11 +148,11 @@ const nextConfig = {
 
 #### 세션 5 완료 기준
 
-- [ ] SPIKE-01 결과 기록 (성공/실패 + 발견 사항)
-- [ ] SPIKE-04 결과 기록
-- [ ] SPIKE-02 결과 기록
-- [ ] `spike/` 디렉토리 정리 (프로덕션 코드 아님)
-- [ ] next.config.ts에 필요한 설정 메모
+- [x] SPIKE-01 결과 기록 (성공 — `spikes/spike-001-sqlite-drizzle-result.md`)
+- [x] SPIKE-04 결과 기록 (성공 — `spikes/spike-004-shadcn-result.md`)
+- [x] SPIKE-02 결과 기록 (성공 — `spikes/spike-002-sse-result.md`)
+- [x] `spike/` 디렉토리 정리 → `spikes/` + `docs/research/`로 관리
+- [x] next.config.ts: `serverExternalPackages: ['better-sqlite3']`
 
 #### 세션 5 인수인계 포인트
 
@@ -256,10 +256,10 @@ src/components/logs/log-filters.tsx  ← 필터 패널
 
 #### 세션 6 완료 기준
 
-- [ ] 모든 API Route에 Zod 스키마 적용
-- [ ] 잘못된 입력에 400 응답 반환
-- [ ] PM2 액션 시 로딩/성공/실패 토스트
-- [ ] `npm run build` 통과
+- [x] 모든 API Route에 Zod 스키마 적용
+- [x] 잘못된 입력에 400 응답 반환
+- [x] PM2 액션 시 로딩/성공/실패 토스트
+- [x] `npm run build` 통과
 - [ ] (선택) 로그 다운로드 TXT/JSON
 
 ---
@@ -330,10 +330,10 @@ src/app/api/audit/route.ts           ← DB 쿼리로 교체
 
 #### 세션 7 완료 기준
 
-- [ ] `data/dashboard.db` 파일 생성
-- [ ] `audit_logs`, `metrics_history`, `ip_whitelist` 테이블 존재
-- [ ] PM2 재시작 후 감사 로그 유지
-- [ ] `npm run build` 통과
+- [x] `data/dashboard.db` 파일 생성
+- [x] `audit_logs`, `metrics_history`, `ip_whitelist` 테이블 존재
+- [x] PM2 재시작 후 감사 로그 유지
+- [x] `npm run build` 통과
 
 ---
 
@@ -393,11 +393,11 @@ src/components/charts/
 
 #### 세션 8 완료 기준
 
-- [ ] IP 화이트리스트 CRUD 동작
-- [ ] 미허용 IP → 403 응답
-- [ ] 메트릭 1분마다 DB 저장
-- [ ] `/metrics` 차트 페이지 동작
-- [ ] 시간 범위 전환 (1h/24h/7d/30d)
+- [x] IP 화이트리스트 CRUD 동작
+- [x] 미허용 IP → 403 응답
+- [x] 메트릭 1분마다 DB 저장
+- [x] `/metrics` 차트 페이지 동작
+- [x] 시간 범위 전환 (1h/24h/7d/30d)
 
 ---
 
@@ -445,12 +445,12 @@ return new Response(stream, {
 
 #### 세션 9 완료 기준
 
-- [ ] 대시보드 메트릭 SSE 실시간 업데이트
-- [ ] PM2 프로세스 상태 실시간
-- [ ] 로그 실시간 테일링
-- [ ] 연결 상태 인디케이터 (헤더에 녹/회 점)
-- [ ] Cloudflare Tunnel 경유 정상 동작
-- [ ] PM2 재시작 시 자동 재연결
+- [x] 대시보드 메트릭 SSE 실시간 업데이트
+- [x] PM2 프로세스 상태 실시간
+- [x] 로그 실시간 테일링
+- [x] 연결 상태 인디케이터 (헤더에 녹/회 점)
+- [ ] Cloudflare Tunnel 경유 정상 동작 (배포 후 검증 필요)
+- [x] PM2 재시작 시 자동 재연결 (use-sse 폴백)
 
 ---
 
@@ -506,11 +506,11 @@ src/components/settings/env-editor.tsx ← Key-Value 편집기
 
 #### 세션 10 완료 기준
 
-- [ ] 감사 로그 테이블 페이지네이션 (50개씩)
-- [ ] 액션/결과/IP/기간 필터
-- [ ] CSV 내보내기
-- [ ] 환경변수 목록 조회 (마스킹)
-- [ ] 환경변수 추가/수정
+- [x] 감사 로그 테이블 페이지네이션 (50개씩)
+- [x] 액션/결과/IP/기간 필터
+- [x] CSV 내보내기
+- [x] 환경변수 목록 조회 (마스킹)
+- [x] 환경변수 추가/수정
 
 ---
 
@@ -571,11 +571,11 @@ src/app/api/users/route.ts          ← 신규: 사용자 CRUD (admin only)
 
 #### 세션 11 완료 기준
 
-- [ ] bcrypt 기반 DB 인증 동작
-- [ ] admin 계정 자동 마이그레이션
-- [ ] 비밀번호 변경 API
-- [ ] viewer 계정 생성/로그인
-- [ ] viewer → PM2 액션 시 403
+- [x] bcrypt 기반 DB 인증 동작 (PostgreSQL User + Prisma)
+- [x] admin 계정: kimdooo@stylelucky4u.com (DB 직접 삽입)
+- [x] 비밀번호 변경 API (/api/v1/auth/password)
+- [x] viewer 계정 생성/로그인 (/settings/users)
+- [x] viewer → PM2 액션 시 403 (미들웨어 ADMIN_ONLY_PATHS)
 
 ---
 
@@ -618,10 +618,10 @@ src/components/ui/empty-state.tsx    ← 신규: 빈 상태 공통 컴포넌트
 
 #### 세션 12 완료 기준
 
-- [ ] Cmd+K / Ctrl+K 동작
-- [ ] 명령어 타이핑 필터링
-- [ ] 모든 데이터 로딩 시 스켈레톤
-- [ ] 빈 상태 메시지
+- [x] Cmd+K / Ctrl+K 동작
+- [x] 명령어 타이핑 필터링
+- [ ] 모든 데이터 로딩 시 스켈레톤 (보류 — 테마 작업 후 진행)
+- [ ] 빈 상태 메시지 (보류)
 
 ---
 

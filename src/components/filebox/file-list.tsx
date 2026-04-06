@@ -41,14 +41,14 @@ export function FileList({ files, onDelete }: FileListProps) {
       {files.map((file) => (
         <div
           key={file.id}
-          className={`group flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-surface-300/50 transition-colors ${
+          className={`group flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-surface-300 transition-colors ${
             deletingId === file.id ? "opacity-50" : ""
           }`}
         >
           <FileTypeIcon mimeType={file.mimeType} size={28} />
-          <span className="text-sm text-gray-200 flex-1 truncate">{file.originalName}</span>
-          <span className="text-xs text-gray-600 hidden sm:block w-16 text-right">{formatBytes(file.size)}</span>
-          <span className="text-xs text-gray-600 hidden sm:block w-20 text-right">
+          <span className="text-sm text-gray-800 flex-1 truncate">{file.originalName}</span>
+          <span className="text-xs text-gray-400 hidden sm:block w-16 text-right">{formatBytes(file.size)}</span>
+          <span className="text-xs text-gray-400 hidden sm:block w-20 text-right">
             {new Date(file.createdAt).toLocaleDateString("ko")}
           </span>
 
@@ -69,7 +69,7 @@ export function FileList({ files, onDelete }: FileListProps) {
             <button
               onClick={() => handleDelete(file.id, file.originalName)}
               disabled={deletingId === file.id}
-              className="p-1.5 rounded text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+              className="p-1.5 rounded text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
               title="삭제"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

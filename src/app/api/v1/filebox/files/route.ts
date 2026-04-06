@@ -33,7 +33,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   }
 
   try {
-    const metadata = await uploadFile(file, folderId, user.sub);
+    const metadata = await uploadFile(file, folderId, user.sub, user.role);
     return successResponse(metadata, 201);
   } catch (err) {
     const message = err instanceof Error ? err.message : "업로드 실패";

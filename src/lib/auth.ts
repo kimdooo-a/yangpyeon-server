@@ -4,6 +4,14 @@ import { cookies } from "next/headers";
 const COOKIE_NAME = "dashboard_session";
 const MAX_AGE = 60 * 60 * 24; // 24시간
 
+/** 대시보드 세션 JWT 페이로드 */
+export interface DashboardSessionPayload {
+  sub: string;
+  email: string;
+  role: string;
+  authenticated: true; // 하위호환
+}
+
 function getSecret() {
   const secret = process.env.AUTH_SECRET;
   if (!secret || secret.length < 16) {
@@ -12,8 +20,16 @@ function getSecret() {
   return new TextEncoder().encode(secret);
 }
 
-export async function createSession(): Promise<string> {
-  const token = await new SignJWT({ authenticated: true })
+/**
+ * 대시보드 세션 JWT 생성
+ * @param payload - sub, email, role 포함
+ */
+export async function createSession(payload: {
+  sub: string;
+  email: string;
+  role: string;
+}): Promise<string> {
+  const token = await new SignJWT({ ...payload, authenticated: true })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${MAX_AGE}s`)
@@ -22,19 +38,32 @@ export async function createSession(): Promise<string> {
   return token;
 }
 
-export async function verifySession(token: string): Promise<boolean> {
+/**
+ * 대시보드 세션 JWT 검증 및 페이로드 반환
+ * 레거시 토큰(role 없음)은 role="ADMIN"으로 간주 (30일 전환 기간)
+ */
+export async function verifySession(
+  token: string,
+): Promise<DashboardSessionPayload | null> {
   try {
-    await jwtVerify(token, getSecret());
-    return true;
+    const { payload } = await jwtVerify(token, getSecret());
+
+    // 레거시 쿠키 하위호환: role 없으면 ADMIN으로 간주
+    return {
+      sub: (payload.sub as string) ?? "legacy",
+      email: (payload.email as string) ?? "admin",
+      role: (payload.role as string) ?? "ADMIN",
+      authenticated: true,
+    };
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function getSessionFromCookies(): Promise<boolean> {
+export async function getSessionFromCookies(): Promise<DashboardSessionPayload | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(COOKIE_NAME)?.value;
-  if (!token) return false;
+  if (!token) return null;
   return verifySession(token);
 }
 

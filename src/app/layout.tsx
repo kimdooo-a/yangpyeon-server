@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/sidebar";
+import { Shell } from "@/components/layout/shell";
+import { CommandMenu } from "@/components/command-menu";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 import { Toaster } from "sonner";
@@ -10,6 +11,7 @@ const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 export const metadata: Metadata = {
   title: "양평 부엌 서버",
   description: "서버 관리 대시보드",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({
@@ -18,20 +20,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko" className={cn("dark", "font-sans", geist.variable)}>
-      <body className="flex h-screen overflow-hidden relative">
-        <Sidebar />
-        <main className="flex-1 overflow-auto bg-surface-100 pt-14 md:pt-0">
-          {children}
-        </main>
+    <html lang="ko" className={cn("font-sans", geist.variable)}>
+      <body className="flex h-screen overflow-hidden relative bg-surface-100 text-foreground">
+        <Shell>{children}</Shell>
+        <CommandMenu />
         <Toaster
-          theme="dark"
+          theme="light"
           position="bottom-right"
           toastOptions={{
             style: {
-              background: "#1c1c1c",
-              border: "1px solid #2e2e2e",
-              color: "#ededed",
+              background: "#FFFFFF",
+              border: "1px solid #E2DDD4",
+              color: "#1A1815",
             },
           }}
         />

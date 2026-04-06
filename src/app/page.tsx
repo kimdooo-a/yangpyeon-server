@@ -6,6 +6,8 @@ import { SystemInfo } from "@/components/dashboard/system-info";
 import { MiniChart } from "@/components/dashboard/mini-chart";
 import { PageHeader } from "@/components/ui/page-header";
 import { IconRefresh } from "@/components/ui/icons";
+import { SseIndicator } from "@/components/ui/sse-indicator";
+import { useSse } from "@/hooks/use-sse";
 
 interface DiskInfo {
   mount: string;
@@ -38,12 +40,6 @@ interface Pm2Process {
 
 const MAX_HISTORY = 20;
 
-function diskColor(percent: number): "brand" | "amber" | "red" {
-  if (percent < 50) return "brand";
-  if (percent < 80) return "amber";
-  return "red";
-}
-
 function diskBarColor(percent: number): string {
   if (percent < 50) return "bg-brand";
   if (percent < 80) return "bg-amber-500";
@@ -68,6 +64,7 @@ export default function DashboardPage() {
   const cpuHistory = useRef<number[]>([]);
   const memHistory = useRef<number[]>([]);
 
+  // 폴백용 fetch 함수 (SSE 연결 실패 시 사용)
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch("/api/system");
@@ -95,19 +92,29 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // 시스템 데이터 폴링 (3초)
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 3000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+  // 시스템 메트릭 SSE 구독
+  const { status: metricsStatus, reconnect: reconnectMetrics } = useSse<SystemData>({
+    url: "/api/sse/metrics",
+    onMessage: (json) => {
+      setData(json);
+      setError(null);
+      setLastUpdated(Date.now());
+      cpuHistory.current = [...cpuHistory.current, json.cpu.usage].slice(-MAX_HISTORY);
+      memHistory.current = [...memHistory.current, json.memory.percent].slice(-MAX_HISTORY);
+    },
+    fallbackFn: fetchData,
+    fallbackInterval: 5000,
+  });
 
-  // PM2 데이터 폴링 (3초)
-  useEffect(() => {
-    fetchPm2();
-    const interval = setInterval(fetchPm2, 3000);
-    return () => clearInterval(interval);
-  }, [fetchPm2]);
+  // PM2 프로세스 SSE 구독
+  const { status: pm2Status } = useSse<{ processes: Pm2Process[] }>({
+    url: "/api/sse/pm2",
+    onMessage: (json) => {
+      setProcesses(json.processes ?? []);
+    },
+    fallbackFn: fetchPm2,
+    fallbackInterval: 5000,
+  });
 
   // 경과 시간 표시 업데이트 (1초)
   useEffect(() => {
@@ -120,7 +127,7 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="bg-red-900/30 border border-red-800 rounded-lg p-4 text-red-300">
+        <div className="bg-red-50 border border-red-800 rounded-lg p-4 text-red-700">
           서버 연결 오류: {error}
         </div>
       </div>
@@ -163,10 +170,11 @@ export default function DashboardPage() {
         title="대시보드"
         description={`${data.hostname} · ${data.time}`}
       >
+        <SseIndicator status={metricsStatus} />
         <span className="text-xs text-gray-500">{elapsed}</span>
         <button
-          onClick={() => { fetchData(); fetchPm2(); }}
-          className="p-2 rounded-lg border border-border bg-surface-200 hover:bg-surface-300 transition-colors text-gray-400 hover:text-gray-200"
+          onClick={() => { reconnectMetrics(); fetchPm2(); }}
+          className="p-2 rounded-lg border border-border bg-surface-200 hover:bg-surface-300 transition-colors text-gray-500 hover:text-gray-800"
           aria-label="새로고침"
         >
           <IconRefresh size={16} />
@@ -209,11 +217,11 @@ export default function DashboardPage() {
 
       {/* 디스크 — 수평 바 형태 */}
       <div>
-        <h2 className="text-sm font-medium text-gray-400 mb-3">디스크</h2>
+        <h2 className="text-sm font-medium text-gray-500 mb-3">디스크</h2>
         <div className="bg-surface-200 border border-border rounded-lg divide-y divide-border">
           {data.disks.map((disk) => (
             <div key={disk.mount} className="flex items-center gap-4 px-5 py-3">
-              <span className="text-sm text-gray-300 w-24 shrink-0 truncate" title={disk.mount}>
+              <span className="text-sm text-gray-700 w-24 shrink-0 truncate" title={disk.mount}>
                 {disk.mount}
               </span>
               <div className="flex-1 h-2 bg-surface-400 rounded-full overflow-hidden">
@@ -223,7 +231,7 @@ export default function DashboardPage() {
                 />
               </div>
               <span className={`text-sm font-medium w-12 text-right ${
-                disk.percent >= 80 ? "text-red-400" : disk.percent >= 50 ? "text-amber-400" : "text-gray-300"
+                disk.percent >= 80 ? "text-red-600" : disk.percent >= 50 ? "text-amber-400" : "text-gray-700"
               }`}>
                 {disk.percent.toFixed(0)}%
               </span>
@@ -237,7 +245,7 @@ export default function DashboardPage() {
 
       {/* 시스템 정보 — 2열 그리드 */}
       <div>
-        <h2 className="text-sm font-medium text-gray-400 mb-3">시스템 정보</h2>
+        <h2 className="text-sm font-medium text-gray-500 mb-3">시스템 정보</h2>
         <div className="bg-surface-200 border border-border rounded-lg grid grid-cols-1 md:grid-cols-2">
           {[
             { label: "호스트명", value: data.hostname },
@@ -251,8 +259,8 @@ export default function DashboardPage() {
                 idx < 2 ? "md:border-b" : ""
               } ${idx % 2 === 0 ? "md:border-r" : ""} ${idx < 3 ? "border-b md:border-b-0" : ""} ${idx < 2 ? "border-b" : ""}`}
             >
-              <span className="text-gray-400">{row.label}</span>
-              <span className="text-gray-200">{row.value}</span>
+              <span className="text-gray-500">{row.label}</span>
+              <span className="text-gray-800">{row.value}</span>
             </div>
           ))}
         </div>

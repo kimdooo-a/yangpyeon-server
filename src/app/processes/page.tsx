@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { IconSearch, IconRestart, IconStop, IconPlay } from "@/components/ui/icons";
+import { SseIndicator } from "@/components/ui/sse-indicator";
 import { usePm2Action } from "@/hooks/use-pm2-action";
+import { useSse } from "@/hooks/use-sse";
 import { toast } from "sonner";
 
 interface Pm2Process {
@@ -45,6 +47,7 @@ export default function ProcessesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
+  // 폴백용 fetch 함수 (SSE 연결 실패 시 사용)
   const fetchProcesses = useCallback(async () => {
     try {
       const res = await fetch("/api/pm2");
@@ -59,11 +62,16 @@ export default function ProcessesPage() {
 
   const { execute: pm2Action, isPending } = usePm2Action({ onSuccess: fetchProcesses });
 
-  useEffect(() => {
-    fetchProcesses();
-    const interval = setInterval(fetchProcesses, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  // PM2 프로세스 SSE 구독
+  const { status: sseStatus } = useSse<{ processes: Pm2Process[] }>({
+    url: "/api/sse/pm2",
+    onMessage: (data) => {
+      setProcesses(data.processes ?? []);
+      setLoading(false);
+    },
+    fallbackFn: fetchProcesses,
+    fallbackInterval: 5000,
+  });
 
   // 요약 카드 수치 계산
   const counts = useMemo(() => {
@@ -98,10 +106,10 @@ export default function ProcessesPage() {
 
   const statusColor = (status: string) => {
     switch (status) {
-      case "online": return "text-emerald-400";
+      case "online": return "text-emerald-600";
       case "stopped": return "text-gray-500";
-      case "errored": return "text-red-400";
-      default: return "text-yellow-400";
+      case "errored": return "text-red-600";
+      default: return "text-yellow-600";
     }
   };
 
@@ -131,16 +139,17 @@ export default function ProcessesPage() {
 
   // 요약 카드 데이터
   const summaryCards: { label: string; value: number; filter: StatusFilter; color: string }[] = [
-    { label: "전체", value: counts.total, filter: "all", color: "text-gray-100" },
-    { label: "Online", value: counts.online, filter: "online", color: "text-emerald-400" },
+    { label: "전체", value: counts.total, filter: "all", color: "text-gray-900" },
+    { label: "Online", value: counts.online, filter: "online", color: "text-emerald-600" },
     { label: "Stopped", value: counts.stopped, filter: "stopped", color: "text-gray-500" },
-    { label: "Error", value: counts.errored, filter: "errored", color: "text-red-400" },
+    { label: "Error", value: counts.errored, filter: "errored", color: "text-red-600" },
   ];
 
   return (
     <div className="p-6 space-y-6">
       {/* 1. PageHeader + 모두 재시작 버튼 */}
       <PageHeader title="PM2 프로세스" description="프로세스 관리 및 모니터링">
+        <SseIndicator status={sseStatus} />
         <button
           onClick={handleRestartAll}
           className="px-3 py-1.5 text-sm bg-surface-300 hover:bg-surface-400 border border-border rounded transition-colors"
@@ -195,7 +204,7 @@ export default function ProcessesPage() {
       <div className="bg-surface-200 border border-border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border text-gray-400">
+            <tr className="border-b border-border text-gray-500">
               <th className="text-left px-5 py-3 font-medium">이름</th>
               <th className="text-left px-5 py-3 font-medium">상태</th>
               <th className="text-right px-5 py-3 font-medium">CPU</th>
@@ -227,10 +236,10 @@ export default function ProcessesPage() {
                   <td className="px-5 py-3">
                     <StatusBadge status={proc.status} />
                   </td>
-                  <td className="px-5 py-3 text-right text-gray-300">{proc.cpu}%</td>
-                  <td className="px-5 py-3 text-right text-gray-300">{formatMemory(proc.memory)}</td>
-                  <td className="px-5 py-3 text-right text-gray-300">{formatUptime(proc.uptime)}</td>
-                  <td className="px-5 py-3 text-right text-gray-300">{proc.restarts}</td>
+                  <td className="px-5 py-3 text-right text-gray-700">{proc.cpu}%</td>
+                  <td className="px-5 py-3 text-right text-gray-700">{formatMemory(proc.memory)}</td>
+                  <td className="px-5 py-3 text-right text-gray-700">{formatUptime(proc.uptime)}</td>
+                  <td className="px-5 py-3 text-right text-gray-700">{proc.restarts}</td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex gap-1.5 justify-end">
                       <button
@@ -244,7 +253,7 @@ export default function ProcessesPage() {
                         <button
                           onClick={() => pm2Action(proc.name, "stop")}
                           title="중지"
-                          className="bg-red-900/20 hover:bg-red-900/40 border border-red-800/50 text-red-400 rounded p-1.5 transition-colors"
+                          className="bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded p-1.5 transition-colors"
                         >
                           <IconStop size={14} />
                         </button>
@@ -252,7 +261,7 @@ export default function ProcessesPage() {
                         <button
                           onClick={() => pm2Action(proc.name, "start")}
                           title="시작"
-                          className="bg-emerald-900/20 hover:bg-emerald-900/40 border border-emerald-800/50 text-emerald-400 rounded p-1.5 transition-colors"
+                          className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-600 rounded p-1.5 transition-colors"
                         >
                           <IconPlay size={14} />
                         </button>
@@ -268,10 +277,10 @@ export default function ProcessesPage() {
 
       {/* 상세 정보 모달 */}
       {(detail || detailLoading) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setDetail(null); setDetailLoading(false); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={() => { setDetail(null); setDetailLoading(false); }}>
           <div className="bg-surface-200 border border-border rounded-lg w-full max-w-lg mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             {detailLoading ? (
-              <div className="p-8 text-center text-gray-400">로딩 중...</div>
+              <div className="p-8 text-center text-gray-500">로딩 중...</div>
             ) : detail ? (
               <>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -279,7 +288,7 @@ export default function ProcessesPage() {
                     <h3 className="text-lg font-bold">{detail.name}</h3>
                     <span className={`text-xs ${statusColor(detail.status)}`}>{detail.status}</span>
                   </div>
-                  <button onClick={() => setDetail(null)} className="text-gray-500 hover:text-white text-xl leading-none">&times;</button>
+                  <button onClick={() => setDetail(null)} className="text-gray-500 hover:text-gray-900 text-xl leading-none">&times;</button>
                 </div>
                 <div className="p-5 space-y-3 text-sm max-h-96 overflow-auto">
                   {[
@@ -298,8 +307,8 @@ export default function ProcessesPage() {
                     ["생성일", detail.created_at],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between gap-4">
-                      <span className="text-gray-400 shrink-0">{label}</span>
-                      <span className="text-gray-200 text-right break-all">{value || "-"}</span>
+                      <span className="text-gray-500 shrink-0">{label}</span>
+                      <span className="text-gray-800 text-right break-all">{value || "-"}</span>
                     </div>
                   ))}
                 </div>

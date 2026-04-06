@@ -67,9 +67,18 @@ export async function POST(request: NextRequest) {
   // 성공: 실패 카운터 초기화
   loginAttempts.delete(ip);
 
-  const token = await createSession();
+  // 레거시 비밀번호 로그인: ADMIN 역할로 세션 발급
+  const token = await createSession({
+    sub: "legacy",
+    email: "admin",
+    role: "ADMIN",
+  });
 
-  const response = NextResponse.json({ success: true });
+  const response = NextResponse.json({
+    success: true,
+    deprecated: true,
+    message: "이메일 로그인으로 전환하세요",
+  });
   response.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

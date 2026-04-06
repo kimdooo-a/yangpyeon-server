@@ -4,10 +4,10 @@ interface StatusBadgeProps {
 }
 
 const statusStyles: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  online: { bg: "bg-emerald-900/30", text: "text-emerald-400", dot: "bg-emerald-400", label: "online" },
-  stopped: { bg: "bg-gray-800/50", text: "text-gray-400", dot: "bg-gray-500", label: "stopped" },
-  errored: { bg: "bg-red-900/30", text: "text-red-400", dot: "bg-red-400", label: "errored" },
-  launching: { bg: "bg-yellow-900/30", text: "text-yellow-400", dot: "bg-yellow-400", label: "launching" },
+  online: { bg: "bg-emerald-50", text: "text-emerald-600", dot: "bg-emerald-500", label: "online" },
+  stopped: { bg: "bg-gray-100", text: "text-gray-500", dot: "bg-gray-400", label: "stopped" },
+  errored: { bg: "bg-red-50", text: "text-red-600", dot: "bg-red-500", label: "errored" },
+  launching: { bg: "bg-yellow-50", text: "text-yellow-600", dot: "bg-yellow-500", label: "launching" },
 };
 
 export function StatusBadge({ status, size = "sm" }: StatusBadgeProps) {
