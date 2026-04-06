@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { PageHeader } from "@/components/ui/page-header";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { IconSearch, IconRestart, IconStop, IconPlay } from "@/components/ui/icons";
 
 interface Pm2Process {
   name: string;
@@ -30,11 +33,15 @@ interface ProcessDetail {
   created_at: string;
 }
 
+type StatusFilter = "all" | "online" | "stopped" | "errored";
+
 export default function ProcessesPage() {
   const [processes, setProcesses] = useState<Pm2Process[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<ProcessDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   const fetchProcesses = async () => {
     try {
@@ -53,6 +60,24 @@ export default function ProcessesPage() {
     const interval = setInterval(fetchProcesses, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // 요약 카드 수치 계산
+  const counts = useMemo(() => {
+    const total = processes.length;
+    const online = processes.filter((p) => p.status === "online").length;
+    const stopped = processes.filter((p) => p.status === "stopped").length;
+    const errored = processes.filter((p) => p.status === "errored").length;
+    return { total, online, stopped, errored };
+  }, [processes]);
+
+  // 검색 + 상태 필터 적용
+  const filtered = useMemo(() => {
+    return processes.filter((p) => {
+      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
+      const matchStatus = statusFilter === "all" || p.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [processes, search, statusFilter]);
 
   const formatUptime = (ms: number) => {
     const hours = Math.floor(ms / 3600000);
@@ -76,15 +101,6 @@ export default function ProcessesPage() {
     }
   };
 
-  const statusDot = (status: string) => {
-    switch (status) {
-      case "online": return "bg-emerald-400";
-      case "stopped": return "bg-gray-500";
-      case "errored": return "bg-red-400";
-      default: return "bg-yellow-400";
-    }
-  };
-
   const handleAction = async (name: string, action: "restart" | "stop" | "start") => {
     await fetch(`/api/pm2/${action}`, {
       method: "POST",
@@ -92,6 +108,12 @@ export default function ProcessesPage() {
       body: JSON.stringify({ name }),
     });
     setTimeout(fetchProcesses, 1000);
+  };
+
+  const handleRestartAll = async () => {
+    for (const proc of processes.filter((p) => p.status === "online")) {
+      await handleAction(proc.name, "restart");
+    }
   };
 
   const openDetail = async (name: string) => {
@@ -107,13 +129,69 @@ export default function ProcessesPage() {
     }
   };
 
+  // 요약 카드 데이터
+  const summaryCards: { label: string; value: number; filter: StatusFilter; color: string }[] = [
+    { label: "전체", value: counts.total, filter: "all", color: "text-gray-100" },
+    { label: "Online", value: counts.online, filter: "online", color: "text-emerald-400" },
+    { label: "Stopped", value: counts.stopped, filter: "stopped", color: "text-gray-500" },
+    { label: "Error", value: counts.errored, filter: "errored", color: "text-red-400" },
+  ];
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">PM2 프로세스</h1>
-        <p className="text-gray-500 text-sm mt-1">프로세스 관리 및 모니터링</p>
+      {/* 1. PageHeader + 모두 재시작 버튼 */}
+      <PageHeader title="PM2 프로세스" description="프로세스 관리 및 모니터링">
+        <button
+          onClick={handleRestartAll}
+          className="px-3 py-1.5 text-sm bg-surface-300 hover:bg-surface-400 border border-border rounded transition-colors"
+        >
+          모두 재시작
+        </button>
+      </PageHeader>
+
+      {/* 2. 요약 카드 4개 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {summaryCards.map((card) => (
+          <button
+            key={card.filter}
+            onClick={() => setStatusFilter(card.filter === statusFilter ? "all" : card.filter)}
+            className={`bg-surface-200 border rounded-lg p-4 text-left transition-colors ${
+              statusFilter === card.filter && statusFilter !== "all"
+                ? "border-brand"
+                : "border-border hover:border-gray-600"
+            }`}
+          >
+            <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+            <p className="text-xs text-gray-500 mt-1">{card.label}</p>
+          </button>
+        ))}
       </div>
 
+      {/* 3. 검색 + 필터 툴바 */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="relative">
+          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+          <input
+            type="text"
+            placeholder="프로세스 검색..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-3 py-1.5 text-sm bg-surface-200 border border-border rounded focus:outline-none focus:border-brand transition-colors w-56"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          className="px-3 py-1.5 text-sm bg-surface-200 border border-border rounded focus:outline-none focus:border-brand transition-colors"
+        >
+          <option value="all">전체 상태</option>
+          <option value="online">online</option>
+          <option value="stopped">stopped</option>
+          <option value="errored">errored</option>
+        </select>
+      </div>
+
+      {/* 4. 테이블 */}
       <div className="bg-surface-200 border border-border rounded-lg overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -132,12 +210,14 @@ export default function ProcessesPage() {
               <tr>
                 <td colSpan={7} className="px-5 py-8 text-center text-gray-500">로딩 중...</td>
               </tr>
-            ) : processes.length === 0 ? (
+            ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">실행 중인 프로세스가 없습니다</td>
+                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
+                  {processes.length === 0 ? "실행 중인 프로세스가 없습니다" : "검색 결과가 없습니다"}
+                </td>
               </tr>
             ) : (
-              processes.map((proc) => (
+              filtered.map((proc) => (
                 <tr key={proc.pm_id} className="border-b border-border hover:bg-surface-300 transition-colors">
                   <td className="px-5 py-3">
                     <button onClick={() => openDetail(proc.name)} className="font-medium text-brand hover:underline">
@@ -145,36 +225,36 @@ export default function ProcessesPage() {
                     </button>
                   </td>
                   <td className="px-5 py-3">
-                    <span className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${statusDot(proc.status)}`} />
-                      <span className={statusColor(proc.status)}>{proc.status}</span>
-                    </span>
+                    <StatusBadge status={proc.status} />
                   </td>
                   <td className="px-5 py-3 text-right text-gray-300">{proc.cpu}%</td>
                   <td className="px-5 py-3 text-right text-gray-300">{formatMemory(proc.memory)}</td>
                   <td className="px-5 py-3 text-right text-gray-300">{formatUptime(proc.uptime)}</td>
                   <td className="px-5 py-3 text-right text-gray-300">{proc.restarts}</td>
                   <td className="px-5 py-3 text-right">
-                    <div className="flex gap-2 justify-end">
+                    <div className="flex gap-1.5 justify-end">
                       <button
                         onClick={() => handleAction(proc.name, "restart")}
-                        className="px-2.5 py-1 text-xs bg-surface-400 hover:bg-surface-300 border border-border rounded transition-colors"
+                        title="재시작"
+                        className="bg-surface-400 hover:bg-surface-300 border border-border rounded p-1.5 transition-colors"
                       >
-                        재시작
+                        <IconRestart size={14} />
                       </button>
                       {proc.status === "online" ? (
                         <button
                           onClick={() => handleAction(proc.name, "stop")}
-                          className="px-2.5 py-1 text-xs bg-red-900/30 hover:bg-red-900/50 border border-red-800/50 text-red-300 rounded transition-colors"
+                          title="중지"
+                          className="bg-red-900/20 hover:bg-red-900/40 border border-red-800/50 text-red-400 rounded p-1.5 transition-colors"
                         >
-                          중지
+                          <IconStop size={14} />
                         </button>
                       ) : (
                         <button
                           onClick={() => handleAction(proc.name, "start")}
-                          className="px-2.5 py-1 text-xs bg-emerald-900/30 hover:bg-emerald-900/50 border border-emerald-800/50 text-emerald-300 rounded transition-colors"
+                          title="시작"
+                          className="bg-emerald-900/20 hover:bg-emerald-900/40 border border-emerald-800/50 text-emerald-400 rounded p-1.5 transition-colors"
                         >
-                          시작
+                          <IconPlay size={14} />
                         </button>
                       )}
                     </div>

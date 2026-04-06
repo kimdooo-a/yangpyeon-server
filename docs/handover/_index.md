@@ -20,6 +20,8 @@
 |------|------|-----------|
 | 1 | [250406-session1-init-security.md](./250406-session1-init-security.md) | 초기화 + 대시보드 v1 + 보안 Wave 1 |
 | 2 | [260406-session2-dashboard-improve.md](./260406-session2-dashboard-improve.md) | 대시보드 기능 개선 (그래프, 모달, 검색, 반응형) |
+| 3 | [260406-session3-security-wave2.md](./260406-session3-security-wave2.md) | 보안 Wave 2 (Rate Limiting + 감사 로그) |
+| 4 | [260406-session4-frontend-design.md](./260406-session4-frontend-design.md) | 프론트엔드 디자인 전면 개선 + ypserver 배포 스킬 |
 
 ---
 
