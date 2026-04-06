@@ -22,9 +22,9 @@
 - [x] Phase 8: 보안 Wave 1 (인증, 명령어 주입 방지, CORS/CSRF, 보안 헤더)
 - [x] Phase 9: 대시보드 기능 개선 (그래프, 프로세스 모달, 로그 검색, 반응형 사이드바)
 - [x] Phase 9b: 프론트엔드 디자인 전면 개선 (5개 페이지 + 공통 컴포넌트 + 사이드바)
-- [ ] Phase 9c: 추가 개선 (네트워크 트래픽, 알림 페이지) ← **다음 작업**
+- [ ] Phase 9c: 추가 개선 (네트워크 트래픽, 알림 페이지)
 - [x] Phase 10: 보안 Wave 2 (Rate Limiting, 감사 로그) — Zod는 다음 세션
-- [ ] Phase 11: Zod 입력 검증 (전체 API 일괄 적용)
+- [ ] Phase 11~15: **마스터 계획서 작성 완료** → [docs/MASTER-DEV-PLAN.md](../MASTER-DEV-PLAN.md) ← **다음: 세션 5(SPIKE 검증)부터**
 
 ## 실행 방법
 
@@ -54,6 +54,7 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 2 | 2026-04-06 | 대시보드 기능 개선 (그래프, 모달, 검색, 반응형) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session2-dashboard-improve.md) |
 | 3 | 2026-04-06 | 보안 Wave 2 (Rate Limiting + 감사 로그) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session3-security-wave2.md) |
 | 4 | 2026-04-06 | 프론트엔드 디자인 전면 개선 + ypserver 배포 스킬 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session4-frontend-design.md) |
+| 5 | 2026-04-06 | kdywave 종합 분석 + 마스터 개발 계획서 작성 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260406-session5-master-plan.md) |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수
