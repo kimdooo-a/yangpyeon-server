@@ -46,22 +46,36 @@ async function checkDashboardSession(
   }
 }
 
+async function runHandler(
+  handler: AuthenticatedHandler,
+  request: NextRequest,
+  user: AccessTokenPayload,
+  context?: { params: Promise<Record<string, string>> }
+): Promise<Response> {
+  try {
+    return await handler(request, user, context);
+  } catch (err) {
+    if (err instanceof Error && err.name === "StaleSessionError") {
+      return errorResponse("STALE_SESSION", err.message, 401);
+    }
+    throw err;
+  }
+}
+
 export function withAuth(handler: AuthenticatedHandler) {
   return async (
     request: NextRequest,
     context?: { params: Promise<Record<string, string>> }
   ) => {
-    // 1. Bearer Token 확인
     const bearerToken = extractBearerToken(request);
     if (bearerToken) {
       const payload = await verifyAccessToken(bearerToken);
-      if (payload) return handler(request, payload, context);
+      if (payload) return runHandler(handler, request, payload, context);
       return errorResponse("INVALID_TOKEN", "유효하지 않은 토큰입니다", 401);
     }
 
-    // 2. 대시보드 쿠키 세션 fallback
     const dashboardUser = await checkDashboardSession(request);
-    if (dashboardUser) return handler(request, dashboardUser, context);
+    if (dashboardUser) return runHandler(handler, request, dashboardUser, context);
 
     return errorResponse("UNAUTHORIZED", "인증 토큰이 필요합니다", 401);
   };
