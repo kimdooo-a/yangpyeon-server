@@ -32,8 +32,10 @@ npm run dev
 docs/MASTER-DEV-PLAN.md                              — 세션별 개발 마스터 계획서 (단일 진실 소스)
 CLAUDE.md                                            — 프로젝트 규칙 + 문서 트리
 docs/status/current.md                               — 현재 상태 + 세션 요약표
-docs/handover/260412-session18-auth-refactor.md      — 최신 인수인계서 (세션 18) ⭐
-docs/handover/260412-session17-monaco-xyflow.md      — 직전 인수인계서 (세션 17)
+docs/handover/260412-session19-ops-security-hardening.md — 최신 인수인계서 (세션 19) ⭐
+docs/handover/phase-14b-crud-prompt.md               — Phase 14b CRUD 전용 상세 프롬프트 ⭐
+docs/handover/260412-session18-auth-refactor.md      — 세션 18 인수인계서
+docs/handover/260412-session17-monaco-xyflow.md      — 세션 17 인수인계서
 docs/handover/260412-session16-supabase-deploy.md    — 세션 16
 docs/handover/260412-session15-supabase-clone.md     — 세션 15
 docs/references/_SUPABASE_TECH_MAP.md                — Supabase 이식 기술 매핑
@@ -56,7 +58,13 @@ docs/solutions/2026-04-12-*.md                       — 세션 17 Compound Know
 - 세션 15: Supabase 관리 체계 이식 — Phase A(리서치 23문서) + Phase B(Prisma +7 모델, 11 P0 모듈 55 파일)
 - 세션 16: 세션 15 프로덕션 배포 — 마이그레이션 + `app_readonly` PG 롤 + monaco/xyflow/elkjs 설치 + Cloudflare Tunnel PM2 등록
 - 세션 17: SQL Editor Monaco 치환 + Schema Visualizer xyflow/elkjs 치환 + 12 P0 Playwright E2E (콘솔 에러 0건) + `FROM "User"` → `FROM users` 수정
-- **세션 18 (최신)**: **근본 auth 아키텍처 재설계** + 기술부채 정리 + **Phase 14a Table Editor** (11 커밋)
+- **세션 19 (최신)**: **세션 18 후속 — 운영/보안 잔가지 정리** (5 커밋, `dec6abe..ae07e67`)
+  - auth-guard API `request` 필수화 + AUTH_FAILED/FORBIDDEN 감사 로그 자동 기록
+  - `src/instrumentation.ts`에 `data/` 선제 `mkdirSync` 추가 — SQLite cold start 로그 노이즈 제거
+  - Table Editor 프로덕션 E2E S1/S3~S6 실행 — 6 injection 벡터 + 4 write vector 전부 차단 확인
+  - `docs/handover/phase-14b-crud-prompt.md` — 다음 세션(Phase 14b CRUD) 자기완결형 프롬프트
+  - npm audit moderate 9 비익스플로이트 분류, Turbopack NFT 경고 구조적 한계 cosmetic 확정
+- **세션 18**: **근본 auth 아키텍처 재설계** + 기술부채 정리 + **Phase 14a Table Editor** (11 커밋)
   - `middleware.ts` → `proxy.ts` (Next.js 16 + **CVE-2025-29927 구조적 방어**)
   - `(protected)` 라우트 그룹 + Layout `requireSession`/`requireRole` 재검증 (15 페이지 git mv)
   - 쿠키 Route Handler 8개에 `requireSessionApi`/`requireRoleApi` 배선
@@ -105,18 +113,25 @@ Server Component / Route Handler
 ```
 브랜치: main
 리모트: origin → https://github.com/kimdooo-a/yangpyeon-server.git
-최신: 77be0fe (세션 18 푸시 완료)
+최신: ae07e67 (세션 19 푸시 완료)
 ```
+
+## 배포 상태 주의 ⚠️
+
+- **원격 main**: `ae07e67` (세션 19)
+- **프로덕션(WSL2 PM2)**: `0e59be0` (세션 18 종료) — 세션 19 커밋 미반영
+- **다음 세션 시작 시**: `/ypserver` 스킬로 배포해야 auth-guard 감사 로그 + data/ mkdir 반영됨
 
 ## 추천 다음 작업
 
-### 즉시 가능 (세션 18 후속)
-1. **Table Editor 브라우저 E2E** — 로그인 후 `/tables` → 각 테이블 페이지네이션/정렬/빈 상태 수동 검증
-2. **Phase 14b CRUD 에디터** — `/api/v1/tables/[table]` POST/PUT/DELETE. `app_readonly` 해제 전략 설계 필요 (별도 RW 롤 or session-scoped transaction)
-3. **Phase 15b Webhook/Alert 완성** — 세션 15 스캐폴드 → 이벤트 트리거 + 시그니처 검증 + 재전송 로직
-4. **Turbopack NFT 경고 완전 제거** — `outputFileTracingExcludes` 적용 후에도 경고 잔존 → `turbopackIgnore` 주석 또는 pgdump 동적 require
-5. **data/ 디렉터리 PM2 pre-start mkdir** — cold start 누적 에러 로그 제거
-6. **auth-guard 감사 로그** — `requireSessionApi`/`requireRoleApi` 실패 시 `writeAuditLog({action:"AUTH_FAILED"/"FORBIDDEN"})` 추가
+### 즉시 가능 (세션 19 후속)
+1. **세션 19 커밋 배포** — `/ypserver` 스킬로 WSL2 PM2 재빌드. 배포 후 `/audit` 페이지에서 비로그인 `fetch('/api/settings/users')` 시도해 AUTH_FAILED 기록 확인
+2. **Phase 14b CRUD 에디터** — ⭐ `docs/handover/phase-14b-crud-prompt.md` 참조. 새 터미널 세션 권장. superpowers:brainstorming → writing-plans → executing-plans 체인
+3. **VIEWER 테스트 계정 생성** — S2 시나리오 + Phase 14b 권한 매트릭스 검증용
+4. **Phase 15b Webhook/Alert 완성** — 세션 15 스캐폴드 → 이벤트 트리거 + 시그니처 검증 + 재전송 로직
+5. **테이블 목록 행 수 정확화 (cosmetic)** — 현재 "행 ~-1" 표시. `information_schema.reltuples` 또는 `COUNT(*)` 전환
+6. **identifier regex 길이 제한 (cosmetic)** — `^[a-zA-Z_][a-zA-Z0-9_]{0,62}$`로 PG 최대 63자 적용
+7. **S7 PM2 로그 검증** — WSL2에서 `pm2 logs yp-dashboard --lines 200 | grep "SET LOCAL ROLE"` 수행
 
 ### 완료된 범위 (참고)
 - Phase 1~13 전부 완료
@@ -140,6 +155,9 @@ Server Component / Route Handler
 - ~~middleware 경고~~ → 세션 18에서 proxy.ts 전환 완료
 - ~~Cron 부트스트랩 지연~~ → 세션 18에서 `src/instrumentation.ts`로 PM2 기동 즉시 tick
 - ~~`npm audit` HIGH~~ → 세션 18에서 next 16.2.3으로 해결
+- ~~`data/` cold start 노이즈~~ → 세션 19에서 `instrumentation.register()`가 `mkdirSync` 선제 수행
+- ~~auth 실패 감사 로그 부재~~ → 세션 19에서 `requireSessionApi`/`requireRoleApi`가 AUTH_FAILED/FORBIDDEN 자동 기록
+- ~~`npm audit` moderate 9~~ → 세션 19에서 현 배포 비익스플로이트 분류 완료 (monaco 커스텀 provider 0건, @prisma/dev/drizzle-kit dev-only)
 - **proxy.ts `runtime` 선언 금지**: Next.js 16 `proxy.ts`는 암시적 Node.js 런타임. `export const runtime = "nodejs"` 등 route segment config 선언 시 빌드 오류. 주석으로 대체
 - **Route Handler에서 쿠키 읽기 안전**: CVE-2025-29927은 middleware 레벨의 `x-middleware-subrequest` 헤더 우회 버그. Route Handler의 `request.cookies`/`cookies()`는 영향권 밖 — api-guard cookie fallback은 구조적으로 안전
 - **레거시 인증 30일 전환**: `verifySession`에서 role 없는 구형 JWT → ADMIN 간주. 전환 기간 종료 시 제거 예정 (`DASHBOARD_PASSWORD` fallback 포함)
