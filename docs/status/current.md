@@ -88,6 +88,7 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 17 | 2026-04-12 | SQL Editor Monaco 치환 + Schema Visualizer xyflow/elkjs 치환 + 12 P0 페이지 Playwright E2E (기본 쿼리 오류 1건 부수 수정) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session17-monaco-xyflow.md) |
 | 18 | 2026-04-12 | 근본 auth 재설계 (middleware→proxy + CVE-2025-29927 방어 + authZ 버그 수정) + 기술부채 정리 (NFT/audit/cron) + Phase 14a Table Editor | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session18-auth-refactor.md) |
 | 19 | 2026-04-12 | 세션 18 후속 — auth-guard 감사 로그 + instrumentation data/ mkdir + Table Editor 프로덕션 E2E + Phase 14b CRUD 프롬프트 + NFT/audit 분류 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session19-ops-security-hardening.md) |
+| 20 | 2026-04-12 | Phase 14b 설계 체인 — brainstorming(D1~D5 + 추가 3건 합의) → ADR-003 → 실행 계획(12 Task × 5 커밋, 구현 전 단계 완료) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session20-phase-14b-design.md) |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수
@@ -98,6 +99,8 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 - ~~Turbopack NFT 경고~~ — 세션 19에서 구조적 한계로 확정(cosmetic). `outputFileTracingExcludes`로 번들 제외는 유지, `paths.ts` 분리로 download 라우트 trace 범위 축소
 - ~~`npm audit` 11건~~ — 세션 19에서 잔여 9 moderate 현 배포 비익스플로이트 분류 완료 (monaco는 커스텀 hover/completion provider 0건, @prisma/dev dev-only, drizzle-kit devDeps)
 - **세션 19 주의**: auth-guard API 변경으로 `requireSessionApi(request)` / `requireRoleApi(request, role)` 시그니처 — 신규 쿠키 기반 라우트 추가 시 `request` 필수. 감사 로그(AUTH_FAILED/FORBIDDEN) 자동 기록
+- **세션 20 (Phase 14b 설계 완료, 구현 미착수)**: ADR-003 + 실행 계획 확정. D1~D5 + 추가 3건 합의 — 민감 테이블 차단 목록(`users`/`api_keys`/`_prisma_migrations` + `edge_function_runs` DELETE-only), 모달 집중 UI, DB 영속 감사 로그, `runReadwrite` fail-closed, 3상태 폼 입력. **다음 세션은 executing-plans로 C1~C5 순차 실행 — C1(SQL 롤) WSL2 psql 수동 적용 → 코드 배포 순서 준수** (코드 선행 시 CRUD가 fail-closed 500)
+- **프로젝트 단위 테스트 부재 주의**: Vitest 등 단위 러너 미설치. 신규 유틸(`identifier`/`coerce`/`table-policy`)은 curl 통합 + 브라우저 수동 E2E로 검증. 후속 세션에서 Vitest 도입 시 ADR-003 §5 재활성화
 - **세션 18 주의**: Next.js 16 proxy.ts는 암시적 Node.js 런타임 — `export const runtime = "nodejs"` 선언 금지 (빌드 오류)
 - **세션 18 주의**: Route Handler에서 `request.cookies`/`cookies()` 직접 읽기는 CVE-2025-29927 영향권 밖 (middleware 레벨 헤더 우회 버그). 쿠키 fallback은 안전하며 authZ는 실제 세션 주체 기반으로 수행
 - Windows `next build` — `lightningcss-win32-x64-msvc` optional bin 미설치로 불가. WSL2 빌드가 진실 소스라 영향 없으나, `/ypserver` Phase 1이 항상 실패하므로 스킬 보강 필요 (세션 17)
