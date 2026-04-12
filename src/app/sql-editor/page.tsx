@@ -1,14 +1,19 @@
 "use client";
 
-/**
- * 세션 14: SQL Editor
- * TODO: 추후 monaco-editor로 textarea 대체
- */
-
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import type { SqlRunResult } from "@/lib/types/supabase-clone";
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-56 items-center justify-center rounded-lg border border-border bg-surface-200 text-xs text-gray-500">
+      에디터 로딩 중...
+    </div>
+  ),
+});
 
 interface SavedQuery {
   id: string;
@@ -20,7 +25,7 @@ interface SavedQuery {
 }
 
 export default function SqlEditorPage() {
-  const [sql, setSql] = useState<string>("SELECT id, email, role FROM \"User\" LIMIT 20;");
+  const [sql, setSql] = useState<string>("SELECT id, email, role FROM users LIMIT 20;");
   const [result, setResult] = useState<SqlRunResult | null>(null);
   const [running, setRunning] = useState(false);
   const [savedQueries, setSavedQueries] = useState<SavedQuery[]>([]);
@@ -112,22 +117,44 @@ export default function SqlEditorPage() {
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
         {/* 좌측: 에디터 + 결과 */}
         <div className="flex flex-col gap-4">
-          {/* TODO: monaco-editor 설치 후 교체 */}
-          <textarea
-            value={sql}
-            onChange={(e) => setSql(e.target.value)}
-            className="w-full h-56 p-3 bg-surface-200 border border-border rounded-lg text-sm font-mono text-gray-800 focus:outline-none focus:border-brand resize-y"
-            placeholder="SELECT ... FROM ... WHERE ..."
-            spellCheck={false}
-          />
+          <div className="h-64 overflow-hidden rounded-lg border border-border bg-surface-200">
+            <MonacoEditor
+              height="100%"
+              defaultLanguage="sql"
+              value={sql}
+              onChange={(value) => setSql(value ?? "")}
+              theme="vs"
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                lineNumbers: "on",
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                wordWrap: "on",
+                tabSize: 2,
+                renderLineHighlight: "line",
+                padding: { top: 8, bottom: 8 },
+              }}
+              onMount={(editor, monaco) => {
+                editor.addCommand(
+                  monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+                  () => {
+                    document.getElementById("sql-execute-btn")?.click();
+                  },
+                );
+              }}
+            />
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
+              id="sql-execute-btn"
               onClick={execute}
               disabled={running}
               className="px-4 py-2 bg-brand text-white rounded hover:bg-brand/90 disabled:opacity-50 text-sm"
+              title="Ctrl/Cmd + Enter로 실행"
             >
-              {running ? "실행 중..." : "실행"}
+              {running ? "실행 중..." : "실행 (⌘+⏎)"}
             </button>
             <input
               type="text"

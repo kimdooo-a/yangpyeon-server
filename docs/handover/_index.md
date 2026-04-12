@@ -18,6 +18,8 @@
 
 | 세션 | 파일 | 주요 작업 |
 |------|------|-----------|
+| 17 | [260412-session17-monaco-xyflow.md](./260412-session17-monaco-xyflow.md) | SQL Editor Monaco 치환 + Schema Visualizer xyflow/elkjs 치환 + 12 P0 페이지 Playwright E2E + 기본 쿼리 오류 부수 수정 |
+| 16 | [260412-session16-supabase-deploy.md](./260412-session16-supabase-deploy.md) | 세션 15 배포 (마이그레이션 적용 + app_readonly 롤 + UI 패키지) + 레거시 에러 2건 수정 + Cloudflare Tunnel PM2 복구 |
 | 15 | [260412-session15-supabase-clone.md](./260412-session15-supabase-clone.md) | Supabase 관리 체계 이식 — Phase A 리서치(23문서) + Phase B 11 P0 모듈 병렬 구현(55 파일) + Prisma +7 모델 |
 | 14 | [260412-session14-phase13d-complete.md](./260412-session14-phase13d-complete.md) | 중단 터미널 3개 복구 + Phase 13d 완료 (9개 페이지 스켈레톤 + EmptyState) |
 

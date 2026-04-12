@@ -40,6 +40,7 @@
 - [ ] Phase 14~15: 데이터 관리 + 자율 운영 → [docs/MASTER-DEV-PLAN.md](../MASTER-DEV-PLAN.md)
 - [x] Phase 14-S (세션 15): Supabase 관리 체계 이식 Phase A+B — Prisma +7 모델, 11 P0 모듈(/sql-editor, /database/schema, /data-api, /database/{webhooks,cron,backups}, /functions, /realtime, /advisors/{security,performance}, /settings/{api-keys,log-drains}) 스캐폴드.
 - [x] Phase 14-S 배포 (세션 16): Prisma 증분 마이그레이션 적용(`20260412120000_supabase_clone_session_14`), `app_readonly` PG 롤 + SELECT 권한, `.env`에 `ENABLE_DB_BACKUPS=true`, monaco/xyflow/elkjs 설치, 12개 신규 페이지 HTTP 307 smoke 통과, 레거시 런타임 에러 2건(감사 로그 디렉토리, 스테일 세션 FK) 수정, Cloudflare Tunnel PM2 등록.
+- [x] Phase 14-S UI 고도화 (세션 17): SQL Editor `textarea` → Monaco(dynamic, Ctrl+Enter), Schema Visualizer 카드 그리드 → xyflow + elkjs layered(RIGHT) 자동 레이아웃, Playwright로 12 P0 페이지 E2E 0 에러 검증, 기본 쿼리 `"User"` → `users` 부수 수정.
 
 ## 실행 방법
 
@@ -81,6 +82,7 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 14 | 2026-04-12 | 중단 터미널 3개 복구 + Phase 13d 완료 (9개 페이지 스켈레톤+EmptyState) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session14-phase13d-complete.md) |
 | 15 | 2026-04-12 | Supabase 관리 체계 이식 — 리서치+문서화 + 11 P0 모듈 병렬 구현 (55 신규 파일) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session15-supabase-clone.md) |
 | 16 | 2026-04-12 | 세션 15 배포(마이그레이션 적용 + app_readonly 롤 + UI 패키지) + 레거시 에러 2건 수정 + Cloudflare Tunnel 복구 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session16-supabase-deploy.md) |
+| 17 | 2026-04-12 | SQL Editor Monaco 치환 + Schema Visualizer xyflow/elkjs 치환 + 12 P0 페이지 Playwright E2E (기본 쿼리 오류 1건 부수 수정) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session17-monaco-xyflow.md) |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수
@@ -89,3 +91,4 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 - CPU 사용률 0% 표시 이슈 (순간 스냅샷, 평균 계산 로직 필요) — 미니 그래프로 추이 확인 가능해짐
 - ~~Cloudflare Tunnel: WSL 재시작 시 수동 시작 필요~~ — 세션 16에서 PM2로 등록 (`pm2 start cloudflared -- tunnel run`), `pm2 save`로 dump 저장
 - Turbopack NFT 경고(`next.config.ts` → `pgdump.ts` 트레이스), `npm audit` 11건(moderate 10, high 1) — 차기 세션 정리 대상
+- Windows `next build` — `lightningcss-win32-x64-msvc` optional bin 미설치로 불가. WSL2 빌드가 진실 소스라 영향 없으나, `/ypserver` Phase 1이 항상 실패하므로 스킬 보강 필요 (세션 17)
