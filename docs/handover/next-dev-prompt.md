@@ -32,8 +32,11 @@ npm run dev
 docs/MASTER-DEV-PLAN.md                              — 세션별 개발 마스터 계획서 (단일 진실 소스)
 CLAUDE.md                                            — 프로젝트 규칙 + 문서 트리
 docs/status/current.md                               — 현재 상태 + 세션 요약표
-docs/handover/260412-session19-ops-security-hardening.md — 최신 인수인계서 (세션 19) ⭐
-docs/handover/phase-14b-crud-prompt.md               — Phase 14b CRUD 전용 상세 프롬프트 ⭐
+docs/handover/260412-session20-phase-14b-design.md   — 최신 인수인계서 (세션 20, Phase 14b 설계 완료) ⭐
+docs/research/decisions/ADR-003-phase-14b-table-editor-crud.md — Phase 14b 설계 결정 ⭐
+docs/research/plans/phase-14b-table-editor-crud-plan.md         — Phase 14b 실행 계획 (12 Task × 5 커밋) ⭐
+docs/handover/260412-session19-ops-security-hardening.md — 세션 19 인수인계서
+docs/handover/phase-14b-crud-prompt.md               — Phase 14b CRUD 원본 프롬프트 (세션 19 작성)
 docs/handover/260412-session18-auth-refactor.md      — 세션 18 인수인계서
 docs/handover/260412-session17-monaco-xyflow.md      — 세션 17 인수인계서
 docs/handover/260412-session16-supabase-deploy.md    — 세션 16
@@ -58,7 +61,13 @@ docs/solutions/2026-04-12-*.md                       — 세션 17 Compound Know
 - 세션 15: Supabase 관리 체계 이식 — Phase A(리서치 23문서) + Phase B(Prisma +7 모델, 11 P0 모듈 55 파일)
 - 세션 16: 세션 15 프로덕션 배포 — 마이그레이션 + `app_readonly` PG 롤 + monaco/xyflow/elkjs 설치 + Cloudflare Tunnel PM2 등록
 - 세션 17: SQL Editor Monaco 치환 + Schema Visualizer xyflow/elkjs 치환 + 12 P0 Playwright E2E (콘솔 에러 0건) + `FROM "User"` → `FROM users` 수정
-- **세션 19 (최신)**: **세션 18 후속 — 운영/보안 잔가지 정리** (5 커밋, `dec6abe..ae07e67`)
+- **세션 20 (최신)**: **Phase 14b 설계 체인 — brainstorming → ADR → 실행 계획** (2 커밋, `d9d059b..10c5065`, 코드 변경 0)
+  - Brainstorming D1~D5 + 추가 3건 합의 — 민감 테이블(users/api_keys/_prisma_migrations 차단 + edge_function_runs DELETE-only) / 모달 집중 UI / DB 영속 감사 로그 / runReadwrite fail-closed / 3상태 폼 입력
+  - `docs/research/decisions/ADR-003-phase-14b-table-editor-crud.md` (206줄)
+  - `docs/research/plans/phase-14b-table-editor-crud-plan.md` (1,689줄, 12 Task × 5 커밋 경계 + 각 Task 완전 코드 블록)
+  - Vitest 미설치 현실 반영 — tsc + curl + 브라우저 수동 E2E로 검증 전략 재편
+  - 커밋 `10c5065`에 세션 19 pre-staged 8건(handover 세션19/solutions 2건/index/next-prompt/current/logs/journal) 스윕 포함 — 내용 회귀 없음
+- **세션 19**: **세션 18 후속 — 운영/보안 잔가지 정리** (5 커밋, `dec6abe..ae07e67`)
   - auth-guard API `request` 필수화 + AUTH_FAILED/FORBIDDEN 감사 로그 자동 기록
   - `src/instrumentation.ts`에 `data/` 선제 `mkdirSync` 추가 — SQLite cold start 로그 노이즈 제거
   - Table Editor 프로덕션 E2E S1/S3~S6 실행 — 6 injection 벡터 + 4 write vector 전부 차단 확인
@@ -113,20 +122,23 @@ Server Component / Route Handler
 ```
 브랜치: main
 리모트: origin → https://github.com/kimdooo-a/yangpyeon-server.git
-최신: ae07e67 (세션 19 푸시 완료)
+로컬 HEAD: 10c5065 (세션 20 계획서) — 푸시 상태는 /cs 5단계 결과 참조
 ```
 
 ## 배포 상태 주의 ⚠️
 
-- **원격 main**: `ae07e67` (세션 19)
-- **프로덕션(WSL2 PM2)**: `0e59be0` (세션 18 종료) — 세션 19 커밋 미반영
-- **다음 세션 시작 시**: `/ypserver` 스킬로 배포해야 auth-guard 감사 로그 + data/ mkdir 반영됨
+- **원격 main**: `ae07e67` (세션 19) + 세션 20 커밋 2건 푸시 대기
+- **프로덕션(WSL2 PM2)**: `0e59be0` (세션 18 종료) — 세션 19 + 세션 20 커밋 모두 미반영
+- **다음 세션 Phase 14b 구현 시**: C5(WSL2 빌드) 한 번에 세션 19(auth-guard 감사 로그 + data/ mkdir) + Phase 14b(CRUD) 동시 반영됨
+- **C1 먼저 수행 필수**: `scripts/sql/create-app-readwrite.sql`를 WSL2 `psql -f`로 수동 적용. 코드 선행 배포 시 `runReadwrite` fail-closed로 CRUD 전부 500
 
 ## 추천 다음 작업
 
-### 즉시 가능 (세션 19 후속)
-1. **세션 19 커밋 배포** — `/ypserver` 스킬로 WSL2 PM2 재빌드. 배포 후 `/audit` 페이지에서 비로그인 `fetch('/api/settings/users')` 시도해 AUTH_FAILED 기록 확인
-2. **Phase 14b CRUD 에디터** — ⭐ `docs/handover/phase-14b-crud-prompt.md` 참조. 새 터미널 세션 권장. superpowers:brainstorming → writing-plans → executing-plans 체인
+### 즉시 가능 (세션 20 후속)
+1. **Phase 14b 구현 착수** — ⭐ 설계·계획 완료 상태. `docs/research/plans/phase-14b-table-editor-crud-plan.md`의 Task 1(C1 SQL 롤)부터 순차 실행. 진입 방법:
+   - `superpowers:subagent-driven-development` — Task별 신선한 서브에이전트 발사 (권장)
+   - `superpowers:executing-plans` — 현 세션에서 배치 실행 (체크포인트 단위 리뷰)
+2. **세션 19 + Phase 14b 누적 배포** — Phase 14b C5 단계에서 `/ypserver` 한 번에 세션 19(auth-guard 감사 로그 + data/ mkdir) + Phase 14b CRUD 동시 반영. 별도 배포 불필요
 3. **VIEWER 테스트 계정 생성** — S2 시나리오 + Phase 14b 권한 매트릭스 검증용
 4. **Phase 15b Webhook/Alert 완성** — 세션 15 스캐폴드 → 이벤트 트리거 + 시그니처 검증 + 재전송 로직
 5. **테이블 목록 행 수 정확화 (cosmetic)** — 현재 "행 ~-1" 표시. `information_schema.reltuples` 또는 `COUNT(*)` 전환
@@ -166,7 +178,9 @@ Server Component / Route Handler
 - **Windows `next build` 불가**: `lightningcss-win32-x64-msvc` 미설치. WSL2 Linux 바이너리 정상 — 배포는 문제없음. `/ypserver` Phase 1 실패하므로 WSL 빌드로 통일 또는 `npm i -D lightningcss-win32-x64-msvc` 로 복구
 - **SQLite `data/` cold start**: 첫 `getDb()` 호출 전 PM2 로그에 "Cannot open database because the directory does not exist" 누적. `src/lib/db/index.ts`가 `fs.mkdirSync({recursive:true})`로 자동 생성하지만 로그 노이즈 제거용으로 PM2 pre-start mkdir 검토
 - **Cloudflare Tunnel WSL2 재기동**: systemd 비활성 환경에서 Windows 재시작 시 PM2 데몬 자체가 사라질 수 있음 — `pm2 resurrect` 자동화 또는 WSL systemd 활성 검토
-- **Table Editor CRUD 미구현**: 읽기 전용만 지원. Phase 14b에서 완성
+- **Table Editor CRUD 미구현**: 읽기 전용만 지원. 세션 20에서 설계·계획 완료 — Phase 14b 구현만 남음
+- **프로젝트 단위 테스트 러너 부재**: Vitest 등 미설치. Phase 14b 순수 함수(`identifier`/`coerce`/`table-policy`)는 curl 통합 + 브라우저 E2E로 검증. Vitest 도입 필요 시 ADR-003 §5 재활성화
+- **세션 19 커밋 스윕(10c5065)**: 세션 20 계획서 커밋에 세션 19 pre-staged 8건 포함됨. 내용 회귀 없음. `git show 10c5065 --stat`으로 상세 확인 가능
 
 ---
 [← handover/_index.md](./_index.md)
