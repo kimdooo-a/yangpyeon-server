@@ -3,7 +3,7 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
 import { isIpAllowed } from "@/lib/ip-whitelist-cache";
 
-export const runtime = "nodejs";
+// Next.js 16 proxy는 암시적으로 Node.js 런타임에서만 동작 — `runtime` 선언 금지.
 
 function getRateLimitConfig(pathname: string, method: string) {
   if (pathname === "/api/auth/login") return RATE_LIMITS.login;
