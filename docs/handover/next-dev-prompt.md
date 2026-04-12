@@ -69,9 +69,8 @@ docs/handover/260406-session8-12-massive-feature.md — 직전 인수인계서 (
 **마스터 계획서(`docs/MASTER-DEV-PLAN.md`)의 세션 번호를 따라 진행합니다.**
 
 ### 즉시 가능
-- [ ] Phase 13d 잔여: 스켈레톤 UI를 members/network/settings(users, env, ip-whitelist)/filebox/members-[id]에 확장 + 빈 상태 컴포넌트 공통화
-  - 이미 완료: 대시보드(page.tsx), 프로세스(processes/page.tsx), 감사로그(audit), 메트릭(metrics)
-  - 남은 페이지: `로딩 중...` 텍스트만 있는 7개 페이지 → audit/processes 패턴 따라 스켈레톤 적용
+- Phase 13 전체 완료 — 다음은 Phase 14a (TanStack Table Editor: DB 테이블 브라우저)부터
+- Phase 13d 스켈레톤 UI는 9개 페이지 전부 적용 완료 (대시보드/프로세스/감사/메트릭/회원/회원상세/네트워크/파일박스/설정3종)
 
 ### 세션 13~15 (마스터 계획 세션 14~18)
 - [ ] Phase 14a: TanStack Table Editor (DB 테이블 브라우저)
