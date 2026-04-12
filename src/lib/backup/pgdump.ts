@@ -3,8 +3,9 @@ import { createWriteStream, promises as fs } from "node:fs";
 import { createGzip } from "node:zlib";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { getBackupsDir } from "./paths";
 
-export const BACKUPS_DIR = path.resolve(process.cwd(), "backups");
+export { getBackupsDir, backupsEnabled, sanitizeBackupFilename } from "./paths";
 
 const PG_DUMP_BIN = process.env.PG_DUMP_BIN || "pg_dump";
 const TIMEOUT_MS = 120_000; // 2분
@@ -16,16 +17,16 @@ export interface BackupFileInfo {
 }
 
 export async function ensureBackupsDir(): Promise<void> {
-  await fs.mkdir(BACKUPS_DIR, { recursive: true });
+  await fs.mkdir(getBackupsDir(), { recursive: true });
 }
 
 export async function listBackups(): Promise<BackupFileInfo[]> {
   await ensureBackupsDir();
-  const entries = await fs.readdir(BACKUPS_DIR);
+  const entries = await fs.readdir(getBackupsDir());
   const results: BackupFileInfo[] = [];
   for (const name of entries) {
     if (!name.endsWith(".sql.gz")) continue;
-    const full = path.join(BACKUPS_DIR, name);
+    const full = path.join(getBackupsDir(), name);
     const stat = await fs.stat(full).catch(() => null);
     if (!stat || !stat.isFile()) continue;
     results.push({
@@ -60,7 +61,7 @@ export async function createBackup(): Promise<BackupFileInfo> {
 
   await ensureBackupsDir();
   const filename = tsFilename();
-  const outPath = path.join(BACKUPS_DIR, filename);
+  const outPath = path.join(getBackupsDir(), filename);
 
   const child = spawn(PG_DUMP_BIN, ["--no-owner", "--no-acl", "--format=plain", dbUrl], {
     env: { ...process.env },
@@ -112,15 +113,3 @@ export async function createBackup(): Promise<BackupFileInfo> {
   };
 }
 
-export function backupsEnabled(): boolean {
-  return process.env.ENABLE_DB_BACKUPS === "true";
-}
-
-/** 경로 traversal 방어: 안전한 파일명만 허용 */
-export function sanitizeBackupFilename(name: string): string | null {
-  if (!name) return null;
-  if (name.includes("/") || name.includes("\\") || name.includes("..")) return null;
-  if (!/^[A-Za-z0-9._-]+$/.test(name)) return null;
-  if (!name.endsWith(".sql.gz")) return null;
-  return name;
-}
