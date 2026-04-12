@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconRefresh } from "@/components/ui/icons";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconRefresh, IconUsers } from "@/components/ui/icons";
 import { toast } from "sonner";
 
 interface User {
@@ -229,30 +230,44 @@ export default function SettingsUsersPage() {
           </h2>
         </div>
 
-        {loading ? (
-          <div className="px-5 py-8 text-center text-gray-500 text-sm">
-            로딩 중...
-          </div>
-        ) : users.length === 0 ? (
-          <div className="px-5 py-8 text-center text-gray-500 text-sm">
-            등록된 사용자가 없습니다
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-gray-500">
-                  <th className="px-5 py-2.5 font-medium">이메일</th>
-                  <th className="px-5 py-2.5 font-medium">이름</th>
-                  <th className="px-5 py-2.5 font-medium">역할</th>
-                  <th className="px-5 py-2.5 font-medium">상태</th>
-                  <th className="px-5 py-2.5 font-medium">마지막 로그인</th>
-                  <th className="px-5 py-2.5 font-medium">가입일</th>
-                  <th className="px-5 py-2.5 font-medium text-right">액션</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-gray-500">
+                <th className="px-5 py-2.5 font-medium">이메일</th>
+                <th className="px-5 py-2.5 font-medium">이름</th>
+                <th className="px-5 py-2.5 font-medium">역할</th>
+                <th className="px-5 py-2.5 font-medium">상태</th>
+                <th className="px-5 py-2.5 font-medium">마지막 로그인</th>
+                <th className="px-5 py-2.5 font-medium">가입일</th>
+                <th className="px-5 py-2.5 font-medium text-right">액션</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i} className="border-b border-border last:border-b-0">
+                    <td className="px-5 py-2.5"><div className="h-4 w-32 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5"><div className="h-4 w-20 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5"><div className="h-5 w-14 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5"><div className="h-5 w-14 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5"><div className="h-4 w-24 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5"><div className="h-4 w-24 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5 text-right"><div className="h-6 w-16 bg-surface-300 rounded animate-pulse ml-auto" /></td>
+                  </tr>
+                ))
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-0">
+                    <EmptyState
+                      icon={<IconUsers size={32} />}
+                      message="등록된 사용자가 없습니다"
+                      description="상단 폼에서 첫 사용자를 추가하세요"
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
+              ) : (
+                users.map((u) => (
                   <tr
                     key={u.id}
                     className="border-b border-border hover:bg-surface-300 transition-colors"
@@ -326,11 +341,11 @@ export default function SettingsUsersPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

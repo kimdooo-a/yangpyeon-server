@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconRefresh } from "@/components/ui/icons";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconRefresh, IconMembers } from "@/components/ui/icons";
 import { toast } from "sonner";
 
 interface MemberDetail {
@@ -91,16 +92,37 @@ export default function MemberDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <p className="text-gray-500">로딩 중...</p>
+      <div className="p-6 max-w-3xl mx-auto">
+        <PageHeader title="회원 상세" />
+        <div className="bg-surface-200 border border-border rounded-lg p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {[...Array(8)].map((_, i) => (
+              <div key={i}>
+                <div className="h-3 w-20 bg-surface-300 rounded animate-pulse" />
+                <div className="h-5 w-40 bg-surface-300 rounded animate-pulse mt-2" />
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-3 pt-4 border-t border-border">
+            <div className="h-9 w-20 bg-surface-300 rounded-lg animate-pulse" />
+            <div className="h-9 w-20 bg-surface-300 rounded-lg animate-pulse" />
+          </div>
+        </div>
       </div>
     );
   }
 
   if (!member) {
     return (
-      <div className="p-6">
-        <p className="text-gray-500">회원을 찾을 수 없습니다</p>
+      <div className="p-6 max-w-3xl mx-auto">
+        <PageHeader title="회원 상세" />
+        <div className="bg-surface-200 border border-border rounded-lg">
+          <EmptyState
+            icon={<IconMembers size={32} />}
+            message="회원을 찾을 수 없습니다"
+            description="이미 삭제되었거나 잘못된 ID입니다"
+          />
+        </div>
       </div>
     );
   }

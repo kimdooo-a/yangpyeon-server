@@ -136,8 +136,17 @@ export default function NetworkPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-surface-200 border border-border rounded-lg px-5 py-8 text-center text-gray-500">
-          로딩 중...
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="bg-surface-200 border border-border rounded-lg p-5">
+              <div className="h-3 w-20 bg-surface-300 rounded animate-pulse mb-3" />
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-surface-300 animate-pulse" />
+                <div className="h-6 w-28 bg-surface-300 rounded animate-pulse" />
+              </div>
+              <div className="h-3 w-24 bg-surface-300 rounded animate-pulse mt-3" />
+            </div>
+          ))}
         </div>
       )}
 

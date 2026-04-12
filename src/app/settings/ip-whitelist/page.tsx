@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { IconShield } from "@/components/ui/icons";
 import { toast } from "sonner";
 
@@ -157,27 +158,38 @@ export default function IpWhitelistPage() {
           <h2 className="text-sm font-medium">등록된 IP ({list.length})</h2>
         </div>
 
-        {loading ? (
-          <div className="px-5 py-8 text-center text-gray-500 text-sm">
-            로딩 중...
-          </div>
-        ) : list.length === 0 ? (
-          <div className="px-5 py-8 text-center text-gray-500 text-sm">
-            등록된 IP가 없습니다. 비어있으면 모든 IP가 허용됩니다.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-gray-500">
-                  <th className="px-5 py-2.5 text-left font-medium">IP</th>
-                  <th className="px-5 py-2.5 text-left font-medium">설명</th>
-                  <th className="px-5 py-2.5 text-left font-medium">등록일</th>
-                  <th className="px-5 py-2.5 text-right font-medium">삭제</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-gray-500">
+                <th className="px-5 py-2.5 text-left font-medium">IP</th>
+                <th className="px-5 py-2.5 text-left font-medium">설명</th>
+                <th className="px-5 py-2.5 text-left font-medium">등록일</th>
+                <th className="px-5 py-2.5 text-right font-medium">삭제</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i} className="border-b border-border last:border-b-0">
+                    <td className="px-5 py-2.5"><div className="h-4 w-28 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5"><div className="h-4 w-40 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5"><div className="h-4 w-24 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5 text-right"><div className="h-6 w-12 bg-surface-300 rounded animate-pulse ml-auto" /></td>
+                  </tr>
+                ))
+              ) : list.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="p-0">
+                    <EmptyState
+                      icon={<IconShield size={32} />}
+                      message="등록된 IP가 없습니다"
+                      description="비어있으면 모든 IP가 허용됩니다. 상단 폼에서 IP를 추가하세요"
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {list.map((entry) => (
+              ) : (
+                list.map((entry) => (
                   <tr
                     key={entry.id}
                     className="border-b border-border last:border-b-0 hover:bg-surface-300 transition-colors"
@@ -202,11 +214,11 @@ export default function IpWhitelistPage() {
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

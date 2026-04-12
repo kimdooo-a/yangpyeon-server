@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/ui/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { IconEnv } from "@/components/ui/icons";
 import { toast } from "sonner";
 
@@ -258,26 +259,36 @@ export default function EnvPage() {
           </h2>
         </div>
 
-        {loading ? (
-          <div className="px-5 py-8 text-center text-gray-500 text-sm">
-            로딩 중...
-          </div>
-        ) : list.length === 0 ? (
-          <div className="px-5 py-8 text-center text-gray-500 text-sm">
-            .env 파일에 등록된 환경변수가 없습니다.
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-gray-500">
-                  <th className="px-5 py-2.5 text-left font-medium">키</th>
-                  <th className="px-5 py-2.5 text-left font-medium">값</th>
-                  <th className="px-5 py-2.5 text-right font-medium">액션</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-gray-500">
+                <th className="px-5 py-2.5 text-left font-medium">키</th>
+                <th className="px-5 py-2.5 text-left font-medium">값</th>
+                <th className="px-5 py-2.5 text-right font-medium">액션</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i} className="border-b border-border last:border-b-0">
+                    <td className="px-5 py-2.5"><div className="h-4 w-32 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5"><div className="h-4 w-64 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-2.5 text-right"><div className="h-6 w-14 bg-surface-300 rounded animate-pulse ml-auto" /></td>
+                  </tr>
+                ))
+              ) : list.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="p-0">
+                    <EmptyState
+                      icon={<IconEnv size={32} />}
+                      message=".env 파일에 등록된 환경변수가 없습니다"
+                      description="상단 폼에서 KEY=VALUE를 추가하세요"
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {list.map((entry) => (
+              ) : (
+                list.map((entry) => (
                   <tr
                     key={entry.key}
                     className="border-b border-border last:border-b-0 hover:bg-surface-300 transition-colors"
@@ -363,11 +374,11 @@ export default function EnvPage() {
                       )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

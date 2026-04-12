@@ -36,7 +36,7 @@
 - [x] Phase 13a: DB 인증 통합 (하드코딩 → PostgreSQL User)
 - [x] Phase 13b: 역할 기반 접근 제어 + 사용자 관리
 - [x] Phase 13c: Cmd+K 커맨드 팔레트
-- [ ] Phase 13d: 스켈레톤 UI + 빈 상태 컴포넌트 ← **다음**
+- [x] Phase 13d: 스켈레톤 UI + 빈 상태 컴포넌트 (9개 페이지 일괄)
 - [ ] Phase 14~15: 데이터 관리 + 자율 운영 → [docs/MASTER-DEV-PLAN.md](../MASTER-DEV-PLAN.md)
 
 ## 실행 방법

@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
-import { IconRefresh } from "@/components/ui/icons";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconRefresh, IconMembers } from "@/components/ui/icons";
 
 interface Member {
   id: string;
@@ -96,15 +97,25 @@ export default function MembersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                  로딩 중...
-                </td>
-              </tr>
+              <>
+                {[...Array(4)].map((_, i) => (
+                  <tr key={i} className="border-b border-border">
+                    <td className="px-4 py-3"><div className="h-4 w-44 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-20 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-5 w-14 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-5 w-16 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-4 py-3"><div className="h-4 w-24 bg-surface-300 rounded animate-pulse" /></td>
+                  </tr>
+                ))}
+              </>
             ) : members.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
-                  회원이 없습니다
+                <td colSpan={5} className="p-0">
+                  <EmptyState
+                    icon={<IconMembers size={32} />}
+                    message="회원이 없습니다"
+                    description={search ? "검색 조건에 맞는 회원이 없습니다" : "첫 회원을 등록해보세요"}
+                  />
                 </td>
               </tr>
             ) : (
