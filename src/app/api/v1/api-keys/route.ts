@@ -1,0 +1,85 @@
+import { NextRequest } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { withRole } from "@/lib/api-guard";
+import { successResponse, errorResponse } from "@/lib/api-response";
+import { issueApiKey } from "@/lib/auth/keys";
+import { writeAuditLog } from "@/lib/audit-log";
+
+const ALLOWED_SCOPES = ["read", "write", "admin"] as const;
+
+const createSchema = z.object({
+  name: z.string().min(1).max(100),
+  type: z.enum(["PUBLISHABLE", "SECRET"]),
+  scopes: z.array(z.enum(ALLOWED_SCOPES)).min(1),
+});
+
+export const GET = withRole(["ADMIN"], async () => {
+  const keys = await prisma.apiKey.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      prefix: true,
+      type: true,
+      scopes: true,
+      ownerId: true,
+      lastUsedAt: true,
+      revokedAt: true,
+      createdAt: true,
+    },
+  });
+  return successResponse(keys);
+});
+
+export const POST = withRole(["ADMIN"], async (request: NextRequest, user) => {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return errorResponse("INVALID_JSON", "잘못된 요청 형식입니다", 400);
+  }
+
+  const parsed = createSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse(
+      "VALIDATION_ERROR",
+      parsed.error.issues[0]?.message ?? "입력값이 올바르지 않습니다",
+      400
+    );
+  }
+
+  try {
+    const result = await issueApiKey({
+      name: parsed.data.name,
+      type: parsed.data.type,
+      scopes: parsed.data.scopes,
+      ownerId: user.sub,
+    });
+
+    writeAuditLog({
+      timestamp: new Date().toISOString(),
+      method: "POST",
+      path: "/api/v1/api-keys",
+      ip: request.headers.get("x-forwarded-for") ?? "unknown",
+      action: "API_KEY_ISSUE",
+      detail: `${user.email} -> ${result.apiKey.name} (${result.apiKey.type}, scopes=${parsed.data.scopes.join(",")})`,
+    });
+
+    // 평문 키를 1회만 반환 (이후 조회 불가)
+    return successResponse(
+      {
+        apiKey: result.apiKey,
+        plaintext: result.issued.plaintext,
+        prefix: result.issued.prefix,
+      },
+      201
+    );
+  } catch (err) {
+    return errorResponse(
+      "ISSUE_FAILED",
+      err instanceof Error ? err.message : "발급 실패",
+      500
+    );
+  }
+});

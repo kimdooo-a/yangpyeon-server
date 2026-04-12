@@ -8,18 +8,21 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  passwordHash String    @map("password_hash")
-  name         String?
-  phone        String?
-  role         Role      @default(USER)
-  isActive     Boolean   @default(true) @map("is_active")
-  lastLoginAt  DateTime? @map("last_login_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  folders      Folder[]  @relation("UserFolders")
-  files        File[]    @relation("UserFiles")
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String         @map("password_hash")
+  name          String?
+  phone         String?
+  role          Role           @default(USER)
+  isActive      Boolean        @default(true) @map("is_active")
+  lastLoginAt   DateTime?      @map("last_login_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  folders       Folder[]       @relation("UserFolders")
+  files         File[]         @relation("UserFiles")
+  sqlQueries    SqlQuery[]     @relation("UserSqlQueries")
+  edgeFunctions EdgeFunction[] @relation("UserEdgeFunctions")
+  apiKeys       ApiKey[]       @relation("UserApiKeys")
 
   @@map("users")
 }
@@ -60,4 +63,165 @@ enum Role {
   ADMIN
   MANAGER
   USER
+}
+
+// ─────────────────────────────────────────────────────────────
+// 세션 14: Supabase 관리 체계 이식 — 추가 모델
+// 참고: docs/research/decisions/ADR-002-supabase-adaptation-strategy.md
+// ─────────────────────────────────────────────────────────────
+
+/// SQL Editor에서 저장한 쿼리
+model SqlQuery {
+  id        String     @id @default(uuid())
+  name      String
+  sql       String
+  scope     QueryScope @default(PRIVATE)
+  ownerId   String     @map("owner_id")
+  owner     User       @relation("UserSqlQueries", fields: [ownerId], references: [id], onDelete: Cascade)
+  lastRunAt DateTime?  @map("last_run_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@index([ownerId, scope])
+  @@map("sql_queries")
+}
+
+/// Edge Functions (lite) — 사용자가 등록한 코드 스니펫
+model EdgeFunction {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  description String?
+  code        String
+  runtime     FunctionRuntime   @default(NODE_VM)
+  enabled     Boolean           @default(true)
+  ownerId     String            @map("owner_id")
+  owner       User              @relation("UserEdgeFunctions", fields: [ownerId], references: [id])
+  runs        EdgeFunctionRun[]
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  @@map("edge_functions")
+}
+
+/// Edge Function 실행 로그
+model EdgeFunctionRun {
+  id         String       @id @default(uuid())
+  functionId String       @map("function_id")
+  function   EdgeFunction @relation(fields: [functionId], references: [id], onDelete: Cascade)
+  status     RunStatus
+  durationMs Int?         @map("duration_ms")
+  stdout     String?
+  stderr     String?
+  startedAt  DateTime     @default(now()) @map("started_at")
+  finishedAt DateTime?    @map("finished_at")
+
+  @@index([functionId, startedAt])
+  @@map("edge_function_runs")
+}
+
+/// Database Webhook — 테이블 이벤트 → HTTP 호출
+model Webhook {
+  id              String       @id @default(uuid())
+  name            String
+  sourceTable     String       @map("source_table")
+  event           WebhookEvent
+  url             String
+  headers         Json         @default("{}")
+  secret          String?
+  enabled         Boolean      @default(true)
+  lastTriggeredAt DateTime?    @map("last_triggered_at")
+  failureCount    Int          @default(0) @map("failure_count")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  @@map("webhooks")
+}
+
+/// Cron Job — 주기 실행 작업
+model CronJob {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  schedule   String
+  kind       CronKind
+  payload    Json     @default("{}")
+  enabled    Boolean  @default(true)
+  lastRunAt  DateTime? @map("last_run_at")
+  lastStatus String?  @map("last_status")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("cron_jobs")
+}
+
+/// API Keys — publishable/secret 이중화. keyHash만 저장, 평문은 발급 시 1회 노출.
+model ApiKey {
+  id         String     @id @default(uuid())
+  name       String
+  prefix     String     @unique
+  keyHash    String     @unique @map("key_hash")
+  type       ApiKeyType
+  scopes     String[]
+  ownerId    String     @map("owner_id")
+  owner      User       @relation("UserApiKeys", fields: [ownerId], references: [id])
+  lastUsedAt DateTime?  @map("last_used_at")
+  revokedAt  DateTime?  @map("revoked_at")
+  createdAt  DateTime   @default(now()) @map("created_at")
+
+  @@map("api_keys")
+}
+
+/// Log Drains — 외부 관측 플랫폼으로 로그 전송
+model LogDrain {
+  id              String    @id @default(uuid())
+  name            String
+  type            DrainType
+  url             String
+  authHeader      String?   @map("auth_header")
+  filters         Json      @default("{}")
+  enabled         Boolean   @default(true)
+  lastDeliveredAt DateTime? @map("last_delivered_at")
+  failureCount    Int       @default(0) @map("failure_count")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@map("log_drains")
+}
+
+enum QueryScope {
+  PRIVATE
+  SHARED
+  FAVORITE
+}
+
+enum FunctionRuntime {
+  NODE_VM
+  WORKER_THREAD
+}
+
+enum RunStatus {
+  SUCCESS
+  FAILURE
+  TIMEOUT
+}
+
+enum WebhookEvent {
+  INSERT
+  UPDATE
+  DELETE
+  ANY
+}
+
+enum CronKind {
+  SQL
+  FUNCTION
+  WEBHOOK
+}
+
+enum ApiKeyType {
+  PUBLISHABLE
+  SECRET
+}
+
+enum DrainType {
+  HTTP
+  LOKI
+  WEBHOOK
 }

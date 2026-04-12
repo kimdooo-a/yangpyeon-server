@@ -1,7 +1,7 @@
 # 기술 레퍼런스 색인
 
 > 상위: [CLAUDE.md](../../CLAUDE.md) → **여기**
-> 최종 수정: 세션 N
+> 최종 수정: 세션 14 (2026-04-12)
 
 ---
 
@@ -11,6 +11,9 @@
 |------|------|-----------|
 | _TEMPLATE_REFERENCE.md | 레퍼런스 작성 템플릿 | 초기 생성 |
 | _NAVIGATION_MAP.md | 페이지 라우트 맵, 진입점/이동 대상, 연결성 검증 | 초기 생성 |
+| _SUPABASE_TECH_MAP.md | Supabase 13개 모듈 → OSS/표준 기술(GitHub/docs/자체구현) 매핑 | 세션 14 |
+| _PROJECT_VS_SUPABASE_GAP.md | 현 프로젝트 vs Supabase 갭 분석 + P0/P1/P2 우선순위 + DAG | 세션 14 |
+| supabase-scrape/ | Supabase 대시보드 스크랩 원본 14개 (index + 00~13) | 세션 14 |
 
 ## 일반적인 레퍼런스 유형
 

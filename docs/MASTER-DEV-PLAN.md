@@ -972,11 +972,46 @@ SQL Editor:   SELECT only → 완전 쿼리
 
 ---
 
+## 부록: 세션 14 — Supabase 프로젝트 관리 체계 이식 (2026-04-12 추가)
+
+세션 13(DB 인증 + Warm Ivory 테마) 완료 직후, 사용자가 Supabase 대시보드 13개 페이지의 관리 체계를 이식 요청. 기존 Phase 14(Table/SQL Editor)를 **Supabase 모델 이식 Phase 14-S**로 확장.
+
+**범위**: P0 11개 모듈 병렬 구현. Option B(Supabase UI 학습 + Next.js 네이티브 재구현) — 상세는 ADR-002.
+
+| # | 모듈 | 경로 | Prisma 모델 |
+|---|------|------|-------------|
+| 1 | SQL Editor | `/sql-editor` | `SqlQuery` |
+| 2 | Schema Visualizer | `/database/schema` | — |
+| 3 | Advisors Security | `/advisors/security` | — |
+| 4 | Advisors Performance | `/advisors/performance` | — |
+| 5 | Edge Functions (lite) | `/functions` | `EdgeFunction`, `EdgeFunctionRun` |
+| 6 | Realtime Channels | `/realtime` | — |
+| 7 | Data API | `/data-api` + `/api/v1/data/[table]` | — |
+| 8 | Database Webhooks | `/database/webhooks` | `Webhook` |
+| 9 | Cron Jobs | `/database/cron` | `CronJob` |
+| 10 | API Keys | `/settings/api-keys` | `ApiKey` |
+| 11 | Backups (dev DB UI) | `/database/backups` | — |
+| 12 | Log Drains | `/settings/log-drains` | `LogDrain` |
+
+**상세 실행 계획**: `C:\Users\smart\.claude\plans\indexed-knitting-reef.md`  
+**근거 문서**:
+- 스크랩: `docs/references/supabase-scrape/` (14 files)
+- 기술 매핑: `docs/references/_SUPABASE_TECH_MAP.md`
+- 갭 분석: `docs/references/_PROJECT_VS_SUPABASE_GAP.md`
+- 결정: `docs/research/decisions/ADR-002-supabase-adaptation-strategy.md`
+- 스파이크: `docs/research/spikes/spike-005-*.md` (5 files)
+
+**DAG**: L0 (Prisma + types + sidebar 계약) → L1 (introspect/isolated-runner 공유 기반) → L2 (11개 모듈 병렬) → L3 (사이드바 라우팅 + RBAC 통합 + migrate dev --create-only)
+
+**보류(P1/P2 다음 시즌)**: GraphQL, Queues, Vault, MFA, Rate Limits, OAuth Providers, Custom Reports Builder, Wrappers(FDW).
+
+---
+
 > **이 문서가 세션별 개발의 단일 진실 소스(Single Source of Truth)입니다.**  
 > 각 세션 시작 시 해당 섹션을 참조하고, 완료 기준을 체크하세요.  
 > 스코프 변경이 필요하면 섹션 5의 조정 규칙을 따릅니다.
 
 ---
 
-> 최종 수정: 2026-04-06  
+> 최종 수정: 2026-04-12 (세션 14)  
 > 근거 문서: [Supabase Wave](./supabase-wave/README.md) | [Platform Evolution Wave](./platform-evolution-wave/README.md)

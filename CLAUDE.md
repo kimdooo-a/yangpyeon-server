@@ -32,7 +32,10 @@ CLAUDE.md (루트 — 지금 이 파일)
 │   ├─→ _TEMPLATE_REFERENCE.md ········ 레퍼런스 작성 템플릿
 │   ├─→ _NAVIGATION_MAP.md ············ 페이지 라우트 맵 & 연결성 추적
 │   │   └─ ⚠️ kdyweb 사용 시 _WEB_CONTRACT.md가 이 파일을 대체
-│   └─→ _WEB_CONTRACT.md ·············· (kdyweb 사용 시) 웹 구조 계약 — 단일 진실 소스
+│   ├─→ _WEB_CONTRACT.md ·············· (kdyweb 사용 시) 웹 구조 계약 — 단일 진실 소스
+│   ├─→ _SUPABASE_TECH_MAP.md ········· Supabase 13개 모듈 → OSS 기술 매핑 (세션 14)
+│   ├─→ _PROJECT_VS_SUPABASE_GAP.md ··· 현 프로젝트 vs Supabase 갭 분석 + P0/P1/P2 (세션 14)
+│   └─→ supabase-scrape/ ·············· Supabase 대시보드 스크랩 원본 14개 (세션 14)
 │
 ├─→ docs/handover/_index.md ·············· 인수인계서 마스터 목록
 │   ├─→ next-dev-prompt.md ··········· 다음 세션 프롬프트
@@ -50,6 +53,13 @@ CLAUDE.md (루트 — 지금 이 파일)
 │   ├─→ spike-001-sqlite-drizzle-result.md SQLite+Drizzle 검증
 │   ├─→ spike-002-sse-result.md ········· SSE+Tunnel 검증
 │   └─→ spike-004-shadcn-result.md ······ shadcn/ui 호환 검증
+│
+├─→ docs/research/spikes/ ················· 추가 기술 스파이크 (세션 14~)
+│   ├─→ spike-005-sql-editor.md ······· SQL Editor (monaco + pg 읽기전용)
+│   ├─→ spike-005-schema-visualizer.md  Schema Visualizer (@xyflow + DMMF)
+│   ├─→ spike-005-advisors.md ········· Advisors (splinter TS 포팅)
+│   ├─→ spike-005-edge-functions.md ··· Edge Functions lite (worker_threads)
+│   └─→ spike-005-data-api.md ········· Data API auto-gen (Prisma DMMF)
 │
 └─→ docs/commands/_index.md ·············· 명령어 모음 (복사해서 사용)
 ```

@@ -38,6 +38,7 @@
 - [x] Phase 13c: Cmd+K 커맨드 팔레트
 - [x] Phase 13d: 스켈레톤 UI + 빈 상태 컴포넌트 (9개 페이지 일괄)
 - [ ] Phase 14~15: 데이터 관리 + 자율 운영 → [docs/MASTER-DEV-PLAN.md](../MASTER-DEV-PLAN.md)
+- [x] Phase 14-S (세션 15): Supabase 관리 체계 이식 Phase A+B — Prisma +7 모델, 11 P0 모듈(/sql-editor, /database/schema, /data-api, /database/{webhooks,cron,backups}, /functions, /realtime, /advisors/{security,performance}, /settings/{api-keys,log-drains}) 스캐폴드. tsc clean. migrate 수동 대기.
 
 ## 실행 방법
 
@@ -77,6 +78,7 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 12 | 2026-04-06 | Cmd+K 커맨드 팔레트 (스켈레톤 UI 보류) | [2026-04](../logs/2026-04.md) | ↑ 통합 |
 | 13 | 2026-04-06 | 회원관리 백엔드 + PostgreSQL + Warm Ivory 테마 | [2026-04](../logs/2026-04.md) | ↑ 통합 (logs만) |
 | 14 | 2026-04-12 | 중단 터미널 3개 복구 + Phase 13d 완료 (9개 페이지 스켈레톤+EmptyState) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session14-phase13d-complete.md) |
+| 15 | 2026-04-12 | Supabase 관리 체계 이식 — 리서치+문서화 + 11 P0 모듈 병렬 구현 (55 신규 파일) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session15-supabase-clone.md) |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수
