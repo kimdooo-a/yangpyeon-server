@@ -19,27 +19,61 @@ import {
   IconEnv,
   IconUsers,
 } from "@/components/ui/icons";
+import {
+  Code2,
+  Workflow,
+  ShieldCheck,
+  Gauge,
+  FunctionSquare,
+  Radio,
+  Database,
+  Webhook as WebhookIcon,
+  Clock,
+  KeyRound,
+  Archive,
+  Send,
+} from "lucide-react";
 
-const navItems: { href: string; label: string; icon: ReactNode }[] = [
-  { href: "/", label: "대시보드", icon: <IconDashboard size={18} /> },
-  { href: "/processes", label: "프로세스", icon: <IconProcess size={18} /> },
-  { href: "/logs", label: "로그", icon: <IconLog size={18} /> },
-  { href: "/network", label: "네트워크", icon: <IconNetwork size={18} /> },
-  { href: "/filebox", label: "파일박스", icon: <IconFilebox size={18} /> },
-  { href: "/members", label: "회원 관리", icon: <IconMembers size={18} /> },
-  { href: "/metrics", label: "메트릭 히스토리", icon: <IconChart size={18} /> },
-  { href: "/audit", label: "감사 로그", icon: <IconAudit size={18} /> },
-  {
-    href: "/settings/users",
-    label: "사용자 관리",
-    icon: <IconUsers size={18} />,
-  },
-  {
-    href: "/settings/ip-whitelist",
-    label: "IP 화이트리스트",
-    icon: <IconShield size={18} />,
-  },
-  { href: "/settings/env", label: "환경변수", icon: <IconEnv size={18} /> },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: ReactNode;
+  group?: string;
+};
+
+const navItems: NavItem[] = [
+  // 운영
+  { href: "/", label: "대시보드", icon: <IconDashboard size={18} />, group: "운영" },
+  { href: "/processes", label: "프로세스", icon: <IconProcess size={18} />, group: "운영" },
+  { href: "/logs", label: "로그", icon: <IconLog size={18} />, group: "운영" },
+  { href: "/network", label: "네트워크", icon: <IconNetwork size={18} />, group: "운영" },
+  { href: "/metrics", label: "메트릭 히스토리", icon: <IconChart size={18} />, group: "운영" },
+
+  // 콘텐츠
+  { href: "/filebox", label: "파일박스", icon: <IconFilebox size={18} />, group: "콘텐츠" },
+  { href: "/members", label: "회원 관리", icon: <IconMembers size={18} />, group: "콘텐츠" },
+
+  // 데이터베이스 (신규 — 세션 14)
+  { href: "/sql-editor", label: "SQL 에디터", icon: <Code2 size={18} />, group: "데이터베이스" },
+  { href: "/database/schema", label: "스키마 뷰어", icon: <Workflow size={18} />, group: "데이터베이스" },
+  { href: "/data-api", label: "Data API", icon: <Database size={18} />, group: "데이터베이스" },
+  { href: "/database/webhooks", label: "Webhooks", icon: <WebhookIcon size={18} />, group: "데이터베이스" },
+  { href: "/database/cron", label: "Cron Jobs", icon: <Clock size={18} />, group: "데이터베이스" },
+  { href: "/database/backups", label: "백업", icon: <Archive size={18} />, group: "데이터베이스" },
+
+  // 개발 도구 (신규)
+  { href: "/functions", label: "Edge Functions", icon: <FunctionSquare size={18} />, group: "개발 도구" },
+  { href: "/realtime", label: "Realtime 채널", icon: <Radio size={18} />, group: "개발 도구" },
+  { href: "/advisors/security", label: "보안 어드바이저", icon: <ShieldCheck size={18} />, group: "개발 도구" },
+  { href: "/advisors/performance", label: "성능 어드바이저", icon: <Gauge size={18} />, group: "개발 도구" },
+
+  // 감사·설정
+  { href: "/audit", label: "감사 로그", icon: <IconAudit size={18} />, group: "감사·설정" },
+  { href: "/settings/users", label: "사용자 관리", icon: <IconUsers size={18} />, group: "감사·설정" },
+  { href: "/settings/ip-whitelist", label: "IP 화이트리스트", icon: <IconShield size={18} />, group: "감사·설정" },
+  { href: "/settings/env", label: "환경변수", icon: <IconEnv size={18} />, group: "감사·설정" },
+  { href: "/settings/api-keys", label: "API 키", icon: <KeyRound size={18} />, group: "감사·설정" },
+  { href: "/settings/log-drains", label: "로그 드레인", icon: <Send size={18} />, group: "감사·설정" },
 ];
 
 /** ADMIN 역할만 접근 가능한 경로 */
@@ -48,8 +82,32 @@ const ADMIN_ONLY_PATHS = [
   "/settings/ip-whitelist",
   "/settings/env",
   "/settings/users",
+  "/settings/api-keys",
+  "/settings/log-drains",
   "/members",
+  "/functions",
+  "/database/backups",
 ];
+
+/** MANAGER 이상만 접근 가능한 경로 */
+const MANAGER_PLUS_PATHS = [
+  "/sql-editor",
+  "/database/schema",
+  "/data-api",
+  "/database/webhooks",
+  "/database/cron",
+  "/realtime",
+  "/advisors/security",
+  "/advisors/performance",
+];
+
+const GROUP_ORDER = [
+  "운영",
+  "콘텐츠",
+  "데이터베이스",
+  "개발 도구",
+  "감사·설정",
+] as const;
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -57,34 +115,52 @@ export function Sidebar() {
   const { user } = useCurrentUser();
 
   const isAdmin = user?.role === "ADMIN";
+  const isManagerOrAdmin = user?.role === "ADMIN" || user?.role === "MANAGER";
 
   // 역할에 따라 메뉴 필터링 (로딩 중에는 전체 표시하되, 로그인 후 필터)
   const filteredItems = navItems.filter((item) => {
-    if (ADMIN_ONLY_PATHS.includes(item.href) && user && !isAdmin) return false;
+    if (!user) return true; // 로딩 중
+    if (ADMIN_ONLY_PATHS.includes(item.href) && !isAdmin) return false;
+    if (MANAGER_PLUS_PATHS.includes(item.href) && !isManagerOrAdmin) return false;
     return true;
   });
 
+  // 그룹별로 묶기
+  const grouped: Record<string, NavItem[]> = {};
+  for (const item of filteredItems) {
+    const g = item.group ?? "기타";
+    if (!grouped[g]) grouped[g] = [];
+    grouped[g].push(item);
+  }
+
   const nav = (
     <>
-      <nav className="flex-1 py-3 space-y-0.5">
-        {filteredItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOpen(false)}
-              className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-md text-sm transition-colors ${
-                isActive
-                  ? "bg-brand/10 text-brand border-l-2 border-brand ml-0 pl-[14px] font-semibold"
-                  : "text-gray-500 hover:text-gray-800 hover:bg-surface-300 border-l-2 border-transparent ml-0 pl-[14px]"
-              }`}
-            >
-              <span className={isActive ? "text-brand" : ""}>{item.icon}</span>
-              <span className="font-medium">{item.label}</span>
-            </Link>
-          );
-        })}
+      <nav className="flex-1 py-3 space-y-2 overflow-y-auto">
+        {GROUP_ORDER.filter((g) => grouped[g] && grouped[g].length > 0).map((group) => (
+          <div key={group} className="space-y-0.5">
+            <div className="px-4 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+              {group}
+            </div>
+            {grouped[group].map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-2 mx-2 rounded-md text-sm transition-colors ${
+                    isActive
+                      ? "bg-brand/10 text-brand border-l-2 border-brand ml-0 pl-[14px] font-semibold"
+                      : "text-gray-500 hover:text-gray-800 hover:bg-surface-300 border-l-2 border-transparent ml-0 pl-[14px]"
+                  }`}
+                >
+                  <span className={isActive ? "text-brand" : ""}>{item.icon}</span>
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
       <div className="p-4 border-t border-border space-y-3">
         {/* 현재 사용자 정보 */}
