@@ -5,7 +5,8 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { getBackupsDir } from "./paths";
 
-export { getBackupsDir, backupsEnabled, sanitizeBackupFilename } from "./paths";
+// paths.ts의 경량 유틸 재노출 (기존 import 경로 호환)
+export { backupsEnabled, sanitizeBackupFilename, getBackupsDir } from "./paths";
 
 const PG_DUMP_BIN = process.env.PG_DUMP_BIN || "pg_dump";
 const TIMEOUT_MS = 120_000; // 2분
