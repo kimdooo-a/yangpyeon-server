@@ -48,3 +48,7 @@ Desktop.ini
 nul
 
 /src/generated/prisma
+
+# Playwright MCP artifacts (세션 17~)
+/.playwright-mcp/
+/e2e-*.png

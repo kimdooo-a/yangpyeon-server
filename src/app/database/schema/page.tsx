@@ -1,15 +1,20 @@
 "use client";
 
-/**
- * 세션 14: Schema Visualizer (MVP)
- * - information_schema 기반 테이블/컬럼/FK 렌더
- * - TODO: @xyflow/react 설치 후 드래그 가능한 노드/엣지 뷰로 교체
- */
-
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import type { SchemaGraph } from "@/lib/types/supabase-clone";
+import "@xyflow/react/dist/style.css";
+
+const SchemaFlow = dynamic(() => import("./SchemaFlow"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[640px] items-center justify-center rounded-lg border border-border bg-surface-200 text-sm text-gray-500">
+      다이어그램 로딩 중...
+    </div>
+  ),
+});
 
 export default function SchemaPage() {
   const [graph, setGraph] = useState<SchemaGraph | null>(null);
@@ -36,11 +41,19 @@ export default function SchemaPage() {
     load();
   }, [load]);
 
+  const counts = useMemo(
+    () => ({
+      tables: graph?.nodes.length ?? 0,
+      edges: graph?.edges.length ?? 0,
+    }),
+    [graph],
+  );
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <PageHeader
         title="Schema Visualizer"
-        description="PostgreSQL public 스키마의 테이블 및 관계 (information_schema 기반)"
+        description="PostgreSQL public 스키마 ER 다이어그램 (information_schema 기반, 드래그 가능)"
       >
         <button
           onClick={load}
@@ -58,57 +71,13 @@ export default function SchemaPage() {
       {graph && (
         <div className="mt-6">
           <div className="mb-3 text-sm text-gray-500">
-            테이블 {graph.nodes.length}개 · 관계 {graph.edges.length}개
+            테이블 {counts.tables}개 · 관계 {counts.edges}개
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {graph.nodes.map((node) => (
-              <div key={node.id} className="bg-surface-200 border border-border rounded-lg overflow-hidden">
-                <div className="px-3 py-2 bg-surface-300 border-b border-border">
-                  <div className="font-medium text-sm text-gray-800">{node.table}</div>
-                  <div className="text-[11px] text-gray-500">{node.schema}</div>
-                </div>
-                <ul className="text-xs">
-                  {node.columns.map((col) => (
-                    <li
-                      key={col.name}
-                      className="flex items-center justify-between px-3 py-1.5 border-b border-border last:border-b-0"
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-mono text-gray-800 truncate">{col.name}</span>
-                        {col.isPrimaryKey && (
-                          <span className="px-1 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px]">PK</span>
-                        )}
-                        {col.isForeignKey && (
-                          <span className="px-1 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px]">FK</span>
-                        )}
-                      </div>
-                      <span className="text-gray-500 font-mono ml-2 shrink-0">{col.dataType}</span>
-                    </li>
-                  ))}
-                </ul>
-                {/* FK 참조 */}
-                {node.columns.some((c) => c.isForeignKey) && (
-                  <div className="px-3 py-2 border-t border-border bg-surface-200 text-[11px] text-gray-500 space-y-0.5">
-                    {node.columns
-                      .filter((c) => c.isForeignKey && c.references)
-                      .map((c) => (
-                        <div key={c.name}>
-                          <span className="font-mono text-gray-700">{c.name}</span>
-                          <span className="mx-1">→</span>
-                          <span className="font-mono text-gray-700">
-                            {c.references!.table}.{c.references!.column}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-              </div>
-            ))}
+          <div className="h-[640px] overflow-hidden rounded-lg border border-border bg-surface-200">
+            <SchemaFlow graph={graph} />
           </div>
         </div>
       )}
-
-      {/* TODO: @xyflow/react 설치 후 드래그 가능한 ER 다이어그램으로 교체 예정 */}
     </div>
   );
 }

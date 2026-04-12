@@ -32,12 +32,14 @@ npm run dev
 docs/MASTER-DEV-PLAN.md                              — 세션별 개발 마스터 계획서 (단일 진실 소스)
 CLAUDE.md                                            — 프로젝트 규칙 + 문서 트리
 docs/status/current.md                               — 현재 상태 + 세션 요약표
-docs/handover/260412-session16-supabase-deploy.md    — 최신 인수인계서 (세션 16)
-docs/handover/260412-session15-supabase-clone.md     — 직전 인수인계서 (세션 15)
+docs/handover/260412-session17-monaco-xyflow.md      — 최신 인수인계서 (세션 17)
+docs/handover/260412-session16-supabase-deploy.md    — 직전 인수인계서 (세션 16)
+docs/handover/260412-session15-supabase-clone.md     — 세션 15
 docs/handover/260412-session14-phase13d-complete.md  — 세션 14
 docs/references/_SUPABASE_TECH_MAP.md                — Supabase 이식 기술 매핑
 docs/references/_PROJECT_VS_SUPABASE_GAP.md          — 현 프로젝트 vs Supabase 갭
 docs/research/decisions/ADR-002-supabase-adaptation-strategy.md — Supabase 이식 전략
+docs/solutions/2026-04-12-*.md                       — 세션 17 Compound Knowledge (Monaco SSR, xyflow+ELK, Windows lightningcss)
 ```
 
 ## 최근 완료된 작업
@@ -50,7 +52,8 @@ docs/research/decisions/ADR-002-supabase-adaptation-strategy.md — Supabase 이
 - 세션 13: 회원관리 백엔드 + PostgreSQL 연결/마이그레이션 + 이메일+비밀번호 로그인 + Warm Ivory 라이트 테마 + Phase 13d 착수
 - 세션 14: 중단 터미널 3개 복구 + Phase 13d 완료 → **Phase 13 전체 완료**
 - 세션 15: Supabase 관리 체계 이식 — Phase A(리서치 문서 23건) + Phase B(Prisma +7 모델, 11 P0 모듈 스캐폴드 55 파일). `tsc` clean.
-- **세션 16 (최신)**: 세션 15 프로덕션 배포 — Prisma 증분 마이그레이션 적용(`20260412120000_supabase_clone_session_14`), `app_readonly` PG 롤 + SELECT 권한 + SET ROLE 검증, `.env`에 `ENABLE_DB_BACKUPS=true`, monaco/xyflow/elkjs 설치, 12개 신규 P0 페이지 HTTP 307 smoke 통과. **레거시 에러 2건 수정**(SQLite 디렉토리 자동 생성, 스테일 세션 `P2003` → `401 STALE_SESSION` 매핑, 커밋 `90c1c1e`). **Cloudflare Tunnel PM2 등록**(4 connection registered, `pm2 save` 완료).
+- 세션 16: 세션 15 프로덕션 배포 — Prisma 증분 마이그레이션 적용, `app_readonly` PG 롤 + SELECT 권한 + SET ROLE 검증, `.env`에 `ENABLE_DB_BACKUPS=true`, monaco/xyflow/elkjs 설치, 12개 P0 페이지 HTTP 307 smoke. 레거시 에러 2건 수정(커밋 `90c1c1e`). Cloudflare Tunnel PM2 등록.
+- **세션 17 (최신)**: UI 고도화 — SQL Editor `textarea` → **Monaco(`@monaco-editor/react`, dynamic ssr:false)** + Ctrl/Cmd+Enter 단축키. Schema Visualizer 카드 그리드 → **xyflow v12 + elkjs layered(RIGHT)** 자동 레이아웃(`SchemaFlow.tsx` 분리). Playwright로 12 P0 페이지 E2E 전 **콘솔 에러 0건** 검증. 부수 버그: 기본 쿼리 `FROM "User"` → `FROM users`(Prisma `@@map`) 수정. Windows `next build`는 `lightningcss-win32-x64-msvc` 부재로 불가(WSL2가 진실 소스).
 
 ## 현재 DB 구조
 
@@ -82,15 +85,24 @@ docs/research/decisions/ADR-002-supabase-adaptation-strategy.md — Supabase 이
 
 **마스터 계획서(`docs/MASTER-DEV-PLAN.md`)의 세션 번호를 따라 진행합니다.**
 
-### 즉시 가능 (세션 16 후속 — 최우선)
-1. ~~Prisma 마이그레이션 적용~~ → 세션 16에서 `migrate deploy` 완료
-2. ~~PG 읽기전용 롤 발급~~ → 세션 16에서 `app_readonly` NOLOGIN + SELECT ALL + DEFAULT PRIVILEGES 완료
-3. ~~Backups 활성~~ → 세션 16에서 `.env` `ENABLE_DB_BACKUPS=true` 설정 완료
-4. ~~UI 고도화 의존성 설치~~ → 세션 16에서 `@monaco-editor/react`, `@xyflow/react`, `elkjs` 설치 완료 (실제 UI 치환은 대기)
-5. ~~HTTP smoke test~~ → 세션 16에서 12개 P0 페이지 전부 307 확인
-6. **브라우저 로그인 후 12개 P0 페이지 수동 E2E** (실제 데이터 페치/빈 상태/에러 표시 검증)
-7. **SQL Editor monaco 치환** — `src/app/sql-editor/page.tsx` textarea → `@monaco-editor/react`
-8. **Schema Visualizer xyflow 치환** — `src/app/database/schema/page.tsx` 카드 그리드 → `@xyflow/react` + elkjs 자동 레이아웃
+### 즉시 가능 (세션 17 후속 — 최우선)
+1. ~~Prisma 마이그레이션 적용~~ → 세션 16 완료
+2. ~~PG 읽기전용 롤 발급~~ → 세션 16 완료
+3. ~~Backups 활성~~ → 세션 16 완료
+4. ~~UI 고도화 의존성 설치~~ → 세션 16 완료
+5. ~~HTTP smoke test~~ → 세션 16 완료
+6. ~~브라우저 E2E (12개 P0)~~ → 세션 17에서 Playwright로 완료, 콘솔 에러 0건
+7. ~~SQL Editor Monaco 치환~~ → 세션 17 완료
+8. ~~Schema Visualizer xyflow 치환~~ → 세션 17 완료
+9. **Cron 부트스트랩 이식** — `src/lib/cron/registry.ts` `ensureStarted()`가 `/api/v1/cron` 첫 히트까지 대기. PM2 재시작 직후 Cron 대기 상태 → middleware/proxy 또는 별도 워커로 진입점 이식
+10. **`npm audit` 11건 정리** — moderate 10, high 1 (세션 16~17 잔존). 업데이트 영향 분석 후 `npm audit fix` 선별 적용
+11. **Turbopack NFT 경고 해소** — `next.config.ts` → `src/lib/backup/pgdump.ts` 전체 프로젝트 트레이스. `turbopackIgnore` 주석 또는 static scope 이동
+12. **/ypserver 스킬 보강** — Phase 1 Windows `next build`가 `lightningcss-win32-x64-msvc` 부재로 항상 실패. `--skip-local-build` 플래그 또는 WSL 빌드 자동 전환 분기 추가
+
+### UI 후속 (선택)
+- SQL Editor Monaco 자동완성 확장 (PostgreSQL 전용 키워드 `returning/jsonb/ilike` 등)
+- Schema Visualizer 노드 더블클릭 시 `/sql-editor`로 이동 + `SELECT * FROM {table} LIMIT 100` 프리로드
+- xyflow `fitView` 재실행 버튼 (뷰포트 리셋)
 
 ### 완료된 범위 (참고)
 - Phase 1~13 전부 완료
@@ -116,8 +128,10 @@ docs/research/decisions/ADR-002-supabase-adaptation-strategy.md — Supabase 이
 - ~~세션 15 Prisma migrate 미적용~~ → 세션 16에서 `migrate deploy` 완료, `_prisma_migrations`에 기록됨
 - **Cron 부트스트랩**: `src/lib/cron/registry.ts`의 `ensureStarted()`가 `/api/v1/cron` 첫 호출 시 작동. PM2 재시작 직후 Cron이 대기 상태 — 명시적 초기화 진입점을 후속에서 middleware 또는 별도 워커로 이식 권장.
 - ~~SQL Editor 1차 방어 한정~~ → 세션 16에서 `app_readonly` 발급 완료, `BEGIN READ ONLY + SET LOCAL ROLE app_readonly` 이중 방어 검증
+- ~~기본 SQL `"User"` 하드코딩으로 실행 시 400~~ → 세션 17에서 `users` 소문자로 수정
 - **Turbopack NFT 경고**: `next.config.ts` → `src/lib/backup/pgdump.ts` 전체 트레이스. 런타임 영향 없으나 빌드 시 전체 프로젝트 트레이스로 패키지 크기 증가 가능 — `turbopackIgnore` 주석 또는 static scope 이동 필요
 - **`npm audit` 취약점**: 11건 (moderate 10, high 1). 차기 세션 정리
+- **Windows `next build` 불가**: `lightningcss-win32-x64-msvc` optional native bin 미설치. WSL2 Linux 바이너리로 실제 배포는 정상. `/ypserver` Phase 1이 항상 실패하므로 스킬 보강 또는 `npm i -D lightningcss-win32-x64-msvc` 로 복구 가능
 - ~~다른 터미널 배색/테마 작업 충돌 주의~~ (세션 13~14에서 해결됨)
 
 ---
