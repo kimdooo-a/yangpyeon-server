@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { createBackup, listBackups, backupsEnabled } from "@/lib/backup/pgdump";
+import { createBackup, listBackups } from "@/lib/backup/pgdump";
+import { backupsEnabled } from "@/lib/backup/paths";
 import { writeAuditLog } from "@/lib/audit-log";
 
 export const GET = withRole(["ADMIN"], async () => {

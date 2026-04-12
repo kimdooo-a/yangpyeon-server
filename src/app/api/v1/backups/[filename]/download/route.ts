@@ -3,7 +3,7 @@ import { createReadStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { withRole } from "@/lib/api-guard";
 import { errorResponse } from "@/lib/api-response";
-import { BACKUPS_DIR, sanitizeBackupFilename, backupsEnabled } from "@/lib/backup/pgdump";
+import { getBackupsDir, sanitizeBackupFilename, backupsEnabled } from "@/lib/backup/paths";
 import { writeAuditLog } from "@/lib/audit-log";
 
 type RouteContext = { params: Promise<{ filename: string }> };
@@ -19,7 +19,7 @@ export const GET = withRole(["ADMIN"], async (request: NextRequest, user, contex
     return errorResponse("INVALID_FILENAME", "허용되지 않은 파일명입니다", 400);
   }
 
-  const filePath = path.join(BACKUPS_DIR, safe);
+  const filePath = path.join(getBackupsDir(), safe);
   const stat = await fs.stat(filePath).catch(() => null);
   if (!stat || !stat.isFile()) {
     return errorResponse("NOT_FOUND", "파일을 찾을 수 없습니다", 404);
