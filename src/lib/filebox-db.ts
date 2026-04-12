@@ -43,12 +43,22 @@ export async function initFilesDir(): Promise<void> {
   await fs.mkdir(FILES_DIR, { recursive: true });
 }
 
+export class StaleSessionError extends Error {
+  constructor(userId: string) {
+    super(`세션 유저(${userId})가 DB에 존재하지 않습니다. 재로그인이 필요합니다.`);
+    this.name = "StaleSessionError";
+  }
+}
+
 // 유저 루트 폴더 조회 또는 생성
 export async function getOrCreateRootFolder(userId: string) {
   const existing = await prisma.folder.findFirst({
     where: { ownerId: userId, isRoot: true },
   });
   if (existing) return existing;
+
+  const userExists = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!userExists) throw new StaleSessionError(userId);
 
   return prisma.folder.create({
     data: {
