@@ -32,7 +32,8 @@ npm run dev
 docs/MASTER-DEV-PLAN.md                            — 세션별 개발 마스터 계획서 (단일 진실 소스)
 CLAUDE.md                                          — 프로젝트 규칙 + 문서 트리
 docs/status/current.md                             — 현재 상태 + 세션 요약표
-docs/handover/260406-session8-12-massive-feature.md — 최신 인수인계서 (세션 8~12)
+docs/handover/260406-session13-member-mgmt-theme.md — 최신 인수인계서 (세션 13)
+docs/handover/260406-session8-12-massive-feature.md — 직전 인수인계서 (세션 8~12)
 ```
 
 ## 최근 완료된 작업
@@ -41,7 +42,8 @@ docs/handover/260406-session8-12-massive-feature.md — 최신 인수인계서 (
 - 세션 5: kdywave 종합 분석 + 마스터 계획서
 - 세션 6: SPIKE 검증 + Zod
 - 세션 7: 회원관리 + 파일박스 v2 (PostgreSQL)
-- **세션 8~12 (최신)**: 토스트, 감사로그DB, IP화이트리스트, 메트릭차트, SSE실시간, 감사로그UI, 환경변수관리, DB인증통합, 역할접근제어, Cmd+K
+- 세션 8~12: 토스트, 감사로그DB, IP화이트리스트, 메트릭차트, SSE실시간, 감사로그UI, 환경변수관리, DB인증통합, 역할접근제어, Cmd+K
+- **세션 13 (최신)**: 회원관리 백엔드 마무리 + PostgreSQL 연결/마이그레이션 + 로그인 이메일+비밀번호 전환 + Warm Ivory 라이트 테마 전면 적용 + Phase 13d 스켈레톤 UI 착수 (대시보드/프로세스 완료)
 
 ## 현재 DB 구조
 
@@ -67,7 +69,9 @@ docs/handover/260406-session8-12-massive-feature.md — 최신 인수인계서 (
 **마스터 계획서(`docs/MASTER-DEV-PLAN.md`)의 세션 번호를 따라 진행합니다.**
 
 ### 즉시 가능
-- [ ] Phase 13d: 스켈레톤 UI + 빈 상태 컴포넌트 (테마 작업 완료 후)
+- [ ] Phase 13d 잔여: 스켈레톤 UI를 members/network/settings(users, env, ip-whitelist)/filebox/members-[id]에 확장 + 빈 상태 컴포넌트 공통화
+  - 이미 완료: 대시보드(page.tsx), 프로세스(processes/page.tsx), 감사로그(audit), 메트릭(metrics)
+  - 남은 페이지: `로딩 중...` 텍스트만 있는 7개 페이지 → audit/processes 패턴 따라 스켈레톤 적용
 
 ### 세션 13~15 (마스터 계획 세션 14~18)
 - [ ] Phase 14a: TanStack Table Editor (DB 테이블 브라우저)
