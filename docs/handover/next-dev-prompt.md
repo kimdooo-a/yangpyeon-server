@@ -29,11 +29,11 @@ npm run dev
 ## 필수 참조 파일
 
 ```
-docs/MASTER-DEV-PLAN.md                            — 세션별 개발 마스터 계획서 (단일 진실 소스)
-CLAUDE.md                                          — 프로젝트 규칙 + 문서 트리
-docs/status/current.md                             — 현재 상태 + 세션 요약표
-docs/handover/260406-session13-member-mgmt-theme.md — 최신 인수인계서 (세션 13)
-docs/handover/260406-session8-12-massive-feature.md — 직전 인수인계서 (세션 8~12)
+docs/MASTER-DEV-PLAN.md                              — 세션별 개발 마스터 계획서 (단일 진실 소스)
+CLAUDE.md                                            — 프로젝트 규칙 + 문서 트리
+docs/status/current.md                               — 현재 상태 + 세션 요약표
+docs/handover/260412-session14-phase13d-complete.md  — 최신 인수인계서 (세션 14)
+docs/handover/260406-session8-12-massive-feature.md  — 직전 인수인계서 (세션 8~12)
 ```
 
 ## 최근 완료된 작업
@@ -43,7 +43,8 @@ docs/handover/260406-session8-12-massive-feature.md — 직전 인수인계서 (
 - 세션 6: SPIKE 검증 + Zod
 - 세션 7: 회원관리 + 파일박스 v2 (PostgreSQL)
 - 세션 8~12: 토스트, 감사로그DB, IP화이트리스트, 메트릭차트, SSE실시간, 감사로그UI, 환경변수관리, DB인증통합, 역할접근제어, Cmd+K
-- **세션 13 (최신)**: 회원관리 백엔드 마무리 + PostgreSQL 연결/마이그레이션 + 로그인 이메일+비밀번호 전환 + Warm Ivory 라이트 테마 전면 적용 + Phase 13d 스켈레톤 UI 착수 (대시보드/프로세스 완료)
+- 세션 13: 회원관리 백엔드 + PostgreSQL 연결/마이그레이션 + 이메일+비밀번호 로그인 + Warm Ivory 라이트 테마 + Phase 13d 착수
+- **세션 14 (최신)**: 중단 터미널 3개 복구 + Phase 13d 완료 (9개 페이지 스켈레톤 + EmptyState 일괄) → **Phase 13 전체 완료**
 
 ## 현재 DB 구조
 
@@ -69,8 +70,13 @@ docs/handover/260406-session8-12-massive-feature.md — 직전 인수인계서 (
 **마스터 계획서(`docs/MASTER-DEV-PLAN.md`)의 세션 번호를 따라 진행합니다.**
 
 ### 즉시 가능
-- Phase 13 전체 완료 — 다음은 Phase 14a (TanStack Table Editor: DB 테이블 브라우저)부터
-- Phase 13d 스켈레톤 UI는 9개 페이지 전부 적용 완료 (대시보드/프로세스/감사/메트릭/회원/회원상세/네트워크/파일박스/설정3종)
+- **Phase 14a** — TanStack Table Editor: DB 테이블 브라우저 (PostgreSQL User/Folder/File + SQLite audit_logs/metrics_history/ip_whitelist)
+- **Phase 14b** — CRUD Editor: 행 추가/수정/삭제
+- **Phase 14c** — SQL Editor: Monaco Editor + 읽기 전용 쿼리 실행
+
+### 완료된 범위 (참고)
+- Phase 1~13 전부 완료
+- Phase 13d 스켈레톤 UI는 9개 페이지 전부 적용 (대시보드/프로세스/감사/메트릭/회원/회원상세/네트워크/파일박스/설정3종)
 
 ### 세션 13~15 (마스터 계획 세션 14~18)
 - [ ] Phase 14a: TanStack Table Editor (DB 테이블 브라우저)
@@ -87,7 +93,8 @@ docs/handover/260406-session8-12-massive-feature.md — 직전 인수인계서 (
 - **middleware 경고**: Next.js 16에서 middleware → proxy 이름 변경 권장 (동작 문제 없음)
 - **레거시 인증 30일 전환**: role 없는 구형 JWT → ADMIN 간주, DASHBOARD_PASSWORD fallback 유지
 - **터널 수동 시작**: WSL 재시작 시 `cloudflared tunnel run yangpyeong` 수동 실행 필요
-- **다른 터미널**: 배색/테마 작업 진행 중일 수 있음 — globals.css, 페이지 Tailwind 클래스 충돌 주의
+- **Git 원격 동기화**: 세션 14 종료 시점 main 기준 origin 대비 4 commits ahead — 사용자 승인 시 `git push origin main`
+- ~~다른 터미널 배색/테마 작업 충돌 주의~~ (세션 13~14에서 해결됨)
 
 ---
 [← handover/_index.md](./_index.md)

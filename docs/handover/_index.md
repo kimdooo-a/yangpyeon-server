@@ -14,6 +14,12 @@
 
 <!-- 날짜 그룹별로 정리합니다. 최신이 위로 올라갑니다. -->
 
+### 2026-04-12
+
+| 세션 | 파일 | 주요 작업 |
+|------|------|-----------|
+| 14 | [260412-session14-phase13d-complete.md](./260412-session14-phase13d-complete.md) | 중단 터미널 3개 복구 + Phase 13d 완료 (9개 페이지 스켈레톤 + EmptyState) |
+
 ### 2026-04-06
 
 | 세션 | 파일 | 주요 작업 |
@@ -26,6 +32,7 @@
 | 6 | [260406-session6-spike-zod.md](./260406-session6-spike-zod.md) | ypserver 배포 + Zod + SPIKE 3건 기술 검증 |
 | 7 | [260406-session7-filebox-v2.md](./260406-session7-filebox-v2.md) | 파일박스 v1→v2 (DB 기반 폴더 관리) |
 | 8~12 | [260406-session8-12-massive-feature.md](./260406-session8-12-massive-feature.md) | 토스트+DB감사로그+IP화이트리스트+SSE+인증통합+Cmd+K |
+| 13 | _인수인계서 없음 (logs 통합 참조)_ | 회원관리 백엔드 + PostgreSQL + Warm Ivory 테마 |
 
 ---
 
