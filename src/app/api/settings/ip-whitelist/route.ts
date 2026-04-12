@@ -14,8 +14,8 @@ async function ensureCacheLoaded() {
 /**
  * GET /api/settings/ip-whitelist — 목록 조회
  */
-export async function GET() {
-  const auth = await requireRoleApi("ADMIN");
+export async function GET(request: NextRequest) {
+  const auth = await requireRoleApi(request, "ADMIN");
   if (auth.response) return auth.response;
 
   try {
@@ -35,7 +35,7 @@ export async function GET() {
  * POST /api/settings/ip-whitelist — IP 추가
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireRoleApi("ADMIN");
+  const auth = await requireRoleApi(request, "ADMIN");
   if (auth.response) return auth.response;
 
   try {
@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
  * DELETE /api/settings/ip-whitelist — IP 삭제
  */
 export async function DELETE(request: NextRequest) {
-  const auth = await requireRoleApi("ADMIN");
+  const auth = await requireRoleApi(request, "ADMIN");
   if (auth.response) return auth.response;
 
   try {

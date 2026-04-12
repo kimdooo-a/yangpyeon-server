@@ -7,7 +7,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ action: string }> }
 ) {
-  const auth = await requireRoleApi("ADMIN");
+  const auth = await requireRoleApi(request, "ADMIN");
   if (auth.response) return auth.response;
 
   const paramParsed = pm2ActionParamSchema.safeParse(await params);
