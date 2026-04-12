@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
 import path from "path";
 import { envAddSchema, envDeleteSchema } from "@/lib/schemas";
+import { requireRoleApi } from "@/lib/auth-guard";
 
 const ENV_PATH = path.join(process.cwd(), ".env");
 
@@ -121,6 +122,9 @@ async function deleteEnvVar(key: string): Promise<void> {
  * ?reveal=true&key=XXX — 특정 키의 원본 값 조회
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const revealKey = searchParams.get("key");
@@ -160,6 +164,9 @@ export async function GET(request: NextRequest) {
  * POST /api/settings/env — 환경변수 추가/수정
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   try {
     const body = await request.json();
     const parsed = envAddSchema.safeParse(body);
@@ -186,6 +193,9 @@ export async function POST(request: NextRequest) {
  * DELETE /api/settings/env — 환경변수 삭제
  */
 export async function DELETE(request: NextRequest) {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   try {
     const body = await request.json();
     const parsed = envDeleteSchema.safeParse(body);

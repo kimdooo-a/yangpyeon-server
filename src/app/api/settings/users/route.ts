@@ -1,9 +1,10 @@
-import { withRole } from "@/lib/api-guard";
+import type { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { hashPassword } from "@/lib/password";
 import { z } from "zod";
 import type { Role } from "@/generated/prisma/client";
+import { requireRoleApi } from "@/lib/auth-guard";
 
 /** 사용자 생성 요청 스키마 */
 const createUserSchema = z.object({
@@ -27,7 +28,10 @@ const updateUserSchema = z.object({
  * GET /api/settings/users
  * 사용자 목록 조회 (ADMIN 전용)
  */
-export const GET = withRole(["ADMIN"], async () => {
+export async function GET() {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
     select: {
@@ -42,13 +46,16 @@ export const GET = withRole(["ADMIN"], async () => {
   });
 
   return successResponse(users);
-});
+}
 
 /**
  * POST /api/settings/users
  * 사용자 생성 (ADMIN 전용)
  */
-export const POST = withRole(["ADMIN"], async (request) => {
+export async function POST(request: NextRequest) {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -90,13 +97,16 @@ export const POST = withRole(["ADMIN"], async (request) => {
   });
 
   return successResponse(user, 201);
-});
+}
 
 /**
  * PATCH /api/settings/users
  * 사용자 역할/상태 변경 (ADMIN 전용)
  */
-export const PATCH = withRole(["ADMIN"], async (request) => {
+export async function PATCH(request: NextRequest) {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -137,4 +147,4 @@ export const PATCH = withRole(["ADMIN"], async (request) => {
   });
 
   return successResponse(updated);
-});
+}

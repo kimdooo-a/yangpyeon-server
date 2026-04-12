@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execFileSync } from "child_process";
 import { pm2DetailQuerySchema } from "@/lib/schemas";
+import { requireSessionApi } from "@/lib/auth-guard";
 
 export async function GET(request: NextRequest) {
+  const auth = await requireSessionApi();
+  if (auth.response) return auth.response;
+
   const parsed = pm2DetailQuerySchema.safeParse({
     name: request.nextUrl.searchParams.get("name"),
   });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getWhitelist, addIp, removeIp, syncCache } from "@/lib/ip-whitelist";
 import { isCacheLoaded } from "@/lib/ip-whitelist-cache";
 import { ipWhitelistAddSchema, ipWhitelistDeleteSchema } from "@/lib/schemas";
+import { requireRoleApi } from "@/lib/auth-guard";
 
 // 첫 요청 시 캐시 lazy load
 async function ensureCacheLoaded() {
@@ -14,6 +15,9 @@ async function ensureCacheLoaded() {
  * GET /api/settings/ip-whitelist — 목록 조회
  */
 export async function GET() {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   try {
     await ensureCacheLoaded();
     const list = await getWhitelist();
@@ -31,6 +35,9 @@ export async function GET() {
  * POST /api/settings/ip-whitelist — IP 추가
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   try {
     const body = await request.json();
     const parsed = ipWhitelistAddSchema.safeParse(body);
@@ -63,6 +70,9 @@ export async function POST(request: NextRequest) {
  * DELETE /api/settings/ip-whitelist — IP 삭제
  */
 export async function DELETE(request: NextRequest) {
+  const auth = await requireRoleApi("ADMIN");
+  if (auth.response) return auth.response;
+
   try {
     const body = await request.json();
     const parsed = ipWhitelistDeleteSchema.safeParse(body);
