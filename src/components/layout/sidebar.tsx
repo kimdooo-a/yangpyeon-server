@@ -32,6 +32,7 @@ import {
   KeyRound,
   Archive,
   Send,
+  Table2,
 } from "lucide-react";
 
 type NavItem = {
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
   { href: "/members", label: "회원 관리", icon: <IconMembers size={18} />, group: "콘텐츠" },
 
   // 데이터베이스 (신규 — 세션 14)
+  { href: "/tables", label: "테이블 에디터", icon: <Table2 size={18} />, group: "데이터베이스" },
   { href: "/sql-editor", label: "SQL 에디터", icon: <Code2 size={18} />, group: "데이터베이스" },
   { href: "/database/schema", label: "스키마 뷰어", icon: <Workflow size={18} />, group: "데이터베이스" },
   { href: "/data-api", label: "Data API", icon: <Database size={18} />, group: "데이터베이스" },
@@ -91,6 +93,7 @@ const ADMIN_ONLY_PATHS = [
 
 /** MANAGER 이상만 접근 가능한 경로 */
 const MANAGER_PLUS_PATHS = [
+  "/tables",
   "/sql-editor",
   "/database/schema",
   "/data-api",
