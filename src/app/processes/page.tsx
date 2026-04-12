@@ -216,9 +216,19 @@ export default function ProcessesPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-gray-500">로딩 중...</td>
-              </tr>
+              <>
+                {[...Array(4)].map((_, i) => (
+                  <tr key={i} className="border-b border-border">
+                    <td className="px-5 py-3"><div className="h-4 w-24 bg-surface-300 rounded animate-pulse" /></td>
+                    <td className="px-5 py-3"><div className="h-5 w-16 bg-surface-300 rounded-full animate-pulse" /></td>
+                    <td className="px-5 py-3 text-right"><div className="h-4 w-10 bg-surface-300 rounded animate-pulse ml-auto" /></td>
+                    <td className="px-5 py-3 text-right"><div className="h-4 w-16 bg-surface-300 rounded animate-pulse ml-auto" /></td>
+                    <td className="px-5 py-3 text-right"><div className="h-4 w-20 bg-surface-300 rounded animate-pulse ml-auto" /></td>
+                    <td className="px-5 py-3 text-right"><div className="h-4 w-8 bg-surface-300 rounded animate-pulse ml-auto" /></td>
+                    <td className="px-5 py-3 text-right"><div className="h-6 w-16 bg-surface-300 rounded animate-pulse ml-auto" /></td>
+                  </tr>
+                ))}
+              </>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-5 py-8 text-center text-gray-500">
@@ -280,7 +290,22 @@ export default function ProcessesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={() => { setDetail(null); setDetailLoading(false); }}>
           <div className="bg-surface-200 border border-border rounded-lg w-full max-w-lg mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             {detailLoading ? (
-              <div className="p-8 text-center text-gray-500">로딩 중...</div>
+              <>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+                  <div>
+                    <div className="h-5 w-32 bg-surface-300 rounded animate-pulse" />
+                    <div className="h-3 w-16 bg-surface-300 rounded animate-pulse mt-2" />
+                  </div>
+                </div>
+                <div className="p-5 space-y-3 max-h-96 overflow-hidden">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="flex justify-between gap-4">
+                      <div className="h-3 w-20 bg-surface-300 rounded animate-pulse" />
+                      <div className="h-3 w-32 bg-surface-300 rounded animate-pulse" />
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : detail ? (
               <>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-border">

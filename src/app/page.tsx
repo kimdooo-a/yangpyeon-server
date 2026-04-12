@@ -136,11 +136,37 @@ export default function DashboardPage() {
 
   if (!data) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
+      <div className="p-6 space-y-6">
+        {/* 헤더 스켈레톤 */}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-7 w-28 bg-surface-300 rounded animate-pulse" />
+            <div className="h-4 w-48 bg-surface-300 rounded animate-pulse mt-2" />
+          </div>
+        </div>
+        {/* 메트릭 카드 스켈레톤 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-surface-300 rounded-lg" />
+            <div key={i} className="bg-surface-200 border border-border rounded-lg p-5">
+              <div className="h-3 w-20 bg-surface-300 rounded animate-pulse mb-3" />
+              <div className="h-8 w-24 bg-surface-300 rounded animate-pulse mb-2" />
+              <div className="h-3 w-36 bg-surface-300 rounded animate-pulse mb-3" />
+              <div className="h-1.5 w-full bg-surface-300 rounded-full animate-pulse" />
+            </div>
           ))}
+        </div>
+        {/* 디스크 스켈레톤 */}
+        <div>
+          <div className="h-4 w-12 bg-surface-300 rounded animate-pulse mb-3" />
+          <div className="bg-surface-200 border border-border rounded-lg divide-y divide-border">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-5 py-3">
+                <div className="h-3 w-16 bg-surface-300 rounded animate-pulse" />
+                <div className="flex-1 h-2 bg-surface-300 rounded-full animate-pulse" />
+                <div className="h-3 w-10 bg-surface-300 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
