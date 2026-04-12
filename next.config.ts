@@ -2,8 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['better-sqlite3'],
-  // pg_dump 바이너리는 런타임 spawn 호출이라 NFT 추적 불가 — 전역 프로젝트 스캔으로 번짐
-  // 백업 라우트와 SQLite Drizzle 마이그레이션 경로만 외부 의존으로 명시 제외
+  // 백업 라우트에서 pg_dump 바이너리/Prisma 엔진을 번들에서 제외 (NFT cosmetic 경고는 잔존 — Turbopack이 동적 fs 연산을 보수적으로 추적하는 구조적 한계)
   outputFileTracingExcludes: {
     "/api/v1/backups": ["**/pg_dump*", "**/node_modules/@prisma/engines/**"],
     "/api/v1/backups/[filename]/download": ["**/pg_dump*"],
