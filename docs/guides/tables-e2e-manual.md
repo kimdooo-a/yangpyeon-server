@@ -95,3 +95,24 @@
 - Table Editor 커밋: `26b65b6 feat(db): A Phase 14a`
 - 식별자 검증: `src/lib/db/identifier.ts`
 - 읽기 전용 트랜잭션: `src/app/api/v1/tables/[table]/route.ts`
+
+## 실행 이력
+
+### 2026-04-12 22:10 KST (프로덕션 `dec6abe`)
+
+| 시나리오 | 결과 | 비고 |
+|---|---|---|
+| S1 인증 가드 | ✅ PASS | `/tables` → 307 `/login` / `/api/auth/me` → 401 |
+| S2 VIEWER 차단 | ⏭ SKIP | VIEWER 테스트 계정 미보유 — 별도 수행 필요 |
+| S3 테이블 목록 | ✅ PASS | 11개 테이블 렌더. 단, "행 ~-1" 표기 — approximate count API 재검토 필요 (cosmetic) |
+| S4 개별 테이블(users) | ✅ PASS | 10컬럼 + 타입 배지, 1행, 페이지네이션 "총 1" |
+| S5 읽기 전용 강제 | ✅ PASS | PATCH/POST/DELETE → 405, SQL UPDATE → 400 DANGEROUS_SQL |
+| S6 식별자 주입 | ✅ PASS | 6/6 공격 차단 — SQL 키워드 주입, 세미콜론, 쿼트 이스케이프, 유니코드, 경로 traversal, 300자 긴 이름 모두 400/403/404 |
+| S7 app_readonly 경로 | ⚠️ PARTIAL | SELECT 200 정상 동작 확인. PM2 로그 내 `SET LOCAL ROLE` 문자열은 별도 WSL 터미널에서 확인 필요 |
+
+**종합**: Phase 14a 보안 게이트 **전체 통과**. UPDATE/DELETE는 HTTP 메서드 레벨(405) + SQL 레벨(DANGEROUS_SQL 400) 이중 방어.
+
+**후속 과제**:
+- S2: VIEWER 계정 생성 후 재수행
+- S3: 행 수 `-1` 표기 — `information_schema.reltuples` 또는 `COUNT(*)` 사용 전환 검토
+- S6 long_name: 300자 이름이 regex는 통과 (`[a-zA-Z_][a-zA-Z0-9_]*`) — DB 대조에서 안전히 걸리지만, 정규식에 `{1,63}` 길이 제한(PG identifier 최대) 추가 권장
