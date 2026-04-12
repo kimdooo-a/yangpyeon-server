@@ -28,8 +28,8 @@ const updateUserSchema = z.object({
  * GET /api/settings/users
  * 사용자 목록 조회 (ADMIN 전용)
  */
-export async function GET() {
-  const auth = await requireRoleApi("ADMIN");
+export async function GET(request: NextRequest) {
+  const auth = await requireRoleApi(request, "ADMIN");
   if (auth.response) return auth.response;
 
   const users = await prisma.user.findMany({
@@ -53,7 +53,7 @@ export async function GET() {
  * 사용자 생성 (ADMIN 전용)
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireRoleApi("ADMIN");
+  const auth = await requireRoleApi(request, "ADMIN");
   if (auth.response) return auth.response;
 
   let body: unknown;
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
  * 사용자 역할/상태 변경 (ADMIN 전용)
  */
 export async function PATCH(request: NextRequest) {
-  const auth = await requireRoleApi("ADMIN");
+  const auth = await requireRoleApi(request, "ADMIN");
   if (auth.response) return auth.response;
 
   let body: unknown;

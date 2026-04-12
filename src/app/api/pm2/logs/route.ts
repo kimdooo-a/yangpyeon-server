@@ -4,7 +4,7 @@ import { pm2LogsQuerySchema } from "@/lib/schemas";
 import { requireSessionApi } from "@/lib/auth-guard";
 
 export async function GET(request: NextRequest) {
-  const auth = await requireSessionApi();
+  const auth = await requireSessionApi(request);
   if (auth.response) return auth.response;
 
   const { searchParams } = new URL(request.url);
