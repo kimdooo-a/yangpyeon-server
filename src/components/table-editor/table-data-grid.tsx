@@ -8,6 +8,8 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { ColumnTypeBadge } from "./column-type-badge";
+import { EditableCell } from "./editable-cell";
+import { useInlineEditMutation } from "./use-inline-edit-mutation";
 
 interface ColumnMeta {
   name: string;
@@ -33,6 +35,10 @@ interface TableDataGridProps {
   onDeleteRow?: (row: Record<string, unknown>) => void;
   /** 부모에서 증가 시 강제 재fetch (행 추가/편집/삭제 후 새로고침용) */
   refreshToken?: number;
+  /** 읽기 전용 시스템 컬럼 (기본: ["created_at", "updated_at"]) */
+  systemColumns?: string[];
+  /** 편집 성공 후 로컬 행 병합(옵션). 없으면 refreshToken 증가 방식 유지 */
+  onRowPatched?: () => void;
 }
 
 const DEFAULT_LIMIT = 50;
@@ -50,8 +56,11 @@ export function TableDataGrid({
   onEditRow,
   onDeleteRow,
   refreshToken,
+  systemColumns = ["created_at", "updated_at"],
+  onRowPatched,
 }: TableDataGridProps) {
   const [columns, setColumns] = useState<ColumnMeta[]>([]);
+  const [primaryKeyName, setPrimaryKeyName] = useState<string | null>(null);
   const [data, setData] = useState<DataResponse | null>(null);
   const [offset, setOffset] = useState(0);
   const [orderBy, setOrderBy] = useState<string | null>(null);
@@ -68,6 +77,7 @@ export function TableDataGrid({
       throw new Error(body.error?.message ?? "스키마 조회 실패");
     }
     setColumns(body.data.columns);
+    setPrimaryKeyName(body.data.primaryKey?.column ?? null);
   }, [table]);
 
   const fetchRows = useCallback(async () => {
@@ -94,6 +104,16 @@ export function TableDataGrid({
       setLoading(false);
     }
   }, [table, limit, offset, orderBy, orderDir]);
+
+  const { submit: submitInlineEdit } = useInlineEditMutation({
+    table,
+    onRowUpdated: () => {
+      if (onRowPatched) onRowPatched();
+      else fetchRows();
+    },
+    onRowReplaced: () => fetchRows(),
+    onRowMissing: () => fetchRows(),
+  });
 
   useEffect(() => {
     setOffset(0);
@@ -182,21 +202,58 @@ export function TableDataGrid({
           )}
         </button>
       ),
-      cell: ({ getValue }) => {
+      cell: ({ getValue, row }) => {
         const v = getValue();
-        const text = formatCell(v);
+        const isSystem = systemColumns.includes(col.name);
+        const readOnly =
+          col.isPrimaryKey ||
+          isSystem ||
+          !policy?.canUpdate ||
+          primaryKeyName === null;
+        if (readOnly) {
+          const text =
+            v === null || v === undefined
+              ? "NULL"
+              : typeof v === "object"
+                ? JSON.stringify(v)
+                : typeof v === "boolean"
+                  ? String(v)
+                  : String(v);
+          return (
+            <span
+              className={`font-mono text-xs ${v === null ? "text-zinc-500 italic" : "text-zinc-200"}`}
+              title={text}
+            >
+              {text.length > 120 ? text.slice(0, 120) + "…" : text}
+            </span>
+          );
+        }
+        const pkVal = row.original[primaryKeyName!];
+        const expectedUpdatedAt = row.original["updated_at"];
         return (
-          <span
-            className={`font-mono text-xs ${v === null ? "text-zinc-500 italic" : "text-zinc-200"}`}
-            title={text}
-          >
-            {text.length > 120 ? text.slice(0, 120) + "…" : text}
-          </span>
+          <EditableCell
+            value={v}
+            dataType={col.dataType}
+            readOnly={false}
+            onCommit={async (next) => {
+              await submitInlineEdit({
+                pkValue: String(pkVal),
+                column: col.name,
+                value: next,
+                expectedUpdatedAt:
+                  typeof expectedUpdatedAt === "string"
+                    ? expectedUpdatedAt
+                    : expectedUpdatedAt instanceof Date
+                      ? expectedUpdatedAt.toISOString()
+                      : null,
+              });
+            }}
+          />
         );
       },
     }));
     return actionColumn ? [actionColumn, ...base] : base;
-  }, [columns, orderBy, orderDir, actionColumn]);
+  }, [columns, orderBy, orderDir, actionColumn, policy, primaryKeyName, systemColumns, submitInlineEdit]);
 
   const tableInstance = useReactTable({
     data: data?.rows ?? [],
