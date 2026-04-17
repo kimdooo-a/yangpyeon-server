@@ -18,6 +18,7 @@
 
 | 세션 | 파일 | 주요 작업 |
 |------|------|-----------|
+| 23 | [260417-session23-phase-14c-updated-at-fix.md](./260417-session23-phase-14c-updated-at-fix.md) | Phase 14c 1순위 — brainstorming→writing-plans→subagent-driven-development 체인 실행. 9 모델(5 병기 + 4 신규) + 단일 migration + B2 백필. `updated_at` 생략 payload E2E 200 확인(세션 22 500 버그 근본 수정). Compound Knowledge 2건(prisma-windows-wsl-gap, curl-e2e-recipe) |
 | 22 | [260417-session22-phase-14b-e2e-updatedat-bug.md](./260417-session22-phase-14b-e2e-updatedat-bug.md) | Phase 14b E2E DOD 실수행(S8~S11 전체 통과) + `@updatedAt` DB DEFAULT 부재 버그 발견·문서화. Phase 14c 1순위 수정 대상 확정 |
 | 21 | [260417-session21-phase-14b-implementation.md](./260417-session21-phase-14b-implementation.md) | Phase 14b 구현 — `/kdyplanon`으로 세션 20 plan 재개, C1 SQL 롤(luckystyle4u DB) + C2 라이브러리 + C3 API + C4 UI 4 커밋 완료. C5(docs + 배포 + push) 사용자 승인 대기 |
 
