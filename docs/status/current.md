@@ -8,7 +8,7 @@
 |------|-----|
 | 프로젝트명 | 양평 부엌 서버 대시보드 |
 | 스택 | Next.js 16 + TypeScript + Tailwind CSS 4 |
-| 최종 수정 | 2026-04-12 (세션 19) |
+| 최종 수정 | 2026-04-18 (세션 24) |
 
 ## 현재 진행 상태
 
@@ -39,6 +39,7 @@
 - [x] Phase 13d: 스켈레톤 UI + 빈 상태 컴포넌트 (9개 페이지 일괄)
 - [x] Phase 14b: Table Editor CRUD (세션 21 완료) — app_readwrite 롤 + runReadwrite fail-closed + identifier/coerce/table-policy 유틸 + POST/PATCH/DELETE API + RowFormModal 3상태 입력 + 민감 테이블 차단 + PK 쿼리 pg_catalog 전환. 6 커밋 푸시, WSL2 배포+E2E S8~S11 통과(TABLE_ROW_INSERT/UPDATE/DELETE 감사 로그 + OPERATION_DENIED + INVALID_TABLE 전부 확인).
 - [x] **Phase 14c 1순위 (세션 23)**: `@updatedAt` DB DEFAULT 근본 수정 — 5개 기존 모델(User/Folder/SqlQuery/EdgeFunction/CronJob)에 `@default(now())` 병기 + 4개 모델(File/Webhook/ApiKey/LogDrain)에 `updatedAt` 신규 + B2 백필 UPDATE(4 테이블 전부 0행). `20260417140000_add_updated_at_default` migrate deploy 적용. E2E 전 매트릭스 통과 — S8a `updated_at` 생략 payload 200 ✅ (세션 22 500 버그 수정 증명), S8d/S8e 신규 테이블 200, S9~S11 전체 PASS.
+- [x] **Phase 14c-α (세션 24)**: 인라인 셀 편집 + 낙관적 잠금 — spec→plan→subagent-driven 체인. EditableCell/useInlineEditMutation/TypedInputControl 3 컴포넌트 + `expected_updated_at` 바디 필드 + 409 CONFLICT + Sonner 토스트 3액션. **세션 중 버그 발견·근본 수정**: raw SQL UPDATE가 `updated_at`를 자동 bump하지 않아 잠금 비교 무력화 → API가 `SET ..., updated_at = NOW()` 자동 주입(Prisma `@updatedAt` 동등). 프로덕션 E2E 매트릭스 C1~C6 전 PASS (감사 로그 UPDATE=10 / UPDATE_CONFLICT=1). ADR-004 + curl E2E 스크립트 + Playwright 스펙(실행은 Playwright 설치 후). E2/E4(Tab·동시편집) 수동 DOD 위임.
 - [ ] Phase 14~15: 데이터 관리 + 자율 운영 → [docs/MASTER-DEV-PLAN.md](../MASTER-DEV-PLAN.md)
 - [x] Phase 14-S (세션 15): Supabase 관리 체계 이식 Phase A+B — Prisma +7 모델, 11 P0 모듈(/sql-editor, /database/schema, /data-api, /database/{webhooks,cron,backups}, /functions, /realtime, /advisors/{security,performance}, /settings/{api-keys,log-drains}) 스캐폴드.
 - [x] Phase 14-S 배포 (세션 16): Prisma 증분 마이그레이션 적용(`20260412120000_supabase_clone_session_14`), `app_readonly` PG 롤 + SELECT 권한, `.env`에 `ENABLE_DB_BACKUPS=true`, monaco/xyflow/elkjs 설치, 12개 신규 페이지 HTTP 307 smoke 통과, 레거시 런타임 에러 2건(감사 로그 디렉토리, 스테일 세션 FK) 수정, Cloudflare Tunnel PM2 등록.
@@ -94,6 +95,7 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 21 | 2026-04-17 | Phase 14b 완전 구현·배포·E2E 통과 — C1 SQL 롤 + C2 라이브러리 + C3 API + C4 UI + C5 docs + PK 쿼리 pg_catalog 전환 fix + Drizzle migrations 적용 + 프로덕션 S8~S11 E2E(TABLE_ROW_INSERT/UPDATE/DELETE 감사 로그 + users 차단 + 인젝션 차단) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260417-session21-phase-14b-implementation.md) |
 | 22 | 2026-04-17 | Phase 14b E2E DOD 실수행 — `/ypserver prod` 재배포(멱등) + curl 자동화 S8~S11 전 매트릭스 통과(TABLE_ROW_INSERT/UPDATE/DELETE 감사 로그 + 차단 5종). **신규 버그 발견**: Prisma `@updatedAt`이 DB DEFAULT를 만들지 않아 raw SQL INSERT가 500 — 현 UI "행 추가" 실사용자 경로 장애. Phase 14c 1순위 수정 대상 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260417-session22-phase-14b-e2e-updatedat-bug.md) |
 | 23 | 2026-04-17 | Phase 14c 1순위 — brainstorming(D1 Option A / D2 A2 scope / D3 B2 backfill / D4 single migration / D5 full matrix) → writing-plans(13 Task) → subagent-driven-development 실행. 9개 모델 변경(5 병기 + 4 신규) + `20260417140000_add_updated_at_default` migrate deploy + E2E 매트릭스 전 PASS(S8a updated_at 생략 payload 200 ✅). Compound Knowledge 2건 기록 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260417-session23-phase-14c-updated-at-fix.md) |
+| 24 | 2026-04-18 | Phase 14c-α 인라인 편집 + 낙관적 잠금 — α/β/γ 분해 후 α 단독 진행. spec→plan→subagent-driven(Tasks 1~6 haiku/sonnet) + ADR-004. **세션 중 2차 버그 근본 수정**: raw SQL UPDATE가 `updated_at`를 auto-bump하지 않아 잠금 무력화 → `SET ..., updated_at = NOW()` 자동 주입. curl E2E C1~C6 전 PASS, 감사 로그 TABLE_ROW_UPDATE_CONFLICT 영속. β(복합 PK)·γ(VIEWER)는 별도 spec 대기 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260418-session24-phase-14c-alpha.md) |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수

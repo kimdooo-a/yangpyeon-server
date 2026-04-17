@@ -32,101 +32,106 @@ npm run dev
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260417-session23-phase-14c-updated-at-fix.md     ⭐ 최신 (세션 23 완료)
-docs/superpowers/specs/2026-04-17-phase-14c-updated-at-default-design.md
-docs/superpowers/plans/2026-04-17-phase-14c-updated-at-default-plan.md
-docs/solutions/2026-04-17-prisma-migration-windows-wsl-gap.md   ⭐ 신규 Compound Knowledge
-docs/solutions/2026-04-17-curl-e2e-recipe-dashboard.md          ⭐ 신규 Compound Knowledge
-docs/solutions/2026-04-17-phase-14b-updated-at-no-db-default.md (해결됨 — 세션 23)
-docs/research/decisions/ADR-003-phase-14b-table-editor-crud.md
+docs/handover/260418-session24-phase-14c-alpha.md              ⭐ 최신 (세션 24 완료)
+docs/superpowers/specs/2026-04-18-phase-14c-alpha-inline-edit-optimistic-locking-design.md
+docs/superpowers/plans/2026-04-18-phase-14c-alpha-inline-edit-optimistic-locking-plan.md
+docs/research/decisions/ADR-004-phase-14c-alpha-optimistic-locking.md
+docs/handover/260417-session23-phase-14c-updated-at-fix.md
+docs/solutions/2026-04-17-prisma-migration-windows-wsl-gap.md
+docs/solutions/2026-04-17-curl-e2e-recipe-dashboard.md
 docs/MASTER-DEV-PLAN.md
 ```
 
-## 현재 상태 (세션 23 종료 시점)
+## 현재 상태 (세션 24 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~13 전부 완료
 - Phase 14-S (세션 15~16): Supabase 이식 Phase A+B
 - Phase 14a (세션 18): Table Editor 읽기 전용
 - Phase 14b (세션 21 구현, 세션 22 DOD curl E2E 통과): Table Editor CRUD
-- **Phase 14c 1순위 (세션 23 완료)**: `@updatedAt` DB DEFAULT 근본 수정 — 5 모델 병기 + 4 모델(File/Webhook/ApiKey/LogDrain) 신규 필드 + B2 백필 마이그레이션(`20260417140000_add_updated_at_default`). 프로덕션 E2E 전 매트릭스 PASS. RowFormModal "keep" 기본값 실사용자 경로 완전 복구.
+- Phase 14c 1순위 (세션 23): `@updatedAt` DB DEFAULT 근본 수정
+- **Phase 14c-α (세션 24 완료)**: 인라인 셀 편집 + 낙관적 잠금 — `expected_updated_at` 바디 필드 + 409 CONFLICT + Sonner 3액션 토스트 + raw SQL UPDATE auto-bump. ADR-004 채택. 프로덕션 E2E C1~C6 전 PASS.
 
 ### 배포 상태 ✅
-- **원격 main**: 세션 22 종료 시점 `beaa2fb` 이후 세션 23에서 추가 6 커밋 예정(spec→plan→schema→migration→solutions→cs)
-- **프로덕션(WSL2 PM2)**: `prisma migrate deploy` 적용 완료 — 9 테이블 `updated_at DEFAULT CURRENT_TIMESTAMP` 활성
-- 프로덕션 엔드포인트 정상: `/login` 200, `/api/auth/me` 401(쿠키 없을 때), `POST /api/v1/tables/folders` 200 (updated_at 생략 payload로도 통과 확인)
+- **원격 main**: 세션 23 `a00beca` 이후 세션 24에서 11 커밋 추가
+- **프로덕션(WSL2 PM2)**: `src` + `tsconfig.json` 복사 + `npm run build` + `pm2 restart dashboard` 완료. PID 308/1351 이후 안정.
+- **스키마 변경 없음**: 세션 23 migration 활용
+- **프로덕션 엔드포인트 정상**: `/login` 200, `/api/v1/tables/folders` PATCH(락 O/X 양쪽) 정상
 
-### 세션 23 검증 결과 (E2E 전 매트릭스)
-| 시나리오 | 결과 | 비고 |
-|---|---|---|
-| S8a folders INSERT (**updated_at 생략**) | ✅ 200 | ⭐ 세션 22 500 버그 수정 증명 |
-| S8b PATCH folders | ✅ 200 | |
-| S8c DELETE folders | ✅ 200 | `{deleted:true}` |
-| S9 audit TABLE_ROW_* 3건 | ✅ 영속 | SQLite `audit_logs` |
-| S10 users POST | ✅ 403 | OPERATION_DENIED |
-| S11a `folders;DROP TABLE x` | ✅ 400 | INVALID_TABLE |
-| S11b edge_function_runs POST | ✅ 403 | "삭제만 가능" |
-| S8d webhooks INSERT (updated_at 생략) | ✅ 200 | 신규 컬럼 DB DEFAULT |
-| S8e log_drains INSERT (updated_at 생략) | ✅ 200 | 신규 컬럼 DB DEFAULT |
+### 세션 24 검증 결과 (curl E2E 전 PASS)
+| 시나리오 | 결과 |
+|----------|------|
+| C1 정상 PATCH (락 일치) | ✅ 200 |
+| C2 CONFLICT | ✅ 409 + current |
+| C3 NOT_FOUND | ✅ 404 |
+| C4 LEGACY (락 미제공) | ✅ 200 |
+| C5 MALFORMED | ✅ 400 INVALID_EXPECTED_UPDATED_AT |
+| C6 감사 로그 영속 | ✅ UPDATE=10, UPDATE_CONFLICT=1 |
+| Playwright E1~E6 | ⚠ Playwright 미설치 — 다음 세션 과제 |
 
-## 현재 DB 구조
+## 현재 DB 구조 (변경 없음)
 
 ### PostgreSQL (Prisma) — 10 테이블 + 롤 2종
 - 10 테이블: User, Folder, File, SqlQuery, EdgeFunction, EdgeFunctionRun, Webhook, CronJob, ApiKey, LogDrain
 - 롤: `app_readonly` (세션 16) + `app_readwrite` (세션 21)
 - `updated_at` 컬럼: 9/10 테이블 (EdgeFunctionRun 제외) — 전부 `DEFAULT CURRENT_TIMESTAMP`
+- **raw SQL UPDATE 시 auto-bump 적용됨** (세션 24 API 수정)
 
 ### SQLite (Drizzle) — data/dashboard.db
 - audit_logs, metrics_history, ip_whitelist
+- 신규 감사 로그 action: `TABLE_ROW_UPDATE_CONFLICT`
 
 ## 추천 다음 작업
 
-### 방향 1: Phase 14c 본 작업 ⭐
-1. **인라인 편집 + 낙관적 잠금** — `updated_at` 비교 기반 conflict detection. 이제 DB DEFAULT가 있어 자연스러움. Phase 14b RowFormModal을 인라인 셀 편집으로 확장.
-2. **복합 PK 지원** — `[pk]` 동적 라우트 → `[...pk]` 또는 쿼리스트링 다중 컬럼 매칭. PK 추출 쿼리(`pg_index.indkey`)는 이미 배열 반환 구조.
-3. **VIEWER 테스트 계정 생성** — S2 권한 매트릭스 + Phase 14b MANAGER/ADMIN/VIEWER 차등 검증용.
+### 우선순위 1: Phase 14c-β — 복합 PK 지원 ⭐
+세션 24 α의 `expected_updated_at` 패턴을 복합 PK 경로에 확장:
+1. `[pk]` → `[...pk]` 동적 라우트 또는 `?pk.col1=val1&pk.col2=val2` 쿼리스트링
+2. WHERE 빌더가 복수 컬럼 `AND col1=$N AND col2=$M` 생성
+3. `introspect().compositePk=true` 분기에서 현재 400 반환 → 정상 경로로 교체
+4. E2E: 복합 PK 테이블은 프로젝트에 현재 없음 → test 테이블 seed 또는 `_prisma_migrations` 읽기 전용 확인으로 간접 검증
 
-### 방향 2: `/ypserver` 스킬 보강 (인프라 정합성)
-세션 23에서 발견된 한계:
-- Phase 1 Windows `next build` 항상 실패 → 조기 abort(CLAUDE.md 문서화됨)
-- `prisma/` 디렉토리 WSL 복사 단계 없음
-- `prisma migrate deploy` 자동 실행 없음
-- `npm run db:migrate` (Drizzle) 자동 실행 없음
+### 우선순위 2: Phase 14c-γ — VIEWER 계정 + 권한 매트릭스 E2E
+1. VIEWER role seed 스크립트
+2. Playwright 설치 (`npm i -D @playwright/test` + `npx playwright install`)
+3. MANAGER/ADMIN/VIEWER 3롤 × (SELECT/INSERT/UPDATE/DELETE) 매트릭스 자동 검증
+4. 세션 24의 `phase-14c-alpha-ui.spec.ts` 실행 가동
 
-권장 스킬 수정안:
-1. Phase 1 Windows build를 선택적으로(환경변수 또는 파라미터로 스킵)
-2. Phase 2-2에 `cp -r /mnt/e/<proj>/prisma ~/dashboard/` 추가
-3. Phase 2-2 빌드 전에 `npx prisma migrate deploy` 추가
-4. Phase 2-2 빌드 후 `npm run db:migrate` 추가
-5. Compound Knowledge 2026-04-17-prisma-migration-windows-wsl-gap.md 내재화
-
-### 방향 3: 기술부채 소진
-- **Vitest 도입** — `identifier` / `coerce` / `table-policy` / `runReadwrite` 순수 함수 유닛 테스트 (ADR-003 §5 재활성화)
-- **Vercel plugin 훅 억제** — `.claude/settings.json` `matchedSkills` 규칙 (세션 21-23 반복 false positive)
-- **Cloudflare Tunnel 530 재발 조사** — `sysctl -w net.core.rmem_max=7340032` 실험
-- **identifier regex 길이 제한** — `^[a-zA-Z_][a-zA-Z0-9_]{0,62}$` (PG 최대 63자)
-- **행 수 `-1` 표기 수정** — `information_schema.reltuples` 또는 `COUNT(*)` 전환 (cosmetic)
+### 우선순위 3: 본 세션 보류 방향 (사용자 "모두 순차적" 지시의 잔여)
+- **방향 B** `/ypserver` 스킬 보강 (5 갭: Windows build 스킵 / prisma 복사 / migrate deploy / drizzle migrate / Compound Knowledge 내재화)
+- **방향 C** Vitest 도입 (ADR-003 §5 재활성화, identifier/coerce/table-policy/runReadwrite 유닛 테스트)
 
 ### 진입점 예시
 ```
-/kdyguide --start   # 현 상태 브리핑 + 방향 추천
-/kdyguide --route "인라인 편집 및 낙관적 잠금 구현"   # 빠른 라우팅
+/kdyguide --start                          # 현 상태 브리핑 + 방향 추천
+/kdyguide --route "복합 PK 지원 구현"        # β 빠른 라우팅
+/kdyguide --route "Playwright 설치 후 E2E"  # γ 진입
 ```
 
 ## 알려진 이슈 및 주의사항
 
-- ~~**@updatedAt DB DEFAULT 부재로 UI keep 500**~~ — **세션 23 해결** (`20260417140000_add_updated_at_default` 적용)
+- **raw SQL UPDATE auto-bump** (세션 24 신규): `src/app/api/v1/tables/[table]/[pk]/route.ts` PATCH는 `updated_at` 컬럼이 있고 사용자가 명시 설정 안 한 경우 `SET ..., updated_at = NOW()`를 자동 주입. Phase 14c-β 복합 PK에도 동일 로직 유지 필요.
+- **Playwright 미설치**: 세션 24가 `scripts/e2e/phase-14c-alpha-ui.spec.ts`를 작성했으나 실행 불가. 다음 세션에서 설치 + 실행.
+- **tsconfig `scripts` exclude**: Playwright 미설치 상태 tsc 통과용. 설치 후에는 `"scripts"` 제외 제거 가능.
 - **`/ypserver` 스킬 한계**: Phase 1 Windows build 항상 실패, prisma/Drizzle 마이그레이션 단계 부재. 수동 보완 절차 — Compound Knowledge `2026-04-17-prisma-migration-windows-wsl-gap.md` 참조
-- **CSRF 경로 구분**: `/api/v1/*`만 CSRF 면제. `/api/auth/*`(예: login-v2)는 Referer/Origin 필수. `src/proxy.ts` L78-117 및 Compound Knowledge `2026-04-17-curl-e2e-recipe-dashboard.md` 참조
+- **CSRF 경로 구분**: `/api/v1/*`만 CSRF 면제. `/api/auth/*`(예: login-v2)는 Referer/Origin 필수. Compound Knowledge `2026-04-17-curl-e2e-recipe-dashboard.md` 참조
 - **WSL auto-shutdown + /tmp 휘발**: 여러 `wsl -e bash -c` 호출 사이에 인스턴스 종료 가능. E2E 스크립트는 단일 호출 내부로 통합 필수
 - **`DATABASE_URL?schema=public` 비호환**: psql 직접 호출 시 `sed 's/?schema=public//'` 전처리 필요
-- **Cloudflare Tunnel 간헐 530**: PM2 재시작 직후 발생 가능. `pm2 restart cloudflared`로 복구. QUIC 버퍼 튜닝 권장
+- **Cloudflare Tunnel 간헐 530**: PM2 재시작 직후 발생 가능. `pm2 restart cloudflared`로 복구. QUIC 버퍼 튜닝 권장. 세션 24에서도 배포 직후 재발 → 재기동 1회로 복구.
 - **Vercel plugin 훅 false positive**: 프로젝트 Vercel 미사용. 세션 시작 가이드대로 스킵
 - **information_schema 롤 필터링**: `app_readonly`에서 `table_constraints`/`key_column_usage` 0행. introspection은 `pg_catalog` 사용
 - **프로젝트 단위 테스트 러너 부재**: Vitest 미설치. 순수 함수가 API 통합 경로로만 검증됨
 - **Windows `next build` 불가**: `lightningcss-win32-x64-msvc` optional bin 미설치. WSL2 빌드가 진실 소스
 - **proxy.ts `runtime` 선언 금지**: Next.js 16 proxy.ts는 암시적 Node.js 런타임
 - **Cloudflare Tunnel WSL2 재기동**: systemd 비활성 환경에서 Windows 재시작 시 PM2 데몬 자체가 사라질 수 있음 — `pm2 resurrect` 또는 WSL systemd 활성 검토
+
+## 세션 24 Compound Knowledge 후보 (미작성 — 다음 세션 추출)
+
+- `docs/solutions/2026-04-18-raw-sql-updatedat-bump.md` — Prisma `@updatedAt` 클라이언트 한계 + raw SQL 경로에서 낙관적 잠금 구현 시 서버측 auto-bump 필수
+- `docs/solutions/2026-04-18-subagent-driven-pragmatism.md` — 플랜에 완전 코드 포함 시 subagent reviewer 2회 dispatch 대신 controller diff 검증이 효율적
+
+## 사용자 기록 (메모리)
+
+- [자율 실행 우선](../../../../Users/smart/.claude/projects/E--00-develop-260406-luckystyle4u-server/memory/feedback_autonomy.md) — 분기 질문 금지, 권장안 즉시 채택 (파괴적 행동만 예외). 세션 24 시작 시 사용자 명시 지시.
 
 ---
 [← handover/_index.md](./_index.md)
