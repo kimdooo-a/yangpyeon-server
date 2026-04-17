@@ -83,12 +83,17 @@ export const GET = withRole(
           ? { column: pkColumn.name, dataType: pkColumn.dataType }
           : null;
       const compositePk = pkRows.length > 1;
+      // pg_index.indkey 순서 보존 — WHERE 절 파라미터 순서에 사용
+      const compositePkColumns = compositePk
+        ? pkRows.map((r) => r.column_name)
+        : [];
 
       return successResponse({
         table,
         columns: result,
         primaryKey,
         compositePk,
+        compositePkColumns,
       });
     } catch (err) {
       return errorResponse(
