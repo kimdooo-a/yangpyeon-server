@@ -184,9 +184,18 @@ export const PATCH = withRole(
       throw err;
     }
 
-    const setSql = setCols
-      .map((c, i) => `${quoteIdent(c)} = $${i + 1}`)
-      .join(", ");
+    // Prisma @updatedAt은 클라이언트 레벨 마커라 raw SQL UPDATE에는 적용되지 않음.
+    // 낙관적 잠금이 작동하려면 매 UPDATE마다 updated_at이 실제 변화해야 함.
+    // 사용자가 updated_at을 명시적으로 set하지 않았고 테이블에 컬럼이 있으면 자동 bump.
+    const hasUpdatedAtCol = meta.colTypeMap.has("updated_at");
+    const userSetUpdatedAt = setCols.includes("updated_at");
+    const autoBumpSuffix =
+      hasUpdatedAtCol && !userSetUpdatedAt ? ", updated_at = NOW()" : "";
+
+    const setSql =
+      setCols
+        .map((c, i) => `${quoteIdent(c)} = $${i + 1}`)
+        .join(", ") + autoBumpSuffix;
     const sqlParams: unknown[] = [...setVals, pkValue];
     let whereSql = `${quoteIdent(meta.pkColumn!.column_name)} = $${sqlParams.length}`;
     if (expectedUpdatedAt !== null) {

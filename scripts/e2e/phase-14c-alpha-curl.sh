@@ -30,15 +30,13 @@ OWNER_ID=$(curl -s -b "$COOKIE" "$DASH_BASE/api/auth/me" \
 echo "OK: 로그인 (OWNER_ID=$OWNER_ID)"
 echo
 
-# --- seed: 테스트 folder 1개 INSERT ---
+# --- seed: 테스트 folder 1개 INSERT + updated_at 수집 (RETURNING *) ---
 TEST_ID=$(python3 -c 'import uuid; print(uuid.uuid4())')
-curl -s -b "$COOKIE" -X POST "$DASH_BASE/api/v1/tables/folders" \
+INSERT_RES=$(curl -s -b "$COOKIE" -X POST "$DASH_BASE/api/v1/tables/folders" \
   -H 'Content-Type: application/json' \
-  -d "{\"values\":{\"id\":{\"action\":\"set\",\"value\":\"$TEST_ID\"},\"name\":{\"action\":\"set\",\"value\":\"alpha-test\"},\"owner_id\":{\"action\":\"set\",\"value\":\"$OWNER_ID\"},\"is_root\":{\"action\":\"set\",\"value\":false}}}" \
-  -o /dev/null
-
-INITIAL_UPDATED_AT=$(curl -s -b "$COOKIE" "$DASH_BASE/api/v1/tables/folders?limit=1&where=id=$TEST_ID" \
-  | python3 -c "import json,sys; d=json.load(sys.stdin); print([r for r in d['data']['rows'] if r['id']=='$TEST_ID'][0]['updated_at'])")
+  -d "{\"values\":{\"id\":{\"action\":\"set\",\"value\":\"$TEST_ID\"},\"name\":{\"action\":\"set\",\"value\":\"alpha-test\"},\"owner_id\":{\"action\":\"set\",\"value\":\"$OWNER_ID\"},\"is_root\":{\"action\":\"set\",\"value\":false}}}")
+INITIAL_UPDATED_AT=$(echo "$INSERT_RES" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["data"]["row"]["updated_at"])')
+[ -z "$INITIAL_UPDATED_AT" ] && { echo "FAIL: seed updated_at 추출 실패 — $INSERT_RES"; exit 1; }
 echo "OK: seed folder $TEST_ID (updated_at=$INITIAL_UPDATED_AT)"
 echo
 
