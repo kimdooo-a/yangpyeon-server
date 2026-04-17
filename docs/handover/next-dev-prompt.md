@@ -39,20 +39,20 @@ docs/handover/260412-session19-ops-security-hardening.md
 docs/handover/260412-session18-auth-refactor.md
 ```
 
-## 현재 상태 (세션 21 종료 시점)
+## 현재 상태 (세션 22 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~13 전부 완료
 - Phase 14-S (세션 15~16): Supabase 이식 Phase A+B
 - Phase 14a (세션 18): Table Editor 읽기 전용
-- **Phase 14b (세션 21): Table Editor CRUD 완전 구현·배포·E2E 통과** ✅
+- **Phase 14b (세션 21 구현, 세션 22 DOD 완료)**: Table Editor CRUD curl E2E S8~S11 전 매트릭스 통과 ✅ — 단 **`@updatedAt` DB DEFAULT 부재로 UI "keep" 경로는 500** (Phase 14c 1순위 수정 대상)
 - Phase 14c (세션 17): SQL Editor Monaco (인라인 편집은 Phase 14c에서 재정의 예정)
 
 ### 배포 상태 ✅
-- **원격 main**: `9f6d611` (세션 21 종료)
-- **로컬 HEAD**: `9f6d611` (동기화됨)
-- **프로덕션(WSL2 PM2)**: 동기화됨 (PK fix + Drizzle migrations + app_readwrite 롤 반영)
-- 프로덕션 엔드포인트 정상: `/login` 200, `/api/auth/me` 401, `/api/v1/tables/folders/schema` 200
+- **원격 main**: `a57cfb6` (세션 21 /cs) — 세션 22는 docs 추가 커밋 예정
+- **로컬 HEAD**: `a57cfb6` → 세션 22 커밋 대기
+- **프로덕션(WSL2 PM2)**: 세션 21 이후 `/ypserver prod` 재배포 멱등 수행 (세션 22, 코드 변경 없음)
+- 프로덕션 엔드포인트 정상: `/login` 200, `/api/auth/me` 401, `/api/v1/tables/folders/schema` 200, `POST /api/v1/tables/folders` 200(updated_at 수동 조건부)
 
 ### 세션 21 검증 결과 (E2E S8~S11)
 | 시나리오 | 결과 |
@@ -75,17 +75,34 @@ docs/handover/260412-session18-auth-refactor.md
 
 ## 추천 다음 작업
 
-### 즉시 가능
+### Phase 14c 1순위 — `@updatedAt` DB DEFAULT 병기 마이그레이션 ⭐
 
-1. **브라우저 UI 최종 재검증** — 세션 21에서 Cloudflare Tunnel 일시 530으로 브라우저 S8~S10 완전 플로우는 curl 대체 검증. 사용자가 직접 브라우저로:
-   - `/tables/folders` "행 추가" → 모달 → 저장 → 그리드 반영
-   - 편집/삭제 버튼 + confirm 다이얼로그
+**배경**: 세션 22 E2E에서 raw SQL INSERT(Phase 14b CRUD)가 `updated_at` 생략 시 500 확인. Prisma `@updatedAt`은 DB DEFAULT를 만들지 않아 ORM 외부 경로가 NULL 제약을 위반. RowFormModal 3상태 "keep" 기본값으로 **현재 프로덕션 UI "행 추가"가 실사용자에게 장애**.
+
+**수정 방법 (Option A 권장)**:
+```prisma
+// prisma/schema.prisma — @updatedAt 선언된 9개 모델(User/Folder/File/SqlQuery/
+//   EdgeFunction/Webhook/CronJob/ApiKey/LogDrain) 전부 병기
+updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp(3)
+//                  ^^^^^^^^^^^^^^^ 추가
+```
+`npx prisma migrate dev -n "add_updated_at_default"` → `ALTER TABLE ... SET DEFAULT CURRENT_TIMESTAMP`. `/ypserver prod` 재배포 후 S8 UI keep 경로 재검증.
+
+**상세**: `docs/solutions/2026-04-17-phase-14b-updated-at-no-db-default.md` (Option A/B/C 비교 포함)
+
+### Phase 14c 본 작업
+1. **브라우저 UI 최종 재검증** — `@updatedAt` fix 배포 후 사용자 직접:
+   - `/tables/folders` "행 추가" → 모달 → 저장(keep 기본값) → 그리드 반영
+   - 편집/삭제 + confirm 다이얼로그
    - `/audit` 페이지에서 TABLE_ROW_* 기록 확인
    - `/tables/users` 편집 불가 메시지
 
-2. **Phase 14c 착수** — 인라인 편집 + 낙관적 잠금 + 복합 PK 지원
-   - 진입점: `/kdyguide --start` → brainstorming → writing-plans 체인
-   - ADR 검토: `updated_at` 기반 낙관적 잠금 설계, 복합 PK WHERE 절 구조
+2. **인라인 편집 + 낙관적 잠금** — `updated_at` 비교 기반 conflict detection. Option A 적용 후 자연스러움.
+3. **복합 PK 지원** — `[pk]` 동적 라우트 → `[...pk]` 또는 쿼리스트링 다중 매칭.
+4. **VIEWER 테스트 계정 생성** — S2 + Phase 14b 권한 매트릭스(MANAGER/ADMIN/VIEWER) 검증.
+
+### 진입점
+`/kdyguide --start` → brainstorming(Option A vs B vs C 선택) → writing-plans (Phase 14c 실행 계획) → executing-plans / subagent-driven-development
 
 3. **배포 스크립트 개선 (`/ypserver` 스킬)** — 세션 21 발견:
    - `drizzle.config.ts` + `prisma/schema.prisma` WSL 복사 단계 추가
