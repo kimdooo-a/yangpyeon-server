@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import { typeToInput, TypedInputControl } from "./editable-cell-inputs";
 
 interface ColumnMeta {
   name: string;
@@ -26,27 +27,6 @@ interface RowFormModalProps {
   primaryKey: { column: string; dataType: string } | null;
   onClose: () => void;
   onSubmitted: () => void;
-}
-
-function typeToInput(
-  dataType: string,
-): "text" | "number" | "checkbox" | "datetime-local" | "textarea" {
-  const dt = dataType.toLowerCase();
-  if (dt === "boolean") return "checkbox";
-  if (
-    dt === "integer" ||
-    dt === "bigint" ||
-    dt === "smallint" ||
-    dt === "numeric" ||
-    dt === "real" ||
-    dt === "double precision" ||
-    dt.startsWith("decimal")
-  ) {
-    return "number";
-  }
-  if (dt.startsWith("timestamp") || dt === "date") return "datetime-local";
-  if (dt === "json" || dt === "jsonb" || dt === "text") return "textarea";
-  return "text";
 }
 
 function defaultCellState(
@@ -188,45 +168,17 @@ export function RowFormModal({
                     <option value="set">값 입력</option>
                     {col.nullable && <option value="null">NULL</option>}
                   </select>
-                  {st.action === "set" && input === "checkbox" && (
-                    <select
-                      value={st.value || "false"}
-                      onChange={(e) =>
-                        setState((p) => ({
-                          ...p,
-                          [col.name]: { ...st, value: e.target.value },
-                        }))
-                      }
-                      className="rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
-                    >
-                      <option value="true">true</option>
-                      <option value="false">false</option>
-                    </select>
-                  )}
-                  {st.action === "set" && input !== "checkbox" && input !== "textarea" && (
-                    <input
-                      type={input}
+                  {st.action === "set" && (
+                    <TypedInputControl
+                      kind={input}
                       value={st.value}
-                      onChange={(e) =>
+                      onChange={(next) =>
                         setState((p) => ({
                           ...p,
-                          [col.name]: { ...st, value: e.target.value },
+                          [col.name]: { ...st, value: next },
                         }))
                       }
-                      className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200"
-                    />
-                  )}
-                  {st.action === "set" && input === "textarea" && (
-                    <textarea
-                      value={st.value}
-                      onChange={(e) =>
-                        setState((p) => ({
-                          ...p,
-                          [col.name]: { ...st, value: e.target.value },
-                        }))
-                      }
-                      rows={3}
-                      className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 font-mono text-xs text-zinc-200"
+                      className={input === "checkbox" ? "" : "flex-1"}
                     />
                   )}
                 </div>
