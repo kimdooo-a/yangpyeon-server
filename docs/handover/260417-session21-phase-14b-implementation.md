@@ -10,7 +10,7 @@
 
 ## 작업 요약
 
-세션 20에서 설계·계획 완료된 Phase 14b(Table Editor CRUD)를 계획서 1:1 매핑으로 구현. `/kdyguide --start` → A 경로(`/kdyplanon` → `superpowers:subagent-driven-development` 가이드) 진입. 12 Task × 5 커밋(C1~C5) 중 **C1~C4 완료(로컬 커밋 4건)**. C5(배포·push)는 사용자 승인 대기.
+세션 20에서 설계·계획 완료된 Phase 14b(Table Editor CRUD)를 계획서 1:1 매핑으로 구현 및 **프로덕션 배포·E2E 통과 완료**. `/kdyguide` → A 경로(`/kdyplanon` → plan 재개) 진입. 12 Task × 5 커밋(C1~C5) 전부 완료 + 배포 중 발견한 2건 버그 수정 + 3건 Compound Knowledge 축적. 총 **7 커밋 원격 푸시**.
 
 ## 커밋 요약 (세션 21 기여)
 
@@ -20,7 +20,11 @@
 | `99585ce` | C2: 라이브러리 | `src/lib/db/identifier.ts`, `coerce.ts`, `table-policy.ts`, `src/lib/pg/pool.ts` |
 | `d967746` | C3: API | `src/app/api/v1/tables/[table]/route.ts` (POST), `[table]/[pk]/route.ts` (신규, PATCH+DELETE), `schema/route.ts` (PK 필드) |
 | `2cbf226` | C4: UI | `src/components/table-editor/row-form-modal.tsx` (신규), `table-data-grid.tsx` (액션 컬럼), `(protected)/tables/[table]/page.tsx` (CTA + 모달) |
-| (pending) | C5: docs + deploy + push | tables-e2e-manual.md, current.md, logs, handover, next-dev-prompt + WSL2 빌드 + `git push` |
+| `0240d69` | C5-docs | tables-e2e-manual S8~S11, current.md, logs, journal, handover, _index, next-dev-prompt |
+| `f288c88` | fix: PK 쿼리 pg_catalog | `schema/route.ts`, `[pk]/route.ts` — app_readonly 롤 호환 |
+| `9f6d611` | docs: 세션 21 완료 반영 | current.md + journal 토픽 8~11 |
+
+**배포**: WSL2 빌드(`bnfg804cy`) + PK fix 재빌드(`byyp94th8`) + Drizzle migrations(`npm run db:migrate`) + PM2 restart 모두 완료. 원격 main `98b4f0c..9f6d611` 푸시. 프로덕션 엔드포인트 정상(`https://stylelucky4u.com/login` 200, `/api/auth/me` 401, `/api/v1/tables/folders/schema` 200 w/ primaryKey).
 
 ## 주요 구현 결정 (실 구현 시 발견)
 
@@ -60,20 +64,35 @@ Plan: `body.data.role` 가정.
 
 ## 검증 결과
 
-- **tsc**: C2/C3/C4 각 단계 완료 시점 EXIT=0
+- **tsc**: C2/C3/C4/PK fix 각 단계 완료 시점 EXIT=0
 - **SQL 적용**: WSL2 PG에 `app_readwrite` 롤 존재 + INSERT/SELECT/DELETE 권한 스모크 통과 (ROLLBACK)
+- **Drizzle migrations**: `db:migrate`로 audit_logs/ip_whitelist/metrics_history 3개 테이블 프로덕션 적용
 - **dev 서버 기동**: 1초 내 ready, `/api/auth/me` 401 응답으로 인증 가드 동작 확인
-- **통합 E2E**: 미수행 (C5 프로덕션 배포 후 실시 예정)
+- **프로덕션 E2E (curl 경유 localhost + 브라우저 일부)**:
+  | 시나리오 | 결과 |
+  |---|---|
+  | S8 POST folders | ✅ 200 + row 반환 |
+  | S9 PATCH folders/[id] name 변경 | ✅ 200 + updated row |
+  | S10 DELETE folders/[id] | ✅ 200 + deleted:true |
+  | S11a POST users | ✅ 403 OPERATION_DENIED |
+  | S11b POST 'folders;DROP' | ✅ 400 INVALID_TABLE |
+- **감사 로그**: `TABLE_ROW_INSERT`/`UPDATE`/`DELETE` 각 1건 영속 기록, detail에 이메일 + diff JSON 포함 확인
+- **테이블 클린업**: folders 원본 1행("내 파일") 유지, 테스트 행 전부 DELETE 정리
 
 ## 터치하지 않은 영역
 
-- WSL2 빌드 + PM2 재시작 (C5 Step 1)
-- 프로덕션 curl smoke (C5 Step 2)
-- 브라우저 수동 E2E S8~S11 (C5 Step 3)
-- `git push origin main` (C5 Step 6)
 - Vitest 도입 (계획서 YAGNI 결정 — ADR-003 §5 재활성화 조건부)
 - 인라인 편집 + 낙관적 잠금 (Phase 14c)
 - 복합 PK 지원 (Phase 14c 이후)
+- 브라우저에서 완전한 S8-S10 플로우 (Cloudflare Tunnel 일시 530으로 curl 대체 검증) — 엔드투엔드 코드 경로는 동일하지만 UI 인터랙션 레이어의 시각적 확인은 사용자 재검증 권장
+
+## Compound Knowledge 산출 (4.5단계)
+
+| # | 파일 | 카테고리 | 요약 |
+|---|------|----------|------|
+| 1 | `docs/solutions/2026-04-17-information-schema-role-filtering-pk-regression.md` | bug-fix | `information_schema` 뷰가 제한 롤에서 privilege 필터링으로 0행 반환 — `pg_catalog` 전환. Phase 14a부터 존재한 숨은 회귀. |
+| 2 | `docs/solutions/2026-04-17-drizzle-migrations-missing-on-wsl2-deploy.md` | tooling | 배포 스크립트가 `npm run db:migrate` 누락 — audit_logs 테이블 부재로 감사 로그 실패(반쪽 성공). ypserver 스킬 개선 필요. |
+| 3 | `docs/solutions/2026-04-17-cloudflare-tunnel-intermittent-530.md` | workaround | PM2 재시작 후 cloudflared가 간헐 530 반환 — `pm2 restart cloudflared`로 복구. QUIC UDP 버퍼 튜닝 권장. |
 
 ## 알려진 이슈
 

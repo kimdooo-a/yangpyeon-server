@@ -22,7 +22,7 @@ npm run dev
 |--------|-----|
 | 로컬 | http://localhost:3000 |
 | 외부 | https://stylelucky4u.com |
-| 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan (`/login-v2` 사용) |
+| 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan (`/login` 페이지 사용, 백엔드는 `/api/v1/auth/login` Bearer) |
 
 ## 필수 참조 파일
 
@@ -30,13 +30,13 @@ npm run dev
 docs/MASTER-DEV-PLAN.md
 CLAUDE.md
 docs/status/current.md
-docs/handover/260417-session21-phase-14b-implementation.md   ⭐ 최신 (세션 21)
+docs/handover/260417-session21-phase-14b-implementation.md   ⭐ 최신 (세션 21 완료)
 docs/research/decisions/ADR-003-phase-14b-table-editor-crud.md
-docs/research/plans/phase-14b-table-editor-crud-plan.md      ⭐ C5 남음
+docs/research/plans/phase-14b-table-editor-crud-plan.md      (완료 기록)
+docs/solutions/2026-04-17-*.md                               ⭐ Compound Knowledge 3건 (PK/migrations/tunnel)
 docs/handover/260412-session20-phase-14b-design.md
 docs/handover/260412-session19-ops-security-hardening.md
 docs/handover/260412-session18-auth-refactor.md
-docs/solutions/2026-04-12-*.md
 ```
 
 ## 현재 상태 (세션 21 종료 시점)
@@ -45,59 +45,78 @@ docs/solutions/2026-04-12-*.md
 - Phase 1~13 전부 완료
 - Phase 14-S (세션 15~16): Supabase 이식 Phase A+B
 - Phase 14a (세션 18): Table Editor 읽기 전용
+- **Phase 14b (세션 21): Table Editor CRUD 완전 구현·배포·E2E 통과** ✅
 - Phase 14c (세션 17): SQL Editor Monaco (인라인 편집은 Phase 14c에서 재정의 예정)
-- **Phase 14b (세션 21, 구현 완료 — 배포 대기)**: Table Editor CRUD
 
-### 배포 상태 ⚠️
-- **원격 main**: `98b4f0c` (세션 20 종료)
-- **로컬 HEAD**: `2cbf226` (C4 완료) — 원격 대비 **4 커밋 앞섬**
-- **프로덕션(WSL2 PM2)**: `0e59be0` (세션 18 종료) — 세션 19+20 문서 + Phase 14b 구현 전부 미반영
+### 배포 상태 ✅
+- **원격 main**: `9f6d611` (세션 21 종료)
+- **로컬 HEAD**: `9f6d611` (동기화됨)
+- **프로덕션(WSL2 PM2)**: 동기화됨 (PK fix + Drizzle migrations + app_readwrite 롤 반영)
+- 프로덕션 엔드포인트 정상: `/login` 200, `/api/auth/me` 401, `/api/v1/tables/folders/schema` 200
 
-### Phase 14b 잔여 작업 (C5 — 다음 세션 즉시 착수)
+### 세션 21 검증 결과 (E2E S8~S11)
+| 시나리오 | 결과 |
+|---|---|
+| S8 POST folders | ✅ 200 + row 반환 |
+| S9 PATCH folders/[id] | ✅ 200 + name 업데이트 |
+| S10 DELETE folders/[id] | ✅ 200 + deleted:true |
+| S11a users POST | ✅ 403 OPERATION_DENIED |
+| S11b `folders;DROP` 인젝션 | ✅ 400 INVALID_TABLE |
+| 감사 로그 | ✅ TABLE_ROW_INSERT/UPDATE/DELETE 3건 영속 |
 
-1. **C5 docs 커밋** — `tables-e2e-manual.md` S8~S11, `current.md`, `logs/2026-04.md`, `journal-2026-04-17.md`, session 21 handover, `_index.md`, 본 `next-dev-prompt.md` (모두 로컬 수정 완료, 커밋만 남음)
-
-2. **WSL2 빌드 + PM2 재시작**:
-   ```bash
-   wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp -r /mnt/e/00_develop/260406_luckystyle4u_server/src . && cp /mnt/e/00_develop/260406_luckystyle4u_server/next.config.ts /mnt/e/00_develop/260406_luckystyle4u_server/tsconfig.json /mnt/e/00_develop/260406_luckystyle4u_server/tailwind.config.ts /mnt/e/00_develop/260406_luckystyle4u_server/postcss.config.mjs /mnt/e/00_develop/260406_luckystyle4u_server/package.json . && npm install && npm run build && pm2 restart dashboard"
-   ```
-
-3. **프로덕션 curl smoke**:
-   ```bash
-   # 쿠키 획득(login-v2 — CSRF 토큰 선행) 또는 브라우저 세션 활용
-   curl -s -b <cookie> https://stylelucky4u.com/api/v1/tables/folders/schema | head -c 300
-   # → primaryKey, compositePk 필드 포함 JSON 기대
-   ```
-
-4. **브라우저 E2E S8~S11**:
-   - `/tables/folders` — 행 추가(ADMIN) / 편집 / 삭제 / 감사 로그 3건 누적 확인
-   - `/tables/users` — "편집 불가" 메시지 + API 직접 호출 시 403
-   - `/tables/edge_function_runs` — 삭제 버튼만 노출(ADMIN)
-
-5. **`git push origin main`** — C1~C5 5 커밋 일괄 푸시
-
-## 현재 DB 구조 (변경 없음)
+## 현재 DB 구조
 
 ### PostgreSQL (Prisma) — 10 테이블 + 롤 2종
 - 10 테이블: User, Folder, File, SqlQuery, EdgeFunction, EdgeFunctionRun, Webhook, CronJob, ApiKey, LogDrain
-- 롤: `app_readonly` (세션 16) + **`app_readwrite`** (세션 21 추가)
+- 롤: `app_readonly` (세션 16) + `app_readwrite` (세션 21)
 
 ### SQLite (Drizzle) — data/dashboard.db
 - audit_logs, metrics_history, ip_whitelist
 
-## Phase 14c 로드맵 (Phase 14b C5 완료 후)
+## 추천 다음 작업
 
-Phase 14c 목표: Table Editor 인라인 편집 + 낙관적 잠금.
+### 즉시 가능
 
-- **복합 PK 지원** — 현 Phase 14b는 단일 PK 한정. 복합 WHERE 절 + 폼 복합 입력 UI
-- **낙관적 잠금** — `updated_at` 비교 기반. 동시 수정 충돌 시 409 Conflict + UI 재조회 유도
-- **인라인 셀 편집** — TanStack Table cell 더블클릭 → 타입별 에디터(체크박스/date/JSON textarea) → Enter 저장 / Esc 취소 / 탭 네비게이션
+1. **브라우저 UI 최종 재검증** — 세션 21에서 Cloudflare Tunnel 일시 530으로 브라우저 S8~S10 완전 플로우는 curl 대체 검증. 사용자가 직접 브라우저로:
+   - `/tables/folders` "행 추가" → 모달 → 저장 → 그리드 반영
+   - 편집/삭제 버튼 + confirm 다이얼로그
+   - `/audit` 페이지에서 TABLE_ROW_* 기록 확인
+   - `/tables/users` 편집 불가 메시지
+
+2. **Phase 14c 착수** — 인라인 편집 + 낙관적 잠금 + 복합 PK 지원
+   - 진입점: `/kdyguide --start` → brainstorming → writing-plans 체인
+   - ADR 검토: `updated_at` 기반 낙관적 잠금 설계, 복합 PK WHERE 절 구조
+
+3. **배포 스크립트 개선 (`/ypserver` 스킬)** — 세션 21 발견:
+   - `drizzle.config.ts` + `prisma/schema.prisma` WSL 복사 단계 추가
+   - `npm run db:migrate` + `npx prisma migrate deploy` 자동 포함
+   - 상세: `docs/solutions/2026-04-17-drizzle-migrations-missing-on-wsl2-deploy.md`
+
+4. **Vercel plugin 훅 억제** — 세션 21에서 false positive 10회 이상. `.claude/settings.json` 규칙으로 pattern-match 범위 조정. 특히:
+   - Next.js 16 async params 린터 (Phase 14a 관습 오판)
+   - Vercel 관련 스킬 injection (프로젝트 Vercel 미사용)
+
+### 후속
+
+5. **Vitest 도입** — `identifier` / `coerce` / `table-policy` 순수 함수 유닛 테스트 (ADR-003 §5 재활성화)
+
+6. **VIEWER 테스트 계정 생성** — S2 + 권한 매트릭스 완전 검증용
+
+7. **QUIC UDP 버퍼 튜닝** — Cloudflare Tunnel 안정화
+   - `net.core.rmem_max=7500000` + `net.core.rmem_default=2500000`
+   - 상세: `docs/solutions/2026-04-17-cloudflare-tunnel-intermittent-530.md`
+
+8. **identifier regex 길이 제한** — `^[a-zA-Z_][a-zA-Z0-9_]{0,62}$` (PG 최대 63자)
+
+9. **행 수 `-1` 표기 수정** — `information_schema.reltuples` 또는 `COUNT(*)` 전환 (cosmetic)
 
 ## 알려진 이슈 및 주의사항
 
-- **Vercel plugin 훅 false positive**: 프로젝트가 Vercel 미사용이라 세션 시작 가이드대로 스킵. 특히 Next.js 16 async params 린터가 Phase 14a 관습(`await context.params` 선처리 후 로컬 변수 접근)을 반복 오판. 후속 세션에서 `.claude/settings.json` 억제 규칙 검토
-- **프로젝트 단위 테스트 러너 부재**: Vitest 미설치. `identifier`/`coerce`/`table-policy` 순수 함수가 API 통합 경로로만 검증됨 — Phase 14c 진입 전 Vitest 도입 권장 (ADR-003 §5 재활성화)
-- **dev 서버 CSRF 플로우**: `/api/auth/login-v2`는 CSRF 토큰 선행 필수. 로컬 curl 통합 테스트가 환경 의존적 — 별도 E2E 스크립트(토큰 획득 → 쿠키 유지) 작성 가능
+- **Cloudflare Tunnel 간헐 530**: PM2 재시작 직후 발생 가능. `pm2 restart cloudflared`로 복구. QUIC 버퍼 튜닝 권장 (solutions/2026-04-17-cloudflare-tunnel-intermittent-530.md)
+- **Vercel plugin 훅 false positive**: 프로젝트 Vercel 미사용. 세션 시작 가이드대로 스킵. 특히 Next.js 16 async params 린터가 Phase 14a 관습(`await context.params` 선처리 후 로컬 변수 접근)을 반복 오판
+- **information_schema 롤 필터링**: `app_readonly`에서 `table_constraints`/`key_column_usage` 0행 반환. introspection은 `pg_catalog` 사용 (solutions/2026-04-17-information-schema-role-filtering-pk-regression.md)
+- **배포 시 `db:migrate` 필수**: `npm run build` + `pm2 restart`만으로는 SQLite/Prisma 스키마 변경 미반영. 새 마이그레이션 추가 시 반드시 적용 (solutions/2026-04-17-drizzle-migrations-missing-on-wsl2-deploy.md)
+- **프로젝트 단위 테스트 러너 부재**: Vitest 미설치. 순수 함수가 API 통합 경로로만 검증됨 — Phase 14c 진입 전 도입 권장
 - **Windows `next build` 불가**: `lightningcss-win32-x64-msvc` optional bin 미설치. WSL2 빌드가 진실 소스
 - **proxy.ts `runtime` 선언 금지**: Next.js 16 proxy.ts는 암시적 Node.js 런타임 — route segment config 선언 시 빌드 오류
 - **Cloudflare Tunnel WSL2 재기동**: systemd 비활성 환경에서 Windows 재시작 시 PM2 데몬 자체가 사라질 수 있음 — `pm2 resurrect` 자동화 또는 WSL systemd 활성 검토
