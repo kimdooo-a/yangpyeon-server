@@ -17,7 +17,7 @@ model User {
   isActive      Boolean        @default(true) @map("is_active")
   lastLoginAt   DateTime?      @map("last_login_at")
   createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at")
   folders       Folder[]       @relation("UserFolders")
   files         File[]         @relation("UserFiles")
   sqlQueries    SqlQuery[]     @relation("UserSqlQueries")
@@ -38,7 +38,7 @@ model Folder {
   files     File[]
   isRoot    Boolean  @default(false) @map("is_root")
   createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@unique([parentId, name, ownerId])
   @@map("folders")
@@ -55,6 +55,7 @@ model File {
   ownerId      String   @map("owner_id")
   owner        User     @relation("UserFiles", fields: [ownerId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("files")
 }
@@ -80,7 +81,7 @@ model SqlQuery {
   owner     User       @relation("UserSqlQueries", fields: [ownerId], references: [id], onDelete: Cascade)
   lastRunAt DateTime?  @map("last_run_at")
   createdAt DateTime   @default(now()) @map("created_at")
-  updatedAt DateTime   @updatedAt @map("updated_at")
+  updatedAt DateTime   @default(now()) @updatedAt @map("updated_at")
 
   @@index([ownerId, scope])
   @@map("sql_queries")
@@ -98,7 +99,7 @@ model EdgeFunction {
   owner       User              @relation("UserEdgeFunctions", fields: [ownerId], references: [id])
   runs        EdgeFunctionRun[]
   createdAt   DateTime          @default(now()) @map("created_at")
-  updatedAt   DateTime          @updatedAt @map("updated_at")
+  updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at")
 
   @@map("edge_functions")
 }
@@ -132,22 +133,23 @@ model Webhook {
   lastTriggeredAt DateTime?    @map("last_triggered_at")
   failureCount    Int          @default(0) @map("failure_count")
   createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at")
 
   @@map("webhooks")
 }
 
 /// Cron Job — 주기 실행 작업
 model CronJob {
-  id         String   @id @default(uuid())
-  name       String   @unique
+  id         String    @id @default(uuid())
+  name       String    @unique
   schedule   String
   kind       CronKind
-  payload    Json     @default("{}")
-  enabled    Boolean  @default(true)
+  payload    Json      @default("{}")
+  enabled    Boolean   @default(true)
   lastRunAt  DateTime? @map("last_run_at")
-  lastStatus String?  @map("last_status")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  lastStatus String?   @map("last_status")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at")
 
   @@map("cron_jobs")
 }
@@ -165,6 +167,7 @@ model ApiKey {
   lastUsedAt DateTime?  @map("last_used_at")
   revokedAt  DateTime?  @map("revoked_at")
   createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at")
 
   @@map("api_keys")
 }
@@ -181,6 +184,7 @@ model LogDrain {
   lastDeliveredAt DateTime? @map("last_delivered_at")
   failureCount    Int       @default(0) @map("failure_count")
   createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
 
   @@map("log_drains")
 }
