@@ -121,3 +121,22 @@ updated_at 수동 주입 후 전체 CRUD 체인 통과 확인:
 - `src/components/table-editor/row-form-modal.tsx` (Option C 후보)
 - `docs/guides/tables-e2e-manual.md` (S8 매뉴얼에 updated_at 주의 각주 추가)
 - `docs/solutions/2026-04-17-information-schema-role-filtering-pk-regression.md` (세션 21 자매 솔루션)
+
+## 해결 — 세션 23 (2026-04-17)
+
+Phase 14c 1순위 spec/plan에 따라 근본 수정 적용 완료.
+
+- **마이그레이션**: `prisma/migrations/20260417140000_add_updated_at_default/migration.sql`
+- **변경**: 5개 기존 모델(users/folders/sql_queries/edge_functions/cron_jobs)에 `@default(now())` 병기 + 4개 모델(files/webhooks/api_keys/log_drains)에 `updatedAt` 신규 필드 + B2 백필 UPDATE 4줄(`updated_at = created_at`)
+- **검증 (프로덕션 WSL2 localhost 경유)**:
+  - S8a folders POST (updated_at 생략 payload) → 200 ✅ (이 버그의 직접 증거)
+  - S8b PATCH / S8c DELETE → 200
+  - S8d webhooks / S8e log_drains INSERT (updated_at 생략) → 200 (4개 신규 컬럼 DB DEFAULT 작동 확인)
+  - S10 users POST → 403 OPERATION_DENIED
+  - S11a `folders;DROP` 인젝션 → 400 INVALID_TABLE
+  - S11b edge_function_runs POST → 403 "삭제만 가능"
+  - 감사 로그 TABLE_ROW_INSERT/UPDATE/DELETE 3건 영속
+- **관련 spec**: `docs/superpowers/specs/2026-04-17-phase-14c-updated-at-default-design.md`
+- **관련 plan**: `docs/superpowers/plans/2026-04-17-phase-14c-updated-at-default-plan.md`
+
+RowFormModal "keep" 3상태 기본값으로도 실사용자가 "행 추가"를 누르면 500을 받지 않는다.
