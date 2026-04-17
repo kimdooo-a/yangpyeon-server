@@ -37,6 +37,7 @@
 - [x] Phase 13b: 역할 기반 접근 제어 + 사용자 관리
 - [x] Phase 13c: Cmd+K 커맨드 팔레트
 - [x] Phase 13d: 스켈레톤 UI + 빈 상태 컴포넌트 (9개 페이지 일괄)
+- [x] Phase 14b: Table Editor CRUD (세션 21) — app_readwrite 롤 + runReadwrite fail-closed + identifier/coerce/table-policy 유틸 + POST/PATCH/DELETE API + RowFormModal 3상태 입력 + 민감 테이블 차단. 로컬 4 커밋(C1~C4), C5(docs + 배포 + push) 사용자 승인 대기.
 - [ ] Phase 14~15: 데이터 관리 + 자율 운영 → [docs/MASTER-DEV-PLAN.md](../MASTER-DEV-PLAN.md)
 - [x] Phase 14-S (세션 15): Supabase 관리 체계 이식 Phase A+B — Prisma +7 모델, 11 P0 모듈(/sql-editor, /database/schema, /data-api, /database/{webhooks,cron,backups}, /functions, /realtime, /advisors/{security,performance}, /settings/{api-keys,log-drains}) 스캐폴드.
 - [x] Phase 14-S 배포 (세션 16): Prisma 증분 마이그레이션 적용(`20260412120000_supabase_clone_session_14`), `app_readonly` PG 롤 + SELECT 권한, `.env`에 `ENABLE_DB_BACKUPS=true`, monaco/xyflow/elkjs 설치, 12개 신규 페이지 HTTP 307 smoke 통과, 레거시 런타임 에러 2건(감사 로그 디렉토리, 스테일 세션 FK) 수정, Cloudflare Tunnel PM2 등록.
@@ -89,6 +90,7 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 18 | 2026-04-12 | 근본 auth 재설계 (middleware→proxy + CVE-2025-29927 방어 + authZ 버그 수정) + 기술부채 정리 (NFT/audit/cron) + Phase 14a Table Editor | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session18-auth-refactor.md) |
 | 19 | 2026-04-12 | 세션 18 후속 — auth-guard 감사 로그 + instrumentation data/ mkdir + Table Editor 프로덕션 E2E + Phase 14b CRUD 프롬프트 + NFT/audit 분류 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session19-ops-security-hardening.md) |
 | 20 | 2026-04-12 | Phase 14b 설계 체인 — brainstorming(D1~D5 + 추가 3건 합의) → ADR-003 → 실행 계획(12 Task × 5 커밋, 구현 전 단계 완료) | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260412-session20-phase-14b-design.md) |
+| 21 | 2026-04-17 | Phase 14b 구현 — C1 SQL 롤(luckystyle4u DB, WSL2 peer auth) + C2 라이브러리(identifier/coerce/table-policy/runReadwrite) + C3 API(POST/PATCH/DELETE + schema PK) + C4 UI(RowFormModal 3상태 + TableDataGrid 액션 + 페이지 CTA). 4 커밋, C5 대기 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260417-session21-phase-14b-implementation.md) |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수

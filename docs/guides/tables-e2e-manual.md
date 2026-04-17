@@ -116,3 +116,38 @@
 - S2: VIEWER 계정 생성 후 재수행
 - S3: 행 수 `-1` 표기 — `information_schema.reltuples` 또는 `COUNT(*)` 사용 전환 검토
 - S6 long_name: 300자 이름이 regex는 통과 (`[a-zA-Z_][a-zA-Z0-9_]*`) — DB 대조에서 안전히 걸리지만, 정규식에 `{1,63}` 길이 제한(PG identifier 최대) 추가 권장
+
+---
+
+## Phase 14b CRUD 시나리오 (세션 21 추가)
+
+### S8. 행 추가 (MANAGER+)
+1. `/tables/folders` 진입 → 헤더 우측 "행 추가" 버튼 클릭
+2. 폼 모달 — name: "시나리오 S8", owner_id: 본인 UUID, is_root: false
+3. 저장 → 그리드 최상단(또는 정렬 순서)에 새 행 반영, 모달 닫힘
+4. `/audit` 페이지에 `TABLE_ROW_INSERT` 기록 1건 확인 (detail에 이메일 + diff JSON)
+
+### S9. 행 편집 (MANAGER+)
+1. S8에서 생성한 행의 "편집" 버튼 클릭
+2. 모달 — name 필드만 action=set, value="S9 renamed" 로 변경 (나머지는 keep)
+3. 저장 → 그리드 해당 셀 반영
+4. `/audit` 페이지에 `TABLE_ROW_UPDATE` 기록 1건 확인
+
+### S10. 행 삭제 (ADMIN only)
+1. S9 편집된 행의 "삭제" 버튼 클릭
+2. `confirm()` 확인 → DELETE API 호출 → 그리드에서 행 제거
+3. `/audit` 페이지에 `TABLE_ROW_DELETE` 기록 1건 확인
+4. MANAGER 계정으로는 "삭제" 버튼 자체가 비노출 + 서버도 403 OPERATION_DENIED
+
+### S11. 차단 테이블 UI + API
+1. `/tables/users` 접근 → "행 추가" 버튼 미노출, "Table Editor에서 편집 불가 (전용 페이지 사용)" 안내
+2. `/tables/api_keys` / `/tables/_prisma_migrations` 동일 거동
+3. curl로 직접 POST `/api/v1/tables/users` 시도 → 403 OPERATION_DENIED (감사 로그 기록 없음)
+4. `/tables/edge_function_runs` → "삭제" 버튼은 ADMIN에게 노출, "편집"/"행 추가"는 차단 (DELETE_ONLY 정책)
+
+## DOD (세션 21 기준)
+- [ ] S8 정상 INSERT (ADMIN + folders)
+- [ ] S9 정상 UPDATE (동일 행)
+- [ ] S10 DELETE + 감사 로그 3건 누적 확인
+- [ ] S11 UI/API 차단 매트릭스
+- [ ] PM2 로그에 `SET LOCAL ROLE app_readwrite` 흔적
