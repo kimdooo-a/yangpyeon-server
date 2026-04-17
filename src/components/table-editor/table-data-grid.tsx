@@ -27,6 +27,12 @@ interface DataResponse {
 
 interface TableDataGridProps {
   table: string;
+  userRole?: "ADMIN" | "MANAGER" | "USER";
+  policy?: { canUpdate: boolean; canDelete: boolean };
+  onEditRow?: (row: Record<string, unknown>) => void;
+  onDeleteRow?: (row: Record<string, unknown>) => void;
+  /** 부모에서 증가 시 강제 재fetch (행 추가/편집/삭제 후 새로고침용) */
+  refreshToken?: number;
 }
 
 const DEFAULT_LIMIT = 50;
@@ -38,7 +44,13 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
-export function TableDataGrid({ table }: TableDataGridProps) {
+export function TableDataGrid({
+  table,
+  policy,
+  onEditRow,
+  onDeleteRow,
+  refreshToken,
+}: TableDataGridProps) {
   const [columns, setColumns] = useState<ColumnMeta[]>([]);
   const [data, setData] = useState<DataResponse | null>(null);
   const [offset, setOffset] = useState(0);
@@ -95,11 +107,48 @@ export function TableDataGrid({ table }: TableDataGridProps) {
     fetchRows();
   }, [fetchRows]);
 
+  // 부모가 refreshToken을 증가시키면 재fetch (행 추가/편집/삭제 후)
+  useEffect(() => {
+    if (refreshToken !== undefined && refreshToken > 0) {
+      fetchRows();
+    }
+  }, [refreshToken, fetchRows]);
+
+  const actionColumn = useMemo<ColumnDef<Record<string, unknown>> | null>(() => {
+    if (!policy?.canUpdate && !policy?.canDelete) return null;
+    return {
+      id: "_actions",
+      header: () => <span className="text-zinc-500">액션</span>,
+      cell: ({ row }) => (
+        <div className="flex gap-1">
+          {policy?.canUpdate && (
+            <button
+              type="button"
+              onClick={() => onEditRow?.(row.original)}
+              className="rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-300 hover:bg-zinc-800"
+            >
+              편집
+            </button>
+          )}
+          {policy?.canDelete && (
+            <button
+              type="button"
+              onClick={() => onDeleteRow?.(row.original)}
+              className="rounded border border-red-900 px-1.5 py-0.5 text-[10px] text-red-300 hover:bg-red-950"
+            >
+              삭제
+            </button>
+          )}
+        </div>
+      ),
+    };
+  }, [policy, onEditRow, onDeleteRow]);
+
   const tanstackColumns = useMemo<
     ColumnDef<Record<string, unknown>>[]
   >(() => {
     if (columns.length === 0) return [];
-    return columns.map((col) => ({
+    const base: ColumnDef<Record<string, unknown>>[] = columns.map((col) => ({
       accessorKey: col.name,
       header: () => (
         <button
@@ -146,7 +195,8 @@ export function TableDataGrid({ table }: TableDataGridProps) {
         );
       },
     }));
-  }, [columns, orderBy, orderDir]);
+    return actionColumn ? [actionColumn, ...base] : base;
+  }, [columns, orderBy, orderDir, actionColumn]);
 
   const tableInstance = useReactTable({
     data: data?.rows ?? [],
