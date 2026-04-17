@@ -96,11 +96,35 @@ export const PATCH = withRole(
       );
     }
 
-    let body: { values?: Record<string, ColumnAction> };
+    let body: {
+      values?: Record<string, ColumnAction>;
+      expected_updated_at?: string;
+    };
     try {
       body = await request.json();
     } catch {
       return errorResponse("INVALID_BODY", "JSON 파싱 실패", 400);
+    }
+
+    // 낙관적 잠금 파라미터 검증
+    let expectedUpdatedAt: Date | null = null;
+    if (body.expected_updated_at !== undefined) {
+      const parsed = new Date(body.expected_updated_at);
+      if (Number.isNaN(parsed.getTime())) {
+        return errorResponse(
+          "INVALID_EXPECTED_UPDATED_AT",
+          "expected_updated_at이 유효한 ISO 타임스탬프가 아닙니다",
+          400,
+        );
+      }
+      if (!meta.colTypeMap.has("updated_at")) {
+        return errorResponse(
+          "UPDATED_AT_NOT_SUPPORTED",
+          "이 테이블은 updated_at 컬럼이 없어 낙관적 잠금을 지원하지 않습니다",
+          400,
+        );
+      }
+      expectedUpdatedAt = parsed;
     }
 
     const setCols: string[] = [];
@@ -163,14 +187,46 @@ export const PATCH = withRole(
     const setSql = setCols
       .map((c, i) => `${quoteIdent(c)} = $${i + 1}`)
       .join(", ");
-    const pkPlaceholder = `$${setCols.length + 1}`;
-    const sql = `UPDATE ${quoteIdent(table)} SET ${setSql} WHERE ${quoteIdent(
-      meta.pkColumn!.column_name,
-    )} = ${pkPlaceholder} RETURNING *`;
+    const sqlParams: unknown[] = [...setVals, pkValue];
+    let whereSql = `${quoteIdent(meta.pkColumn!.column_name)} = $${sqlParams.length}`;
+    if (expectedUpdatedAt !== null) {
+      sqlParams.push(expectedUpdatedAt);
+      whereSql += ` AND updated_at = $${sqlParams.length}`;
+    }
+    const sql = `UPDATE ${quoteIdent(table)} SET ${setSql} WHERE ${whereSql} RETURNING *`;
 
     try {
-      const { rows, rowCount } = await runReadwrite(sql, [...setVals, pkValue]);
+      const { rows, rowCount } = await runReadwrite(sql, sqlParams);
       if (rowCount === 0) {
+        // 낙관적 잠금 사용 중이면 존재 재확인 → 409 vs 404 구분
+        if (expectedUpdatedAt !== null) {
+          const { rows: currentRows } = await runReadonly(
+            `SELECT * FROM ${quoteIdent(table)} WHERE ${quoteIdent(meta.pkColumn!.column_name)} = $1`,
+            [pkValue],
+          );
+          if (currentRows.length > 0) {
+            const current = currentRows[0]!;
+            writeAuditLogDb({
+              timestamp: new Date().toISOString(),
+              method: "PATCH",
+              path: `/api/v1/tables/${table}/${pk}`,
+              ip: request.headers.get("x-forwarded-for") ?? "unknown",
+              action: "TABLE_ROW_UPDATE_CONFLICT",
+              detail: `${user.email} → ${table}(pk=${pk}): expected=${expectedUpdatedAt.toISOString()}, actual=${String(current.updated_at)}`,
+            });
+            return Response.json(
+              {
+                success: false,
+                error: {
+                  code: "CONFLICT",
+                  message: "행이 다른 세션에서 수정되었습니다",
+                  current,
+                },
+              },
+              { status: 409 },
+            );
+          }
+        }
         return errorResponse("NOT_FOUND", "행을 찾을 수 없음", 404);
       }
       writeAuditLogDb({
@@ -179,7 +235,7 @@ export const PATCH = withRole(
         path: `/api/v1/tables/${table}/${pk}`,
         ip: request.headers.get("x-forwarded-for") ?? "unknown",
         action: "TABLE_ROW_UPDATE",
-        detail: `${user.email} → ${table}(pk=${pk}): ${JSON.stringify(redactSensitiveValues(table, diff))}`,
+        detail: `${user.email} → ${table}(pk=${pk}) [locked=${expectedUpdatedAt !== null}]: ${JSON.stringify(redactSensitiveValues(table, diff))}`,
       });
       return successResponse({ row: rows[0] });
     } catch (err) {
