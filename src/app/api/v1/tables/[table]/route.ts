@@ -1,6 +1,18 @@
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { runReadonly } from "@/lib/pg/pool";
+import { runReadonly, runReadwrite } from "@/lib/pg/pool";
+import { isValidIdentifier, quoteIdent } from "@/lib/db/identifier";
+import { coerceValue, CoercionError } from "@/lib/db/coerce";
+import {
+  checkTablePolicy,
+  redactSensitiveValues,
+} from "@/lib/db/table-policy";
+import { writeAuditLogDb } from "@/lib/audit-log-db";
+
+interface ColumnAction {
+  action: "set" | "null";
+  value?: unknown;
+}
 
 const MAX_LIMIT = 200;
 const DEFAULT_LIMIT = 50;
@@ -80,6 +92,112 @@ export const GET = withRole(
       return errorResponse(
         "QUERY_FAILED",
         err instanceof Error ? err.message : "데이터 조회 실패",
+        500,
+      );
+    }
+  },
+);
+
+/**
+ * POST /api/v1/tables/[table]
+ * Body: { values: { [column]: { action: "set"|"null", value?: any } } }
+ * action="keep"인 컬럼은 클라이언트가 payload에서 제외 → DB default 적용.
+ */
+export const POST = withRole(
+  ["ADMIN", "MANAGER"],
+  async (request, user, context) => {
+    const params = context?.params ? await context.params : {};
+    const table = params.table;
+    if (!table || !isValidIdentifier(table)) {
+      return errorResponse("INVALID_TABLE", "유효하지 않은 테이블명", 400);
+    }
+
+    const policy = checkTablePolicy(table, "INSERT", user.role);
+    if (!policy.allowed) {
+      return errorResponse("OPERATION_DENIED", policy.reason!, 403);
+    }
+
+    let body: { values?: Record<string, ColumnAction> };
+    try {
+      body = await request.json();
+    } catch {
+      return errorResponse("INVALID_BODY", "JSON 파싱 실패", 400);
+    }
+    const valuesInput = body.values ?? {};
+
+    // 컬럼 화이트리스트 (실 DB 컬럼 + 타입 메타)
+    const { rows: colRows } = await runReadonly<{
+      column_name: string;
+      data_type: string;
+    }>(
+      `SELECT column_name, data_type
+       FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = $1`,
+      [table],
+    );
+    if (colRows.length === 0) {
+      return errorResponse("NOT_FOUND", "테이블을 찾을 수 없음", 404);
+    }
+    const colTypeMap = new Map(colRows.map((r) => [r.column_name, r.data_type]));
+
+    // payload 키 = 화이트리스트 ∩ action≠"keep" (keep은 클라이언트에서 이미 제외)
+    const insertCols: string[] = [];
+    const insertVals: unknown[] = [];
+    const diff: Record<string, unknown> = {};
+    try {
+      for (const [col, act] of Object.entries(valuesInput)) {
+        if (!colTypeMap.has(col)) {
+          return errorResponse("INVALID_COLUMN", `알 수 없는 컬럼: ${col}`, 400);
+        }
+        if (act.action === "null") {
+          insertCols.push(col);
+          insertVals.push(null);
+          diff[col] = null;
+        } else if (act.action === "set") {
+          const coerced = coerceValue(col, colTypeMap.get(col)!, act.value);
+          insertCols.push(col);
+          insertVals.push(coerced);
+          diff[col] = coerced;
+        }
+      }
+    } catch (err) {
+      if (err instanceof CoercionError) {
+        return errorResponse(
+          "COERCE_FAILED",
+          `${err.column}: ${err.reason}`,
+          400,
+        );
+      }
+      throw err;
+    }
+
+    if (insertCols.length === 0) {
+      return errorResponse(
+        "EMPTY_PAYLOAD",
+        "INSERT할 값이 하나도 없습니다",
+        400,
+      );
+    }
+
+    const colsSql = insertCols.map(quoteIdent).join(", ");
+    const placeholders = insertCols.map((_, i) => `$${i + 1}`).join(", ");
+    const sql = `INSERT INTO ${quoteIdent(table)} (${colsSql}) VALUES (${placeholders}) RETURNING *`;
+
+    try {
+      const { rows } = await runReadwrite(sql, insertVals);
+      writeAuditLogDb({
+        timestamp: new Date().toISOString(),
+        method: "POST",
+        path: `/api/v1/tables/${table}`,
+        ip: request.headers.get("x-forwarded-for") ?? "unknown",
+        action: "TABLE_ROW_INSERT",
+        detail: `${user.email} → ${table}: ${JSON.stringify(redactSensitiveValues(table, diff))}`,
+      });
+      return successResponse({ row: rows[0] });
+    } catch (err) {
+      return errorResponse(
+        "QUERY_FAILED",
+        err instanceof Error ? err.message : "INSERT 실패",
         500,
       );
     }

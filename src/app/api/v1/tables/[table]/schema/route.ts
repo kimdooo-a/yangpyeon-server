@@ -77,7 +77,19 @@ export const GET = withRole(
         ordinalPosition: c.ordinal_position,
       }));
 
-      return successResponse({ table, columns: result });
+      const pkColumn = result.find((c) => c.isPrimaryKey);
+      const primaryKey =
+        pkColumn && pkRows.length === 1
+          ? { column: pkColumn.name, dataType: pkColumn.dataType }
+          : null;
+      const compositePk = pkRows.length > 1;
+
+      return successResponse({
+        table,
+        columns: result,
+        primaryKey,
+        compositePk,
+      });
     } catch (err) {
       return errorResponse(
         "SCHEMA_FAILED",
