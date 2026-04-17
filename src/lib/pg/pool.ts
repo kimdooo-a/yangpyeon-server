@@ -81,3 +81,39 @@ export async function runReadonly<T extends QueryResultRow = QueryResultRow>(
     client.release();
   }
 }
+
+/**
+ * Phase 14b: 쓰기 트랜잭션 실행.
+ * - BEGIN → SET LOCAL ROLE app_readwrite → SET LOCAL statement_timeout → query → COMMIT
+ * - 롤 부재 시 fail-closed(에러 전파) — runReadonly의 관대 정책과 대비.
+ */
+export async function runReadwrite<T extends QueryResultRow = QueryResultRow>(
+  sql: string,
+  params: unknown[] = [],
+  options: { timeoutMs?: number } = {},
+): Promise<{ rows: T[]; rowCount: number }> {
+  const timeoutMs = options.timeoutMs ?? 10_000;
+  const pool = getPgPool();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // fail-closed: app_readwrite 부재 시 여기서 에러 전파
+    await client.query("SET LOCAL ROLE app_readwrite");
+    await client.query(`SET LOCAL statement_timeout = ${timeoutMs}`);
+    const result = await client.query<T>(sql, params);
+    await client.query("COMMIT");
+    return {
+      rows: result.rows,
+      rowCount: result.rowCount ?? 0,
+    };
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
