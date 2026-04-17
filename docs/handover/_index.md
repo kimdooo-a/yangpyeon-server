@@ -14,6 +14,12 @@
 
 <!-- 날짜 그룹별로 정리합니다. 최신이 위로 올라갑니다. -->
 
+### 2026-04-18
+
+| 세션 | 파일 | 주요 작업 |
+|------|------|-----------|
+| 24 | [260418-session24-phase-14c-alpha.md](./260418-session24-phase-14c-alpha.md) | Phase 14c-α 인라인 편집 + 낙관적 잠금 — α/β/γ 분해 후 α 단독. `expected_updated_at` 바디 필드 + 409 CONFLICT + Sonner 3액션 토스트 + EditableCell/useInlineEditMutation/TypedInputControl. 2차 근본 수정: raw UPDATE 자동 `updated_at = NOW()` bump. ADR-004 + curl E2E C1~C6 전 PASS |
+
 ### 2026-04-17
 
 | 세션 | 파일 | 주요 작업 |
