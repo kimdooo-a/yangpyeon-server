@@ -146,7 +146,7 @@
 4. `/tables/edge_function_runs` → "삭제" 버튼은 ADMIN에게 노출, "편집"/"행 추가"는 차단 (DELETE_ONLY 정책)
 
 ## DOD (세션 22 curl E2E 완료)
-- [x] S8 정상 INSERT (ADMIN + folders) — ⚠ curl에서 `updated_at` 수동 주입 필요. **UI "keep" 기본값은 500** (Phase 14c `@default(now())` 병기 마이그레이션으로 해결 예정, [solution](../solutions/2026-04-17-phase-14b-updated-at-no-db-default.md))
+- [x] S8 정상 INSERT (ADMIN + folders) — 세션 23 `@default(now())` 병기 마이그레이션 적용으로 updated_at 자동 기본값 처리 (자세히: [solution](../solutions/2026-04-17-phase-14b-updated-at-no-db-default.md#해결--세션-23-2026-04-17))
 - [x] S9 정상 UPDATE (동일 행) — curl PATCH 통과
 - [x] S10 DELETE + 감사 로그 3건 누적 확인 — `audit_logs` 영속, detail에 actor 이메일 + diff JSON
 - [x] S11 UI/API 차단 매트릭스 — users/api_keys/_prisma_migrations 403 OPERATION_DENIED, edge_function_runs INSERT 403("삭제만 가능") + DELETE 404(정책 통과·행 부재)
