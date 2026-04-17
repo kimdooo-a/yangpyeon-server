@@ -33,22 +33,19 @@ async function introspect(table: string): Promise<IntrospectResult | null> {
   );
   if (cols.length === 0) return null;
 
+  // pg_catalog 기반 — app_readonly 롤에서 information_schema 제약 뷰가
+  // 0행 반환하는 이슈 회피 (세션 21 수정)
   const { rows: pkRows } = await runReadonly<{
     column_name: string;
     data_type: string;
   }>(
-    `SELECT kcu.column_name, c.data_type
-     FROM information_schema.table_constraints tc
-     JOIN information_schema.key_column_usage kcu
-       ON tc.constraint_name = kcu.constraint_name
-      AND tc.table_schema    = kcu.table_schema
-     JOIN information_schema.columns c
-       ON c.table_schema = kcu.table_schema
-      AND c.table_name = kcu.table_name
-      AND c.column_name = kcu.column_name
-     WHERE tc.constraint_type='PRIMARY KEY'
-       AND tc.table_schema='public'
-       AND tc.table_name=$1`,
+    `SELECT a.attname AS column_name,
+            format_type(a.atttypid, a.atttypmod) AS data_type
+     FROM pg_index i
+     JOIN pg_attribute a
+       ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+     WHERE i.indrelid = ('public.' || quote_ident($1))::regclass
+       AND i.indisprimary`,
     [table],
   );
 

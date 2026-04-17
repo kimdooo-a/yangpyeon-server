@@ -55,15 +55,15 @@ export const GET = withRole(
         [table],
       );
 
+      // pg_catalog 기반 — information_schema.table_constraints는
+      // app_readonly 롤에서 권한 필터로 0행 반환하는 문제 회피 (세션 21 수정)
       const { rows: pkRows } = await runReadonly<{ column_name: string }>(
-        `SELECT kcu.column_name
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-          AND tc.table_schema    = kcu.table_schema
-         WHERE tc.constraint_type = 'PRIMARY KEY'
-           AND tc.table_schema    = 'public'
-           AND tc.table_name      = $1`,
+        `SELECT a.attname AS column_name
+         FROM pg_index i
+         JOIN pg_attribute a
+           ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+         WHERE i.indrelid = ('public.' || quote_ident($1))::regclass
+           AND i.indisprimary`,
         [table],
       );
       const pkSet = new Set(pkRows.map((r) => r.column_name));
