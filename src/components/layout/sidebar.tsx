@@ -33,6 +33,7 @@ import {
   Archive,
   Send,
   Table2,
+  Lock,
 } from "lucide-react";
 
 type NavItem = {
@@ -76,6 +77,9 @@ const navItems: NavItem[] = [
   { href: "/settings/env", label: "환경변수", icon: <IconEnv size={18} />, group: "감사·설정" },
   { href: "/settings/api-keys", label: "API 키", icon: <KeyRound size={18} />, group: "감사·설정" },
   { href: "/settings/log-drains", label: "로그 드레인", icon: <Send size={18} />, group: "감사·설정" },
+
+  // 내 계정 (모든 사용자)
+  { href: "/account/security", label: "MFA & 보안", icon: <Lock size={18} />, group: "내 계정" },
 ];
 
 /** ADMIN 역할만 접근 가능한 경로 */
@@ -110,6 +114,7 @@ const GROUP_ORDER = [
   "데이터베이스",
   "개발 도구",
   "감사·설정",
+  "내 계정",
 ] as const;
 
 export function Sidebar() {
