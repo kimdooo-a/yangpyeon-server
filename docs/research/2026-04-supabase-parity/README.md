@@ -1,7 +1,7 @@
 # Supabase 100점 동등성 — Wave 리서치 마스터 인덱스
 
 > 양평 부엌 서버 대시보드의 14개 카테고리를 Supabase Cloud 동등 수준(100점)으로 끌어올리기 위한 체계적 리서치·설계 프로젝트.
-> 규모: **L** | Wave: **5** | 예상 문서: **~91개** (Wave 1+2+3 = 72 ✅)
+> 규모: **L** | Wave: **5** | 예상 문서: **~105개** (Wave 1+2+3+4 = 98 ✅)
 > 시작: 2026-04-18 (세션 24) | 근거: [이전 평가표](../../../) + [_PROJECT_VS_SUPABASE_GAP.md](../../references/_PROJECT_VS_SUPABASE_GAP.md)
 
 상위: [CLAUDE.md](../../../CLAUDE.md) → [docs/](../../) → [research/](../) → **여기**
@@ -15,10 +15,10 @@
 | 1 | 기초 deep-dive | ✅ **완료** | **33/33** | **26,941** |
 | 2 | 비교 매트릭스 + 1:1 | ✅ **완료** | **28/28** | **18,251** |
 | 3 | 100점 정의 + FR/NFR | ✅ **완료** (7 Agent 병렬) | **11/11** | **8,350** |
-| 4 | 카테고리별 청사진 | 🔄 다음 세션 권장 | 0/~20-30 | — |
+| 4 | 카테고리별 청사진 | ✅ **완료** (11 Agent / 3 Tier 병렬) | **26/26** | **32,918** |
 | 5 | 로드맵 + 스파이크 | ⏳ 대기 | 0/~10-15 | — |
 
-**누적: 72 문서 / 53,542줄**
+**누적: 98 문서 / 86,460줄**
 
 ## 14 카테고리 — Wave 1 1순위 + 100점 청사진
 
@@ -134,9 +134,35 @@ docs/research/2026-04-supabase-parity/
 │   ├── 12-observability/           ✅ 2 deep-dive + 1 비교
 │   ├── 13-ux-quality/              ✅ 1 deep-dive + 비교
 │   └── 14-operations/              ✅ 1 deep-dive + 비교
-├── 02-architecture/                ← Wave 4
-├── 03-ui-ux/                       ← Wave 4
-├── 04-integration/                 ← Wave 4
+├── 02-architecture/                ✅ Wave 4 Tier 1+2 (17 문서 / 21,964줄)
+│   ├── 00-system-overview.md       ✅ 1,298줄 (A1 opus, 9-레이어 아키텍처 + 14카 매핑)
+│   ├── 01-adr-log.md               ✅ 848줄 (A1 opus, ADR-001~018 / 재검토 트리거 45건)
+│   ├── 02-data-model-erd.md        ✅ 1,567줄 (A1 opus, PG 10→29 테이블 + SQLite 3→6)
+│   ├── 03-auth-advanced-blueprint.md ✅ 1,833줄 (B1, Phase 15 MVP 1순위 22h WBS)
+│   ├── 04-observability-blueprint.md ✅ 1,403줄 (B2, Phase 16 ~20h + JWKS)
+│   ├── 05-operations-blueprint.md  ✅ 1,368줄 (B2, Phase 16 ~20h + Canary)
+│   ├── 06-auth-core-blueprint.md   ✅ 1,633줄 (B1, Phase 17 MVP 30h)
+│   ├── 07-storage-blueprint.md     ✅ 978줄 (B3, Phase 17 MVP 30h SeaweedFS+B2)
+│   ├── 08-sql-editor-blueprint.md  ✅ 1,039줄 (B4, Phase 18 320h 4단계 14c~14f)
+│   ├── 09-table-editor-blueprint.md ✅ 949줄 (B4, Phase 18 80h 14d/14e)
+│   ├── 10-edge-functions-blueprint.md ✅ 1,408줄 (B3, Phase 19 40h 3층 하이브리드)
+│   ├── 11-realtime-blueprint.md    ✅ 1,337줄 (B5, Phase 19 35h 2계층 CDC+Channel)
+│   ├── 12-schema-visualizer-blueprint.md ✅ 1,219줄 (B6, Phase 20 50h)
+│   ├── 13-db-ops-blueprint.md      ✅ 1,182줄 (B6, Phase 20 68h node-cron+wal-g)
+│   ├── 14-advisors-blueprint.md    ✅ 988줄 (B6, Phase 20 80h 3-Layer)
+│   ├── 15-data-api-blueprint.md    ✅ 1,328줄 (B5, Phase 21 25h REST+pgmq)
+│   └── 16-ux-quality-blueprint.md  ✅ 1,586줄 (B7, Phase 21 15h AI SDK v6)
+├── 03-ui-ux/                       ✅ Wave 4 Tier 3 U1 (5 문서 / 5,841줄)
+│   ├── 00-design-system.md         ✅ 1,165줄 (다크 팔레트 hex + Geist/JetBrains Mono + WCAG 2.2 AA)
+│   ├── 01-layout-navigation.md     ✅ 1,088줄 (3-pane + 14카 사이드바 + Cmd+K)
+│   ├── 02-table-and-form-patterns.md ✅ 1,214줄 (TanStack v8 + cmdk FK + sonner)
+│   ├── 03-auth-ui-flows.md         ✅ 1,286줄 (MFA 등록/세션 관리/Anonymous)
+│   └── 04-editor-components.md     ✅ 1,088줄 (Monaco + @xyflow + useChat + MCP UI)
+├── 04-integration/                 ✅ Wave 4 Tier 3 I1+I2 (4 문서 / 5,113줄)
+│   ├── 00-integration-overview.md  ✅ 1,175줄 (내부 24쌍 + 외부 5종 + 이벤트 16종)
+│   ├── 01-postgres-extensions-integration.md ✅ 1,351줄 (wal2json+pgmq+pg_graphql 조건부)
+│   ├── 02-cloudflare-deployment-integration.md ✅ 1,225줄 (QUIC→HTTP/2 + Canary + /ypserver)
+│   └── 03-external-services-integration.md ✅ 1,362줄 (B2+Anthropic BYOK+Slack+$10 가드)
 ├── 05-roadmap/                     ← Wave 5
 ├── 06-prototyping/                 ← Wave 5 (스파이크 4건은 Wave 1에서 예비 검증)
 └── 07-appendix/
@@ -227,15 +253,42 @@ docs/research/2026-04-supabase-parity/
 - 이는 Wave 4 청사진으로의 전이를 매우 매끄럽게 만듦 — 기술 결정은 잠금된 상태로 아키텍처 설계만 진행 가능
 - **FR 55개 × 구현 기술 명시 100%** — 일반 L 규모 프로젝트 대비 Wave 4 설계 리스크 -30%
 
+## Wave 4 결과 요약 (2026-04-18 완료)
+
+### 아키텍처 청사진 26 문서 / 32,918줄 (Wave 누적 최대)
+
+| Tier | 에이전트 수 | 모델 | 문서 | 줄 수 | 핵심 결정 |
+|------|-----------|------|------|------|----------|
+| 1 | 1 | opus | 00-system-overview + 01-adr-log + 02-data-model-erd | 3,713 | 9-레이어 아키텍처 확정 + 5 아키텍처 원칙(AP-1~5) + ADR 18건 + 재검토 트리거 45건 |
+| 2 | 7 | sonnet | 03~16 (14 카테고리 Blueprint) | 18,251 | 7 클러스터 병렬 (B1 보안 / B2 운영 / B3 compute / B4 editor / B5 data / B6 DB mgmt / B7 UX) |
+| 3 | 3 | sonnet | 03-ui-ux 5 + 04-integration 4 | 11,054 | 디자인 시스템 hex 확정 + 24 내부 통합쌍 + 외부 5종 + QUIC→HTTP/2 교훈 |
+| **합계** | **11** | opus×1+sonnet×10 | **26 문서** | **32,918** | — |
+
+### Wave 4 핵심 발견
+
+1. **9-레이어 아키텍처 확정 (ADR-018)**: L0 인프라 → L8 UX. 14 카테고리 레이어 매핑 완료. Phase 15-22 순서가 레이어 의존성과 일치.
+2. **ADR 18건 누적 + 재검토 트리거 45건 정량화**: ADR-001(멀티테넌시 제외) ~ ADR-017(OAuth 보류) + ADR-018(9-레이어). 모든 결정에 정량 트리거.
+3. **데이터 모델 확장**: PG 10→29 테이블(+18 신규 + 1 조건부 pg_graphql), SQLite 3→6 테이블. 마이그레이션 16-17 파일 / 공수 35-39h.
+4. **DQ 28 답변 완료**: Wave 4 할당 DQ 모두 Blueprint 내부에서 정량 답변 (예: JWT refresh revokedAt+tokenFamily 하이브리드, SigV4-only, Slot 2개 분리, KEK 90일 회전, Papa Parse 14d, cmdk FK, 자체 d3 Plan Visualizer 등).
+5. **Phase 15-22 총 공수 재산정**: Auth Adv 22h + Obs/Ops 40h + Auth Core/Storage 60h + Editors 400h + Edge/Realtime 75h + DB mgmt 198h + API/UX 40h + 마이그레이션 35-39h = **~870-880h** (Wave 3 Preview 992h 대비 -10% 정밀화).
+6. **역방향 피드백 0건**: Wave 1-3 채택안과 Wave 4 청사진 전부 정합. 14/14 Blueprint 모두 이전 Wave 결론을 강화.
+
+### Wave 4 Compound Knowledge — "청사진은 계층 분리를 강제한다"
+
+- Realtime(CDC+Channel 2계층), Advisors(schemalint+squawk+splinter 3-Layer), Edge Functions(isolated-vm+Deno+Sandbox 3층) 모두 **"단일 솔루션이 아니라 역할 분담"**이 청사진 단계에서 더욱 명확해짐 — Wave 1/2 Compound Knowledge 재검증.
+- UI/UX가 아키텍처와 독립 설계 가능: Tier 3 UI/UX 에이전트가 Tier 2 Blueprint와 동시 발사 가능했던 것은 "컴포넌트 이름 계약"이 Tier 2에서 고정됐기 때문. 다음 프로젝트에서도 동일 패턴 권장.
+
 ## 다음 작업
 
-- **강력 권장**: `/cs`로 세션 마감 (Wave 1+2+3 합쳐 53,542줄 컨텍스트 누적, Wave 3 완료는 Vision Suite 확정이라는 중요한 마일스톤)
-- **재개**: 다음 세션에서 `/kdywave --resume` → Phase 2 Wave 4 (아키텍처 청사진) 진입
-- **Wave 4 예상 산출물**: 02-architecture/ + 03-ui-ux/ + 04-integration/ = 20-30 문서
-  - 시스템 개요, 14 카테고리별 청사진, 디자인 시스템, 통합 설계
-  - 입력: Wave 1-3 전체 (채택 기술 + FR/NFR + ADR-001)
-  - DQ 답변 대상: Wave 4에 할당된 28건
+- **강력 권장**: `/cs`로 세션 마감 (Wave 4 완료로 누적 86,460줄 / 98 문서. 아키텍처 잠금 완료 — Wave 5 진입 전 세션 저장이 중요한 마일스톤)
+- **재개**: 다음 세션에서 `/kdywave --resume` → Phase 2 Wave 5 (로드맵 + 스파이크 10-15 문서) 진입
+- **Wave 5 예상 산출물**: 05-roadmap/ + 06-prototyping/ + 07-appendix/
+  - 릴리스 계획 (MVP Phase 15-17 → Beta Phase 18-19 → v1.0 Phase 20-22)
+  - 마일스톤별 WBS 최종화 (Wave 4에서 제시한 공수 기반)
+  - 스파이크 사양 (spike-005 Edge Fn 심화, spike-007 SeaweedFS 50GB)
+  - DQ 남은 16건 답변
+- **MVP 즉시 착수 가능**: Phase 15 Auth Advanced 22h — Blueprint 03 WBS 12 태스크 그대로 실행 가능
 
 ---
 
-> 최종 수정: 2026-04-18 15:41 (Wave 3 완료, 7 Agent 병렬, 11 문서 / 8,350줄)
+> 최종 수정: 2026-04-18 (Wave 4 완료, 11 Agent × 3 Tier, 26 문서 / 32,918줄)

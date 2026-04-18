@@ -2,24 +2,30 @@
 skill: kdywave
 status: in-progress
 last_completed_phase: 2
-last_completed_wave: 3
+last_completed_wave: 4
 wave_4_started: 2026-04-18T19:00:00+09:00
+wave_4_completed: 2026-04-18T22:15:00+09:00
 started: 2026-04-18T08:38:00+09:00
 wave_2_completed: 2026-04-18T17:30:00+09:00
 wave_3_completed: 2026-04-18T15:41:00+09:00
 scale: L
 total_waves: 5
 output_dir: docs/research/2026-04-supabase-parity/
-wave_4_plan:
+wave_4_result:
   total_docs: 26
+  total_lines: 32918
   arch_docs: 17
+  arch_lines: 21964
   uiux_docs: 5
+  uiux_lines: 5841
   integration_docs: 4
-  agents: 11
+  integration_lines: 5113
+  agents_executed: 11
   rounds: 3
-  tier_1: "A1 opus — system-overview + adr-log + data-model-erd"
-  tier_2: "B1~B7 sonnet × 7 — 15 카테고리 blueprint 병렬"
-  tier_3: "U1 + I1 + I2 sonnet × 3 — UI/UX 5 + Integration 4 병렬"
+  backward_feedback: 0
+cumulative:
+  total_docs: 98
+  total_lines: 86460
 ---
 
 # kdywave 체크포인트 — Supabase 100점 동등성 연구
@@ -120,23 +126,27 @@ wave_4_plan:
   - ADR-001 확정: Multi-tenancy 의도적 제외 + 재검토 트리거 4개 정량화
   - 누적: Wave 1+2+3 = **72 문서 / 53,542줄**
 
-### Wave 4: 아키텍처 청사진 🔄 진행 중 (계획 26 문서 / 11 에이전트)
-  - **Tier 1 선행 (A1 opus, 3 문서)** 🚀 발사
-    - 02-architecture/00-system-overview.md — 전체 시스템 "지도"
-    - 02-architecture/01-adr-log.md — 누적 ADR (ADR-002~ 최소 10건)
-    - 02-architecture/02-data-model-erd.md — Prisma + SQLite 통합 ERD
-  - **Tier 2 병렬 (B1~B7 sonnet × 7, 15 카테고리 Blueprint)** ⏳
-    - B1 보안: 03-auth-advanced + 06-auth-core
-    - B2 운영: 04-observability + 05-operations
-    - B3 compute: 07-storage + 10-edge-functions
-    - B4 editor: 08-sql-editor + 09-table-editor
-    - B5 data delivery: 11-realtime + 15-data-api
-    - B6 DB 관리: 12-schema-visualizer + 13-db-ops + 14-advisors
-    - B7 cross-cutting: 16-ux-quality
-  - **Tier 3 병렬 (U1 + I1 + I2 sonnet × 3, UI/UX 5 + Integration 4)** ⏳
-    - U1: 03-ui-ux/ 전체 5 문서
-    - I1: 04-integration/00-overview + 01-postgres-extensions
-    - I2: 04-integration/02-cloudflare-deployment + 03-external-services
+### Wave 4: 아키텍처 청사진 ✅ 완료 (26 문서 / 32,918줄 / 11 에이전트 / 3 Tier)
+  - **Tier 1 ✅ (A1 opus, 3 문서 3,713줄)**
+    - 00-system-overview.md 1,298줄 — 9-레이어 아키텍처 + 14카 매핑 + 5 AP 원칙
+    - 01-adr-log.md 848줄 — ADR-001~018 누적 + 재검토 트리거 45건
+    - 02-data-model-erd.md 1,567줄 — PG 10→29 + SQLite 3→6 테이블
+  - **Tier 2 ✅ (7 Agent sonnet 병렬, 14 문서 18,251줄)**
+    - B1 보안 ✅ 3,466줄 — DQ-AA-8(revokedAt+tokenFamily) / DQ-AC-4(ua-parser-js)
+    - B2 운영 ✅ 2,771줄 — DQ-1.18 KEK 90일 / DQ-1.19 JWKS 3분 grace / DQ-1.21
+    - B3 compute ✅ 2,386줄 — SigV4-only / 3층 decideRuntime P0>P1 / 50GB spike-007
+    - B4 editor ✅ 1,988줄 — DQ-2.4~2.6 SQL / DQ-1.10~1.12 + DQ-2.1~2.3 Table
+    - B5 data delivery ✅ 2,665줄 — DQ-RT-1/2/4/5 / DQ-1.25~1.32 + DQ-11.1/11.3
+    - B6 DB 관리 ✅ 3,389줄 — DQ-3.1~3.15(8) / DQ-4.5~4.23(8) / DQ-ADV-5/7
+    - B7 UX ✅ 1,586줄 — DQ-UX-1~3 / DQ-AI-1~2 / DQ-1.15
+  - **Tier 3 ✅ (3 Agent sonnet 병렬, 9 문서 10,954줄)**
+    - U1 UI/UX 5 문서 5,841줄 — 디자인 시스템 hex + 3-pane 레이아웃 + WCAG 2.2 AA
+    - I1 Integration 개요+PG확장 2 문서 2,526줄 — 내부 24쌍 + 외부 5종 + PG ext 3
+    - I2 Integration 배포+외부 2 문서 2,587줄 — QUIC→HTTP/2 + Canary + $10 가드
+  - **Wave 4 Compound Knowledge**:
+    - 청사진 단계에서 계층 분리가 더 명확해짐 (Realtime 2계층 / Advisors 3-Layer / Edge Fn 3층)
+    - UI/UX와 아키텍처 독립 병렬 가능 (Tier 2에서 컴포넌트 이름 계약 고정 덕분)
+    - 역방향 피드백 0건 — Wave 1-3 채택안 전부 강화 재확인
 
 ### Wave 5: 로드맵·스파이크 ⏳ (~10-15 문서)
 

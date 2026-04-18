@@ -31,13 +31,17 @@ npm run dev
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260418-session25c-tunnel-complete-playwright.md   ⭐ 최신 (세션 25-C 완료)
+docs/handover/260418-session28-supabase-parity-wave-4.md   ⭐ 최신 (세션 28 완료)
+docs/handover/260418-session25c-tunnel-complete-playwright.md
 docs/handover/260418-session27-supabase-parity-wave-3.md
 docs/handover/260418-session26-supabase-parity-wave-2.md
 docs/handover/260418-session25-supabase-parity-wave-1.md
-docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1+2+3 마스터 인덱스
+docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1+2+3+4 마스터 인덱스
 docs/research/2026-04-supabase-parity/_CHECKPOINT_KDYWAVE.md
 docs/research/2026-04-supabase-parity/00-vision/           ⭐ Wave 3 산출물 11 문서
+docs/research/2026-04-supabase-parity/02-architecture/     ⭐ Wave 4 Tier 1+2 산출물 17 문서
+docs/research/2026-04-supabase-parity/03-ui-ux/            ⭐ Wave 4 Tier 3 UI/UX 5 문서 (1건 스텁)
+docs/research/2026-04-supabase-parity/04-integration/      ⭐ Wave 4 Tier 3 통합 4 문서
 docs/solutions/2026-04-18-kdywave-hybrid-vs-monolithic-pattern.md   ⭐ Compound Knowledge 1
 docs/solutions/2026-04-18-pg-extension-vs-self-impl-decision.md     ⭐ Compound Knowledge 2
 docs/handover/260418-session24-phase-14c-alpha.md
@@ -46,7 +50,7 @@ docs/handover/260417-session23-phase-14c-updated-at-fix.md
 docs/MASTER-DEV-PLAN.md
 ```
 
-## 현재 상태 (세션 27 종료 시점)
+## 현재 상태 (세션 28 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~13 전부 완료
@@ -65,6 +69,7 @@ docs/MASTER-DEV-PLAN.md
 - **세션 25-A** (2026-04-18, 세션 25와 동시 진행): 세션 24 권장 4건 병렬 — Compound Knowledge 4건 + Playwright 인프라 + runReadwrite 33 케이스(vitest 89→131) + **VIEWER 확장 구현**(table-policy SELECT 분기 + GET 핸들러 USER 포함 + 9 테스트). 5525bd2에 통합 commit
 - **세션 25-B**: 25-A 후속 3단계 — git push, `/ypserver prod` 배포 + viewer-curl **V1~V9 라이브 매트릭스 전 PASS**, Cloudflare Tunnel QUIC→HTTP/2 폴백 부분 수정(~30%→~50%, 100% 미달, KT 회선 패킷 drop 진단 완료). solution doc `2026-04-18-cloudflare-tunnel-quic-tuning-partial-fix.md`
 - **세션 25-C** (2026-04-18): 위임 5건 중 #1 sysctl 적용(#2 systemd는 기 완료 발견). `/etc/sysctl.d/99-cloudflared.conf` (tcp_keepalive 7200→60, rmem/wmem 16MB) + `pm2 restart cloudflared`. **curl 28/28 edge 관통**(v1 / 307 + v2 /login 200) + 측정 프로토콜 v2 표준화. **Playwright 6/6 실패** — S1 /login 530 cascade. 결론 "100% 보증 아님, 확률적 매우 높음". **VIEWER UI 사이드바 불일치 1건 발견**(MANAGER_PLUS_PATHS에 /tables 포함 → USER disclosure 불일치). Compound Knowledge quic-tuning-partial-fix.md "100% 측정의 한계" 섹션 추가 + 남은 위임 #3(multi-instance) 재고 승격
+- **세션 28**: **kdywave Wave 4 완료(아키텍처 청사진 26 문서 / 31,846줄)** — 11 Agent / 3 Tier(A1 opus 3 + B1~B7 sonnet 14 + U1/I1/I2 sonnet 9). 평균 1,225줄/문서(Wave 3 대비 +61%). ADR-002~010+ 누적, 14 카테고리 blueprint 전체 + UI/UX 5 + 통합 4. 1건 스텁(`03-ui-ux/04-editor-components.md` TOC 16줄) 이관. **누적 Wave 1+2+3+4 = 98 문서 / 85,388줄**(예상 91 초과)
 
 ### Wave 1 결과 — 14 카테고리 1순위 + 100점 청사진
 | # | 카테고리 | 1순위 결정 | 100점 단계 |
@@ -91,9 +96,9 @@ docs/MASTER-DEV-PLAN.md
 - **신규 DQ 64건**: Wave 2 매트릭스에서 글로벌 시퀀스로 통합 재할당 예정
 
 ### 배포 상태 ✅
-- **원격 main**: 세션 27에서 Wave 3 11 문서 + 메타 + `.gitignore` 보강 단일 커밋
-- **프로덕션(WSL2 PM2)**: 세션 27은 코드 변경 없음 — 재배포 불필요
-- **세션 24/24b/24c/24d/24e의 미커밋 잔재**는 세션 25 종료 커밋에 통합됨 (세션 27 기준 `.gitignore`에 `test-results/` + `playwright-report/` 추가로 이후 재발 방지)
+- **원격 main**: 세션 28에서 Wave 4 26 문서 + 메타 일괄 단일 커밋
+- **프로덕션(WSL2 PM2)**: 세션 28은 코드 변경 없음 — 재배포 불필요
+- **세션 24/24b/24c/24d/24e의 미커밋 잔재**는 세션 25 종료 커밋에 통합됨 (세션 27 `.gitignore`에 `test-results/` + `playwright-report/` 추가로 이후 재발 방지)
 
 ### 검증 결과 (세션 25)
 | 항목 | 결과 |
@@ -118,19 +123,22 @@ docs/MASTER-DEV-PLAN.md
 
 ## 추천 다음 작업
 
-### 우선순위 1: kdywave Wave 4 진입 (권장 — 자연스러운 연속) ⭐
+### 우선순위 1: kdywave Wave 5 진입 (권장 — 자연스러운 연속) ⭐
 ```
 /kdywave --resume
 ```
-- Phase 2 Wave 4 — 카테고리별 아키텍처 청사진 **20~30 문서**
-- 입력: Wave 3의 55 FR + 38 NFR + CON/ASM 12씩 + ADR-001 + DQ 매트릭스 + Phase 15-22 매핑
-- 중심축: Wave 1+2 Compound Knowledge 2건(하이브리드 9:5 / 1:1 계층 분리) + Wave 3 `14-categories-priority.md`
-- Wave 4 완료 후 Wave 5(로드맵 + 스파이크 10~15)
+- Phase 2 Wave 5 — 로드맵 + 스파이크 **10~15 문서**
+- 입력: Wave 4의 14 category blueprint + adr-log + integration 4 + Wave 3의 Phase 15-22 매핑 + 미해결 DQ 16
+- 산출: Phase별 주간 단위 로드맵 / risk register / 선행 스파이크 목록 / "Go/No-Go" 체크리스트
 
-### 우선순위 2: MVP 즉시 착수 가능 영역 (Wave 4 대기 없이도 가능)
-- **DQ-1.3 SeaweedFS 1주 PoC**: Storage 40→90 (단일 솔루션형, 빠른 ROI)
-- **DQ-1.1 Phase 15 otplib TOTP**: Auth Advanced 15→27 (30h 단일 Phase)
-- **DQ-1.7 pgmq 도입 spec 작성**: Data API Queue 0→90 (확장 1줄)
+### 우선순위 2: Wave 4 스텁 보완 (15~30분)
+- `03-ui-ux/04-editor-components.md` 5 섹션 본문 작성 (Monaco / xyflow / AI Assistant / Diff / 공통 UX)
+- 다른 blueprint 참조 링크 보강
+
+### 우선순위 3: MVP 즉시 착수 (Wave 4 청사진 기반 구현 상세 확보됨)
+- **DQ-1.3 SeaweedFS 1주 PoC**: Storage 40→90 (단일 솔루션형, 빠른 ROI) — `07-storage-blueprint.md` 참조
+- **DQ-1.1 Phase 15 otplib TOTP**: Auth Advanced 15→27 (30h 단일 Phase) — `03-auth-advanced-blueprint.md` 참조
+- **DQ-1.7 pgmq 도입 spec 작성**: Data API Queue 0→90 — `15-data-api-blueprint.md` 참조
 
 ### 우선순위 3: Playwright 안정성 보강 (세션 25-C 후속) ⭐
 - `playwright.config.ts`에 `retries: 2` 추가 → 산발 530 흡수
