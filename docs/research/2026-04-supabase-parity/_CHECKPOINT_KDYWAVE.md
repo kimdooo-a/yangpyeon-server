@@ -1,9 +1,10 @@
 ---
 skill: kdywave
 status: in-progress
-last_completed_phase: 1
-last_completed_wave: 0
+last_completed_phase: 2
+last_completed_wave: 2
 started: 2026-04-18T08:38:00+09:00
+wave_2_completed: 2026-04-18T17:30:00+09:00
 scale: L
 total_waves: 5
 output_dir: docs/research/2026-04-supabase-parity/
@@ -76,11 +77,32 @@ output_dir: docs/research/2026-04-supabase-parity/
     - 신규 DQ 64건 등록 (Wave 2~5에서 답변)
     - **Compound Knowledge**: 카테고리는 "하이브리드 필수형(9)" vs "단일 솔루션형(5)" 두 그룹 — Wave 4 청사진의 분류 축
 
-### Wave 2: 비교 매트릭스 + 1:1 비교 🔄 — 다음 세션 권장
-### Wave 2: 비교 매트릭스 ⏳ (~28 문서)
-### Wave 3: 비전·요구사항 ⏳ (~6 문서)
-### Wave 4: 아키텍처 청사진 ⏳ (~14 문서)
-### Wave 5: 로드맵·스파이크 ⏳ (~12 문서)
+### Wave 2: 비교 매트릭스 + 1:1 비교 ✅ (28 문서, 18,251줄) — 2026-04-18 17:30 완료
+  - **7 Agent 병렬 발사 (A~G, 각 4 문서)** — Round 단일, 평균 문서 651줄
+    - A: Table + SQL Editor (3,133줄) — 14c-α 자체구현 4.54/5 유지, supabase-studio Apache-2.0 직접 인용 + outerbase 공개자료만 참조 "듀얼 참조"
+    - B: Schema Viz + DB Ops (2,510줄) — schemalint+자체 4.30/5, Prisma Studio INTEG/SEC 각 -2.5 치명갭; node-cron+wal-g 4.36/5, pg_cron Node 핸들러 80% 비중으로 거부
+    - C: Auth Core + Advanced (2,850줄) — Hybrid-Self 4.08/5, Lucia vs Auth.js 0.30 차이(양쪽 모두 라이브러리 거부, 패턴 15개 차용); TOTP/WebAuthn/RL 0.12 격차 동시채택, Phase 15~18 22h
+    - D: Storage + Edge (3,393줄) — SeaweedFS+B2 90~95점, MinIO 2026-02-12 아카이빙+SigV4+AGPL VC로 명확 배제; 3층 하이브리드 `decideRuntime()` 라우팅 코드 제공
+    - E: Realtime + Advisors (1,869줄) — wal2json(CDC) vs supabase-realtime 포팅(Channel) 계층이 다름; 3-Layer Advisor 시점(DDL/런타임) 자연 분리
+    - F: Data API + Observability (2,625줄) — REST+pgmq 86.84점 80~85 즉시, pg_graphql 4개 수요트리거 중 2개+ 조건부; node:crypto+jose 92.54/94.20 KMS 대비 14~16점 우위, DQ-12.3 확정 (MASTER_KEY=/etc/luckystyle4u/secrets.env)
+    - G: UX + Ops (1,871줄) — AI SDK v6 87.2점 LangChain 대비 33% 경량 월$2.5, Capistrano 89.0점 롤백 5초 다운타임 0초 Docker 이행 조건 0개 충족
+  - **Wave 2 종합 결론**:
+    - **Wave 1 채택안 100% 강화 확인** — 7개 카테고리 모두 민감도 분석상 1위 유지, 역방향 피드백 발생 없음
+    - **DQ 답변 추가 확정**: DQ-12.3 (MASTER_KEY 위치) 확정. pg_graphql 도입 수요 트리거 4개 정량화
+    - **"1:1 비교는 계층 분리를 드러낸다"** — wal2json vs supabase-realtime, isolated-vm vs Deno, splinter vs squawk 모두 "경쟁이 아니라 역할 분담" 결론, Wave 4 청사진의 계층 설계에 직접 반영
+    - **Compound Knowledge 재검증**: Wave 1의 "하이브리드 9 : 단일 5" 분류가 Wave 2 매트릭스 점수 분포에서도 그대로 유지 — Wave 4 청사진 구조 축 확정
+
+### Wave 3: 비전·요구사항 🔄 실행 중 (11 문서, 7 Agent 병렬) — 2026-04-18 세션 26
+  - **V1 (opus)**: 00-product-vision.md
+  - **V2 (opus)**: 01-user-stories.md
+  - **R1 (opus)**: 02-functional-requirements.md
+  - **R2 (opus)**: 03-non-functional-requirements.md + 04-constraints-assumptions.md
+  - **M1 (sonnet)**: 05-100점-definition.md + 06-operational-persona.md
+  - **M2 (sonnet)**: 07-dq-matrix.md + 08-security-threat-model.md
+  - **M3 (sonnet)**: 09-multi-tenancy-decision.md + 10-14-categories-priority.md
+  - 출력: 00-vision/00~10-*.md
+### Wave 4: 아키텍처 청사진 ⏳ (~20-30 문서)
+### Wave 5: 로드맵·스파이크 ⏳ (~10-15 문서)
 
 ## Phase 3: Wave 검증 ⏳
 ## Phase 4: 완료 & 인계 ⏳
