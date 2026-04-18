@@ -27,12 +27,17 @@ const DEFAULT_LIMIT = 50;
  *   - limit 상한 200
  */
 export const GET = withRole(
-  ["ADMIN", "MANAGER"],
-  async (request, _user, context) => {
+  ["ADMIN", "MANAGER", "USER"],
+  async (request, user, context) => {
     const params = context?.params ? await context.params : {};
     const table = params.table;
     if (!table || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(table)) {
       return errorResponse("INVALID_TABLE", "유효하지 않은 테이블명", 400);
+    }
+
+    const policy = checkTablePolicy(table, "SELECT", user.role);
+    if (!policy.allowed) {
+      return errorResponse("OPERATION_DENIED", policy.reason!, 403);
     }
 
     const url = new URL(request.url);

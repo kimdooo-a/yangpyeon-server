@@ -5,7 +5,7 @@ import type { Role } from "@/generated/prisma/client";
 describe("checkTablePolicy — FULL_BLOCK tables", () => {
   const blocked = ["users", "api_keys", "_prisma_migrations"];
   const allRoles: Role[] = ["ADMIN", "MANAGER", "USER"];
-  const allOps = ["INSERT", "UPDATE", "DELETE"] as const;
+  const allOps = ["SELECT", "INSERT", "UPDATE", "DELETE"] as const;
 
   it.each(blocked.flatMap((t) => allRoles.flatMap((r) => allOps.map((o) => [t, r, o] as const))))(
     "blocks %s for %s %s",
@@ -34,16 +34,30 @@ describe("checkTablePolicy — DELETE_ONLY tables (edge_function_runs)", () => {
     expect(d.allowed).toBe(false);
   });
 
-  it("blocks INSERT for ADMIN (삭제만 가능)", () => {
+  it("blocks INSERT for ADMIN (조회와 삭제만)", () => {
     const d = checkTablePolicy("edge_function_runs", "INSERT", "ADMIN");
     expect(d.allowed).toBe(false);
-    expect(d.reason).toMatch(/삭제만/);
+    expect(d.reason).toMatch(/조회와 삭제/);
   });
 
-  it("blocks UPDATE for ADMIN (삭제만 가능)", () => {
+  it("blocks UPDATE for ADMIN (조회와 삭제만)", () => {
     const d = checkTablePolicy("edge_function_runs", "UPDATE", "ADMIN");
     expect(d.allowed).toBe(false);
-    expect(d.reason).toMatch(/삭제만/);
+    expect(d.reason).toMatch(/조회와 삭제/);
+  });
+
+  it("allows SELECT for ADMIN", () => {
+    expect(checkTablePolicy("edge_function_runs", "SELECT", "ADMIN").allowed).toBe(true);
+  });
+
+  it("allows SELECT for MANAGER", () => {
+    expect(checkTablePolicy("edge_function_runs", "SELECT", "MANAGER").allowed).toBe(true);
+  });
+
+  it("blocks SELECT for USER (운영자 권한 필요)", () => {
+    const d = checkTablePolicy("edge_function_runs", "SELECT", "USER");
+    expect(d.allowed).toBe(false);
+    expect(d.reason).toMatch(/운영자/);
   });
 });
 
@@ -78,13 +92,16 @@ describe("checkTablePolicy — 일반 업무 테이블 (folders)", () => {
 });
 
 describe("checkTablePolicy — 매트릭스 전수 검증 (folders = 일반 테이블)", () => {
-  const matrix: Array<[Role, "INSERT" | "UPDATE" | "DELETE", boolean]> = [
+  const matrix: Array<[Role, "SELECT" | "INSERT" | "UPDATE" | "DELETE", boolean]> = [
+    ["ADMIN", "SELECT", true],
     ["ADMIN", "INSERT", true],
     ["ADMIN", "UPDATE", true],
     ["ADMIN", "DELETE", true],
+    ["MANAGER", "SELECT", true],
     ["MANAGER", "INSERT", true],
     ["MANAGER", "UPDATE", true],
     ["MANAGER", "DELETE", false],
+    ["USER", "SELECT", true],
     ["USER", "INSERT", false],
     ["USER", "UPDATE", false],
     ["USER", "DELETE", false],
@@ -92,6 +109,26 @@ describe("checkTablePolicy — 매트릭스 전수 검증 (folders = 일반 테�
 
   it.each(matrix)("folders %s %s → %s", (role, op, expected) => {
     expect(checkTablePolicy("folders", op, role).allowed).toBe(expected);
+  });
+});
+
+describe("checkTablePolicy — VIEWER 확장 (USER × SELECT 매트릭스)", () => {
+  it("USER 일반 테이블 SELECT 허용", () => {
+    expect(checkTablePolicy("folders", "SELECT", "USER").allowed).toBe(true);
+    expect(checkTablePolicy("files", "SELECT", "USER").allowed).toBe(true);
+    expect(checkTablePolicy("sql_queries", "SELECT", "USER").allowed).toBe(true);
+  });
+
+  it("USER FULL_BLOCK 테이블 SELECT 차단", () => {
+    expect(checkTablePolicy("users", "SELECT", "USER").allowed).toBe(false);
+    expect(checkTablePolicy("api_keys", "SELECT", "USER").allowed).toBe(false);
+    expect(checkTablePolicy("_prisma_migrations", "SELECT", "USER").allowed).toBe(false);
+  });
+
+  it("USER DELETE_ONLY 테이블 SELECT 차단 (운영 로그 보호)", () => {
+    const d = checkTablePolicy("edge_function_runs", "SELECT", "USER");
+    expect(d.allowed).toBe(false);
+    expect(d.reason).toMatch(/운영자/);
   });
 });
 

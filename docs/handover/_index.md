@@ -18,6 +18,7 @@
 
 | 세션 | 파일 | 주요 작업 |
 |------|------|-----------|
+| 25 | [260418-session25-supabase-parity-wave-1.md](./260418-session25-supabase-parity-wave-1.md) | **Supabase 100점 동등성 평가 + kdywave Wave 1 완료** — 14 카테고리 평가표(절대 55 / 가중 60) → `/kdywave` 호출 → Phase 0/1 자율 압축 → Round 1+2 분할 5+5 Agent 병렬. **33 deep-dive / 26,941줄 / 9 DQ 잠정 답변 / 64 신규 DQ**. 사전 스파이크 4건(Postgres CDC / isolated-vm v6 / SeaweedFS / WebAuthn) 모두 "조건부 GO". Compound Knowledge 2건(단일 vs 하이브리드 9:5 / PG 확장 vs 자체구현 7건 기준) |
 | 24b | [260418-session24-phase-14c-beta.md](./260418-session24-phase-14c-beta.md) | Phase 14c-β 복합 PK 지원 — 신규 `/composite` 엔드포인트(바디 `pk_values` map) + schema `compositePkColumns` + UI 훅 분기. ADR-005. **세션 중 2 근본 수정**: Next.js private folder(`_composite`→`composite`), TIMESTAMP(3) 정밀도 정렬. curl E2E B1~B9 전 PASS |
 | 24 | [260418-session24-phase-14c-alpha.md](./260418-session24-phase-14c-alpha.md) | Phase 14c-α 인라인 편집 + 낙관적 잠금 — α/β/γ 분해 후 α 단독. `expected_updated_at` 바디 필드 + 409 CONFLICT + Sonner 3액션 토스트 + EditableCell/useInlineEditMutation/TypedInputControl. 2차 근본 수정: raw UPDATE 자동 `updated_at = NOW()` bump. ADR-004 + curl E2E C1~C6 전 PASS |
 
