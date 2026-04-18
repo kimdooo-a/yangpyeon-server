@@ -13,3 +13,10 @@
 | 2026-04-12 | Advisors Linter (splinter TS 포팅) | SPIKE | Tech | Go | spikes/spike-005-advisors.md | ADR-002 |
 | 2026-04-12 | Edge Functions lite (worker_threads + vm) | SPIKE | Tech | Go(v1 lite) | spikes/spike-005-edge-functions.md | ADR-002 |
 | 2026-04-12 | Data API auto-gen (Prisma DMMF + 동적 라우트) | SPIKE | Tech | Go | spikes/spike-005-data-api.md | ADR-002 |
+| 2026-04-19 | SP-014 JWKS 캐시 3분 grace | SPIKE | Tech | 조건부 Go | docs/research/spikes/spike-014-jwks-cache-result.md | ADR-013 (보완 대기) |
+| 2026-04-19 | SP-015 Session 인덱스 (SQLite vs PG) | SPIKE | Tech | Go | docs/research/spikes/spike-015-session-index-result.md | ADR-006 (보완 대기) |
+| 2026-04-19 | SP-011 argon2id vs bcrypt | SPIKE | Tech | Go | docs/research/spikes/spike-011-argon2-result.md | ADR-022 (신규 제안) |
+| 2026-04-19 | SP-010 PM2 cluster:4 vs fork | SPIKE | Tech | 조건부 Go | docs/research/spikes/spike-010-pm2-cluster-result.md | ADR-015 (보완 대기) |
+| 2026-04-19 | SP-012 isolated-vm v6 Node v24 | SPIKE | Tech | Go | docs/research/spikes/spike-012-isolated-vm-v6-result.md | ADR-009 (재검토 트리거 1 해소) |
+| 2026-04-19 | SP-013 wal2json 슬롯 | SPIKE | Tech | Pending (축약) | docs/research/spikes/spike-013-wal2json-slot-result.md | ADR-010 (측정 대기) |
+| 2026-04-19 | SP-016 SeaweedFS 50GB | SPIKE | Tech | Pending (축약) | docs/research/spikes/spike-016-seaweedfs-50gb-result.md | ADR-008 (측정 대기) |
