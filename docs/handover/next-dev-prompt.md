@@ -31,7 +31,8 @@ npm run dev
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260418-session27-supabase-parity-wave-3.md   ⭐ 최신 (세션 27 완료)
+docs/handover/260418-session25c-tunnel-complete-playwright.md   ⭐ 최신 (세션 25-C 완료)
+docs/handover/260418-session27-supabase-parity-wave-3.md
 docs/handover/260418-session26-supabase-parity-wave-2.md
 docs/handover/260418-session25-supabase-parity-wave-1.md
 docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1+2+3 마스터 인덱스
@@ -63,6 +64,7 @@ docs/MASTER-DEV-PLAN.md
 - **세션 27**: **kdywave Wave 3 완료(비전+FR/NFR+DQ 재분배, 11 문서 / 8,350줄)** — 7 Agent 병렬(V/R opus, M sonnet). 100점 총 공수 **1,008h(~50주)**, 3년 TCO **$950~2,150 절감**, MVP=Phase 15~17. ADR-001 Multi-tenancy 의도적 제외(재검토 트리거 4). 누적 **72 문서 / 53,542줄**
 - **세션 25-A** (2026-04-18, 세션 25와 동시 진행): 세션 24 권장 4건 병렬 — Compound Knowledge 4건 + Playwright 인프라 + runReadwrite 33 케이스(vitest 89→131) + **VIEWER 확장 구현**(table-policy SELECT 분기 + GET 핸들러 USER 포함 + 9 테스트). 5525bd2에 통합 commit
 - **세션 25-B**: 25-A 후속 3단계 — git push, `/ypserver prod` 배포 + viewer-curl **V1~V9 라이브 매트릭스 전 PASS**, Cloudflare Tunnel QUIC→HTTP/2 폴백 부분 수정(~30%→~50%, 100% 미달, KT 회선 패킷 drop 진단 완료). solution doc `2026-04-18-cloudflare-tunnel-quic-tuning-partial-fix.md`
+- **세션 25-C** (2026-04-18): 위임 5건 중 #1 sysctl 적용(#2 systemd는 기 완료 발견). `/etc/sysctl.d/99-cloudflared.conf` (tcp_keepalive 7200→60, rmem/wmem 16MB) + `pm2 restart cloudflared`. **curl 28/28 edge 관통**(v1 / 307 + v2 /login 200) + 측정 프로토콜 v2 표준화. **Playwright 6/6 실패** — S1 /login 530 cascade. 결론 "100% 보증 아님, 확률적 매우 높음". **VIEWER UI 사이드바 불일치 1건 발견**(MANAGER_PLUS_PATHS에 /tables 포함 → USER disclosure 불일치). Compound Knowledge quic-tuning-partial-fix.md "100% 측정의 한계" 섹션 추가 + 남은 위임 #3(multi-instance) 재고 승격
 
 ### Wave 1 결과 — 14 카테고리 1순위 + 100점 청사진
 | # | 카테고리 | 1순위 결정 | 100점 단계 |
@@ -130,16 +132,23 @@ docs/MASTER-DEV-PLAN.md
 - **DQ-1.1 Phase 15 otplib TOTP**: Auth Advanced 15→27 (30h 단일 Phase)
 - **DQ-1.7 pgmq 도입 spec 작성**: Data API Queue 0→90 (확장 1줄)
 
-### 우선순위 3: Cloudflare Tunnel 후속 5건 (세션 25-B 위임)
-1. WSL2 `sysctl` `tcp_keepalive` + `rmem`/`wmem`
-2. WSL systemd 활성화 (idle shutdown 방지)
-3. `cloudflared` 다중 인스턴스
-4. Cloudflare WARP
-5. auto-restart cron
+### 우선순위 3: Playwright 안정성 보강 (세션 25-C 후속) ⭐
+- `playwright.config.ts`에 `retries: 2` 추가 → 산발 530 흡수
+- `login()` 헬퍼에 `response.status() === 530` 체크 + 지수 백오프 재시도
+- 100 trial 대규모 측정(5s × 100 = ~8분)으로 Tunnel 안정성 정량 % 확정 (현 28 샘플로는 90% 이상 자신감이지만 99% 주장은 샘플 부족)
+- 재실행 후 전 PASS 확인 시 β/γ 스펙 확장
 
-### 우선순위 4: Phase 14c-γ USER-as-VIEWER 분리 spec
+### 우선순위 4: Cloudflare Tunnel 후속 — 재평가 (세션 25-C 결과 반영)
+1. ~~WSL2 sysctl~~ — 세션 25-C 완료
+2. ~~WSL systemd 활성화~~ — 진단 결과 기 완료 확인
+3. **cloudflared 다중 인스턴스** — Playwright 530 재발로 **재고 대상 승격** (2인스턴스 round-robin으로 산발 drop 완화 가능)
+4. Cloudflare WARP — 선택
+5. auto-restart cron — 현재 불필요
+
+### 우선순위 5: Phase 14c-γ USER-as-VIEWER 분리 spec + 사이드바 수정
 - 세션 24c에서 권한 매트릭스 13 시나리오 PASS, USER role SELECT 허용 정책은 별도 spec 이관 (ADR-006)
-- 세션 25-A에서 VIEWER 확장 구현 + 25-B 라이브 매트릭스 전 PASS 확인됨 → spec 문서화만 남음
+- 세션 25-A에서 VIEWER 확장 구현 + 25-B 라이브 매트릭스 전 PASS 확인됨
+- **세션 25-C에서 사이드바 불일치 발견** (`src/components/layout/sidebar.tsx` line 96 `MANAGER_PLUS_PATHS`에 `/tables` 포함 → USER 롤이 사이드바에서 테이블 메뉴 미노출, URL 직접 입력만 가능). 수정 옵션 (A) `/tables`만 빼서 `VIEWER_READONLY_PATHS` 신설 / (B) 사이드바 라벨 동적 / (C) 현 상태 + ADR-007 "Navigation disclosure 최소화" 정당화
 
 ### 진입점 예시
 ```
@@ -164,12 +173,12 @@ docs/MASTER-DEV-PLAN.md
 - **CSRF 경로 구분**: `/api/v1/*`만 CSRF 면제. `/api/auth/*`는 Referer/Origin 필수
 - **WSL auto-shutdown + /tmp 휘발**: E2E 스크립트는 단일 호출 내부로 통합 필수
 - **`DATABASE_URL?schema=public` 비호환**: psql 직접 호출 시 `sed 's/?schema=public//'` 전처리 필요
-- **Cloudflare Tunnel 간헐 530**: 세션 25-B에서 HTTP/2 폴백 + retries/keepAlive 튜닝 적용(`~/.cloudflared/config.yml`) → 안정성 ~30%→~50% **부분 개선**. 100% 미달은 KT 회선 edge↔connector 패킷 drop. 1차 조치 `pm2 restart cloudflared` (cloudflared restart 직후 30~40초 edge propagation lag 530 정상)
+- **Cloudflare Tunnel 간헐 530**: 세션 25-B HTTP/2 폴백 + retries/keepAlive + 세션 25-C `/etc/sysctl.d/99-cloudflared.conf` (tcp_keepalive 7200→60/75→10/9→6, rmem/wmem 212KB→16MB) 적용 → **curl 28/28 성공** (안정성 대폭 개선). 다만 Playwright 실행 시점에 **산발 530 1건 재발** → 100% 보증 아닌 "확률적 매우 높음"으로 결론. KT 회선 drop이 완전 소실이 아니라 빈도 격감. 운영 가이드: 1차 조치 `pm2 restart cloudflared` (30~40초 edge propagation lag 530 정상), 회귀 감시는 `bash scripts/tunnel-measure-v2.sh` (edge 관통 기준)
 - **Vercel plugin 훅 false positive**: 프로젝트 Vercel 미사용 → 세션 시작 가이드대로 스킵
 - **information_schema 롤 필터링**: `app_readonly`에서 `table_constraints`/`key_column_usage` 0행 → introspection은 `pg_catalog` 사용
 - **Windows `next build` 불가**: WSL2 빌드가 진실 소스 (`/ypserver --skip-win-build` 옵션 사용)
 - **proxy.ts `runtime` 선언 금지**: Next.js 16 proxy.ts는 암시적 Node.js 런타임
-- **Cloudflare Tunnel WSL2 재기동**: systemd 비활성 환경에서 Windows 재시작 시 `pm2 resurrect` 또는 systemd 활성 검토
+- ~~**Cloudflare Tunnel WSL2 재기동**: systemd 비활성 환경에서 Windows 재시작 시 `pm2 resurrect` 또는 systemd 활성 검토~~ — **세션 25-C 진단에서 기 완료 확인**. `/etc/wsl.conf` `[boot] systemd=true` + `pm2-smart.service` enabled (ExecStart=`pm2 resurrect`) → Windows 재시작 시 dashboard + cloudflared 자동 복구
 
 ## 사용자 기록 (메모리)
 
