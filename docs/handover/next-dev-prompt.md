@@ -26,33 +26,40 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 우선 스파이크 7건 완결 상태 (세션 30)
+## 필수 참조 파일 ⭐ 세션 31 종료 시점
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session30-spike-priority-set.md   ⭐ 최신 (세션 30 스파이크 7건 완결)
+docs/handover/260419-session31-cleanup-safeguard-adr-reflect.md  ⭐ 최신 (세션 31 safeguard + ADR/DQ 반영)
+docs/handover/260419-session30-spike-priority-set.md             (세션 30 스파이크 7건 완결)
 docs/handover/260418-session29-supabase-parity-wave-5.md
 docs/research/_SPIKE_CLEARANCE.md                      ⭐ 15 엔트리 (9 기존 + 7 세션30 신규)
 docs/research/spikes/spike-010-pm2-cluster-result.md   ⭐ 조건부 Go
-docs/research/spikes/spike-011-argon2-result.md        ⭐ Go (ADR-022 제안)
+docs/research/spikes/spike-011-argon2-result.md        ⭐ Go (ADR-019 확정)
 docs/research/spikes/spike-012-isolated-vm-v6-result.md ⭐ Go (ADR-009 트리거1 해소)
 docs/research/spikes/spike-013-wal2json-slot-result.md ⭐ Pending (축약)
 docs/research/spikes/spike-014-jwks-cache-result.md    ⭐ 조건부 Go
 docs/research/spikes/spike-015-session-index-result.md ⭐ Go (cleanup 대안)
 docs/research/spikes/spike-016-seaweedfs-50gb-result.md ⭐ Pending (축약)
+docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md   ⭐ ADR-001~019 (ADR-019 argon2id 신규 확정)
+docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md  ⭐ §7.2.1~7.2.3 (JWKS/세션/argon2 SP 반영)
+docs/research/2026-04-supabase-parity/00-vision/07-dq-matrix.md       ⭐ DQ-AC-1/AC-2/4.1/12.4 Resolved
+docs/solutions/2026-04-19-*.md (5건)                    ⭐ Compound Knowledge 5건 (세션 31)
+docs/security/skill-audit-2026-04-19.md                 ⭐ /ypserver safeguard 감사 PASS
 docs/research/2026-04-supabase-parity/README.md
 docs/research/2026-04-supabase-parity/_CHECKPOINT_KDYWAVE.md (status=completed)
 docs/research/2026-04-supabase-parity/06-prototyping/02-spike-priority-set.md
 docs/MASTER-DEV-PLAN.md
 ```
 
-## 현재 상태 (세션 30 종료 시점)
+## 현재 상태 (세션 31 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료 (인수인계서 참조)
 - **kdywave Wave 1-5 완주**: 123 문서 / 106,588줄
-- **세션 30: 우선 스파이크 7건 완결** (5 실측 + 2 축약) ⭐
+- **세션 30: 우선 스파이크 7건 완결** (5 실측 + 2 축약)
+- **세션 31: safeguard + ADR/DQ 반영** — `/ypserver` §4 PM2 safeguard + `/kdyskillaudit` PASS + DQ 4건 Resolved + ADR 통계 6지점 동기화 + ADR-019 argon2id 확정 (타 터미널 협업) + CK 5건 (타 터미널) ⭐
 
 ### 우선 스파이크 결과 (세션 30, 2026-04-19)
 
@@ -115,9 +122,12 @@ docs/solutions/2026-04-19-jwks-grace-endpoint-vs-client-cache.md
 입력: `07-appendix/03-genesis-handoff.md` _PROJECT_GENESIS.md 초안 (85+ 태스크)
 산출: 주간 실행 플로우
 
-### 우선순위 6: `/ypserver` 스킬 safeguard
-- `pm2 delete all` 명령 거부 가드
-- 대안 명시: `pm2 delete <name>` 개별 지정
+### ~~우선순위 6: `/ypserver` 스킬 safeguard~~ — **세션 31 완료**
+- ✅ `pm2 delete all` / `pm2 delete all --namespace X` / `pm2 stop all` / `pm2 kill` 4종 금지 (§4-1)
+- ✅ 허용 대안: 개별 이름 나열 (§4-3)
+- ✅ 실행 전 4단계 체크 (§4-4)
+- ✅ 장애 복구 3순위 절차 (§4-5)
+- `/kdyskillaudit` PASS 확인 (`docs/security/skill-audit-2026-04-19.md`)
 
 ### 진입점 예시
 ```
@@ -131,19 +141,24 @@ docs/solutions/2026-04-19-jwks-grace-endpoint-vs-client-cache.md
 
 ## 알려진 이슈 및 주의사항
 
+### 세션 31 신규
+- **글로벌 스킬 git 미추적**: `~/.claude/skills/ypserver/SKILL.md` 수정은 저장소에 없음. 머신 간 동기화는 `kdysync` 필요. 세션 31 §4 safeguard 재적용 시 본 인수인계서 §1 참조
+- **병렬 터미널 분담 원칙**: 같은 파일 동시 편집 시 "File has been modified" 오류. 큰 리팩토링 시 사전 영역 분할 필수
+- **`.playwright-mcp/` 기 tracked 파일 제거 완료**: `.gitignore` 등록 이전 커밋에 포함되어 있던 7건. `cadb8ad`로 저장소에서도 제거됨
+
 ### 세션 30 신규
-- **⚠️ PM2 v6.0.14 `delete all --namespace X` 필터 무시 버그** — 프로덕션 삭제 위험. 개별 이름 지정 필수. 복구는 `pm2 resurrect`
-- **argon2 사실관계 정정** — 프로젝트 현행은 **bcrypt@6.0.0** (N-API), bcryptjs 아님. ADR-006 수정 필요
-- **JWKS grace** — jose 클라이언트 캐시만으로 불가, 엔드포인트가 구·신 키 동시 서빙해야 성립
-- **PG partial index + NOW()** 불가능 → cleanup job 대안 채택
-- **N-API prebuilt** — argon2/isolated-vm/better-sqlite3 모두 3~5초 설치 (node-gyp 우회)
-- **SP-013/016 실측 대기** — `_SPIKE_CLEARANCE.md`에 Pending 엔트리
+- ~~**⚠️ PM2 v6.0.14 `delete all --namespace X` 필터 무시 버그**~~ — **세션 31 `/ypserver` §4 safeguard로 내재화 완료**. `pm2 delete all` 계열 명령 전면 금지, 개별 이름 지정 강제, `pm2 resurrect` 복구 절차 문서화
+- ~~**argon2 사실관계 정정**~~ — **세션 31 ADR-019 신규 확정 + ADR-006 보완 완료**. 프로젝트 현행 `bcrypt@6.0.0` N-API, Phase 17에서 `@node-rs/argon2` 점진 마이그레이션
+- ~~**JWKS grace**~~ — **세션 31 Auth Advanced Blueprint §7.2.1 반영 완료**. jose `cacheMaxAge` 는 클라이언트 캐시만 제어, 엔드포인트가 구·신 키 동시 서빙
+- ~~**PG partial index + NOW()**~~ — **세션 31 DQ-AC-2 Resolved + Blueprint §7.2.2 반영 완료**. 일반 복합 인덱스 `(userId, expiresAt)` + cleanup job (일 1회)
+- **N-API prebuilt** — argon2/isolated-vm/better-sqlite3 모두 3~5초 설치 (node-gyp 우회). CK `2026-04-19-napi-prebuilt-native-modules.md` 참조
+- **SP-013/016 실측 대기** — `_SPIKE_CLEARANCE.md`에 Pending 엔트리 (별도 환경 필요)
 
 ### 기존 (세션 29까지)
 - **kdywave 완주**: Phase 0-4 전체 완료. 123 문서 / 106,588줄. 향후 `/kdywave --feedback` 재개 가능
 - **Wave 5 이중 관점 문서화**: 05-roadmap/ 4 파일 쌍(28-1 + 28-2) 병합 금지
 - **DQ-12.3 MASTER_KEY**: `/etc/luckystyle4u/secrets.env` (root:ypb-runtime 0640) + PM2 `env_file`
-- **Compound Knowledge 누적 7+5건** (외부 7 + 세션 30 신규 5건 대기)
+- **Compound Knowledge 누적 12건** (외부 7 + 세션 30→31 신규 5건 작성 완료: `docs/solutions/2026-04-19-*.md`)
 - **raw SQL UPDATE auto-bump**: `src/app/api/v1/tables/[table]/[pk]/route.ts` PATCH
 - **CSRF 경로 구분**: `/api/v1/*`만 CSRF 면제. `/api/auth/*`는 Referer/Origin 필수
 - **WSL auto-shutdown + /tmp 휘발**: E2E 스크립트는 단일 호출 내부로 통합 필수
