@@ -5,10 +5,19 @@ import { isIpAllowed } from "@/lib/ip-whitelist-cache";
 
 // Next.js 16 proxy는 암시적으로 Node.js 런타임에서만 동작 — `runtime` 선언 금지.
 
+// Step 6 (2026-04-19): DB-backed rate limit으로 양도된 경로.
+// 라우트 핸들러가 src/lib/rate-limit-guard.applyRateLimit() 으로 정밀 제한 (IP+email/user 분리).
+// proxy 레이어 in-memory 와 중복 적용 시 둘 중 더 빡빡한 쪽이 먼저 차단되어 디버깅 혼란 → 단일 책임으로 양도.
+const HANDLER_OWNED_RATE_LIMIT_PATHS = new Set([
+  "/api/v1/auth/login",
+  "/api/v1/auth/mfa/challenge",
+  "/api/v1/auth/mfa/webauthn/assert-verify",
+]);
+
 function getRateLimitConfig(pathname: string, method: string) {
+  if (HANDLER_OWNED_RATE_LIMIT_PATHS.has(pathname)) return null;
   if (pathname === "/api/auth/login") return RATE_LIMITS.login;
   if (pathname === "/api/v1/auth/register") return RATE_LIMITS.v1Register;
-  if (pathname === "/api/v1/auth/login") return RATE_LIMITS.v1Login;
   if (pathname.startsWith("/api/v1/")) return RATE_LIMITS.v1Api;
   if (pathname.match(/^\/api\/pm2\/\w+$/) && method === "POST") return RATE_LIMITS.pm2Action;
   if (pathname.startsWith("/api/filebox") && method === "POST") return RATE_LIMITS.fileUpload;

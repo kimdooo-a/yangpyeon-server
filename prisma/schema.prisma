@@ -8,24 +8,151 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  passwordHash  String         @map("password_hash")
-  name          String?
-  phone         String?
-  role          Role           @default(USER)
-  isActive      Boolean        @default(true) @map("is_active")
-  lastLoginAt   DateTime?      @map("last_login_at")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at")
-  folders       Folder[]       @relation("UserFolders")
-  files         File[]         @relation("UserFiles")
-  sqlQueries    SqlQuery[]     @relation("UserSqlQueries")
-  edgeFunctions EdgeFunction[] @relation("UserEdgeFunctions")
-  apiKeys       ApiKey[]       @relation("UserApiKeys")
-  sessions      Session[]      @relation("UserSessions")
+  id             String                  @id @default(uuid())
+  email          String                  @unique
+  passwordHash   String                  @map("password_hash")
+  name           String?
+  phone          String?
+  role           Role                    @default(USER)
+  isActive       Boolean                 @default(true) @map("is_active")
+  mfaEnabled     Boolean                 @default(false) @map("mfa_enabled")
+  lastLoginAt    DateTime?               @map("last_login_at")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @default(now()) @updatedAt @map("updated_at")
+  folders        Folder[]                @relation("UserFolders")
+  files          File[]                  @relation("UserFiles")
+  sqlQueries     SqlQuery[]              @relation("UserSqlQueries")
+  edgeFunctions  EdgeFunction[]          @relation("UserEdgeFunctions")
+  apiKeys        ApiKey[]                @relation("UserApiKeys")
+  sessions       Session[]               @relation("UserSessions")
+  mfaEnrollment  MfaEnrollment?          @relation("UserMfaEnrollment")
+  recoveryCodes  MfaRecoveryCode[]       @relation("UserMfaRecoveryCodes")
+  authenticators WebAuthnAuthenticator[] @relation("UserAuthenticators")
 
   @@map("users")
+}
+
+/// Phase 15 Auth Advanced — WebAuthn (Passkey) Authenticator (FR-6.2)
+/// 참조: docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md
+/// SimpleWebAuthn v10 데이터 스키마 준용.
+/// credentialId: base64url 인코딩된 credential ID. RP Unique.
+/// publicKey: COSE 인코딩된 public key (byte[]).
+/// counter: Replay 공격 방지용 signature counter. 서명마다 증가.
+/// transports: AuthenticatorTransport[] JSON (internal/hybrid/usb/nfc/ble). 디스커버리 용.
+/// deviceType: single_device(보안키, Touch ID 로컬) / multi_device(iCloud Passkey, Google Password Manager).
+/// backedUp: 해당 자격증명이 클라우드 백업 상태인지 (cross-device 확장 가능 여부).
+model WebAuthnAuthenticator {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  user         User      @relation("UserAuthenticators", fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique @map("credential_id")
+  publicKey    Bytes     @map("public_key")
+  counter      BigInt    @default(0)
+  transports   String[]  @default([])
+  deviceType   String    @map("device_type")
+  backedUp     Boolean   @map("backed_up")
+  friendlyName String?   @map("friendly_name")
+  lastUsedAt   DateTime? @map("last_used_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("webauthn_authenticators")
+}
+
+/// WebAuthn 등록/어설션 챌린지 임시 저장 (단일 노드 가정 — 다중 노드면 Redis 이관).
+/// 생성 시 만료 5분, 검증 시 즉시 삭제.
+model WebAuthnChallenge {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  challenge String   @unique
+  purpose   String // "registration" | "authentication"
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("webauthn_challenges")
+}
+
+/// Phase 15 Auth Advanced — TOTP MFA 등록 정보
+/// 참조: docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md (FR-6.1)
+/// secretCiphertext: AES-256-GCM(MFA_MASTER_KEY)로 암호화된 TOTP secret. 평문 미저장.
+///   format = nonce(12) || authTag(16) || ciphertext (base64url 인코딩).
+/// confirmedAt: 사용자가 최초 OTP 검증에 성공한 시점. NULL 이면 enroll 미완료 (활성 아님).
+/// failedAttempts: 챌린지 단계 실패 카운터. lockedUntil 초과 시 해제 (Rate Limit Step 6 전용).
+model MfaEnrollment {
+  id               String    @id @default(uuid())
+  userId           String    @unique @map("user_id")
+  user             User      @relation("UserMfaEnrollment", fields: [userId], references: [id], onDelete: Cascade)
+  secretCiphertext String    @map("secret_ciphertext")
+  confirmedAt      DateTime? @map("confirmed_at")
+  failedAttempts   Int       @default(0) @map("failed_attempts")
+  lockedUntil      DateTime? @map("locked_until")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@map("mfa_enrollments")
+}
+
+/// Phase 15 Auth Advanced — 일회용 복구 코드 (10개 발급, SHA-256 hash 저장).
+/// 분실·변경 상황에서 MFA 우회 허용. 사용 즉시 usedAt 기록 (재사용 금지).
+/// codeHash: SHA-256 hex (timing-safe 비교). 평문은 발급 시 1회만 사용자에게 노출.
+model MfaRecoveryCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation("UserMfaRecoveryCodes", fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@unique([userId, codeHash])
+  @@index([userId, usedAt])
+  @@map("mfa_recovery_codes")
+}
+
+/// Phase 15 Auth Advanced — JWKS 키 저장소 (ES256 비대칭 서명)
+/// 참조: docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md §7.2.1
+/// SP-014 실증: jose cacheMaxAge(180s)는 클라이언트 캐시만 제어 → grace는 "엔드포인트가 구·신 키 동시 서빙"으로 성립.
+/// 키 회전 절차:
+///   1. 신 키 등록 status=CURRENT, 구 키 status=RETIRED + retireAt = NOW() + max(token TTL, cacheMaxAge) + 60s.
+///   2. JWKS 응답은 CURRENT + (RETIRED AND retireAt > NOW()) 동시 포함.
+///   3. cron 1시간마다 retireAt < NOW() 건 DELETE (cleanup).
+/// publicJwk/privateJwk: jose exportJWK 결과 (ES256 → EC P-256 형식).
+/// privateJwk는 서버 내부에서만 사용, 응답에 절대 노출 금지.
+model JwksKey {
+  id         String     @id @default(uuid())
+  kid        String     @unique
+  alg        String     @default("ES256")
+  publicJwk  Json       @map("public_jwk")
+  privateJwk Json       @map("private_jwk")
+  status     JwksStatus @default(CURRENT)
+  createdAt  DateTime   @default(now()) @map("created_at")
+  rotatedAt  DateTime?  @map("rotated_at")
+  retireAt   DateTime?  @map("retire_at")
+
+  @@index([status])
+  @@index([retireAt])
+  @@map("jwks_keys")
+}
+
+enum JwksStatus {
+  CURRENT
+  RETIRED
+}
+
+/// Phase 15 Auth Advanced Step 6 — DB-backed Rate Limit (FR-6.3)
+/// 참조: docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md
+/// 정책: fixed-window. bucketKey(예: "v1Login:ip:1.2.3.4") 별 hits + windowStart 보유.
+///   윈도우 만료 시(=now > windowStart + windowMs) hits 리셋.
+/// 단일 노드 + PM2 cluster 워커 공유 방식. 다중 노드 확장 시 Redis 또는 별도 PG 인스턴스로 이관.
+/// cleanup: 일 1회 windowStart < NOW() - INTERVAL '1 day' 삭제 (Sessions cleanup 패턴 동일).
+model RateLimitBucket {
+  bucketKey   String   @id @map("bucket_key")
+  hits        Int      @default(1)
+  windowStart DateTime @default(now()) @map("window_start")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([windowStart])
+  @@map("rate_limit_buckets")
 }
 
 /// Phase 15 Auth Advanced — 사용자 세션 (DB-backed, opaque token)
