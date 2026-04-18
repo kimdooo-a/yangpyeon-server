@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 31 종료 시점
+## 필수 참조 파일 ⭐ 세션 32 종료 시점 — Phase 15 Step 1-2 완료
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session31-cleanup-safeguard-adr-reflect.md  ⭐ 최신 (세션 31 safeguard + ADR/DQ 반영)
+docs/handover/260419-session32-phase15-step1-2.md                ⭐ 최신 (세션 32 Prisma Session + argon2id)
+docs/handover/260419-session31-cleanup-safeguard-adr-reflect.md  (세션 31 safeguard + ADR/DQ 반영)
 docs/handover/260419-session30-spike-priority-set.md             (세션 30 스파이크 7건 완결)
 docs/handover/260418-session29-supabase-parity-wave-5.md
 docs/research/_SPIKE_CLEARANCE.md                      ⭐ 15 엔트리 (9 기존 + 7 세션30 신규)
@@ -53,13 +54,14 @@ docs/research/2026-04-supabase-parity/06-prototyping/02-spike-priority-set.md
 docs/MASTER-DEV-PLAN.md
 ```
 
-## 현재 상태 (세션 31 종료 시점)
+## 현재 상태 (세션 32 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료 (인수인계서 참조)
 - **kdywave Wave 1-5 완주**: 123 문서 / 106,588줄
 - **세션 30: 우선 스파이크 7건 완결** (5 실측 + 2 축약)
-- **세션 31: safeguard + ADR/DQ 반영** — `/ypserver` §4 PM2 safeguard + `/kdyskillaudit` PASS + DQ 4건 Resolved + ADR 통계 6지점 동기화 + ADR-019 argon2id 확정 (타 터미널 협업) + CK 5건 (타 터미널) ⭐
+- **세션 31: safeguard + ADR/DQ 반영** — `/ypserver` §4 PM2 safeguard + `/kdyskillaudit` PASS + DQ 4건 Resolved + ADR 통계 6지점 동기화 + ADR-019 argon2id 확정 (타 터미널 협업) + CK 5건 (타 터미널)
+- **세션 32: Phase 15 Auth Advanced Step 1-2** ⭐ — Prisma Session 모델 + 복합 인덱스 + cleanup 함수 / @node-rs/argon2 + 시그니처 보존 분기 + login route 자동 재해시(round-trip 0개 압축) / Vitest 131→139 PASS / 프로덕션 자동 재해시 실증($2b$→$argon2id$) / Sessions 인덱스 EXPLAIN Index Scan
 
 ### 우선 스파이크 결과 (세션 30, 2026-04-19)
 
@@ -75,33 +77,41 @@ docs/MASTER-DEV-PLAN.md
 
 ## 추천 다음 작업
 
-### 우선순위 1: Phase 15 Auth Advanced MVP (22h) ⭐ 즉시 착수 가능
-청사진: `02-architecture/03-auth-advanced-blueprint.md`
+### 우선순위 1: Phase 15 Auth Advanced Step 3 — JWKS endpoint (4h) ⭐ 즉시 착수 가능
+청사진: `02-architecture/03-auth-advanced-blueprint.md` §7.2.1 + SP-014 조건부 Go
 
-세션 30 결과를 반영한 구현 순서:
-1. **Prisma Session 모델 추가** (1h)
-   - SP-015 Go 기준: SHA-256 hex + 복합 인덱스 (userId, expiresAt) + cleanup job
-2. **argon2id 도입** (3h)
-   - SP-011 Go 기준: @node-rs/argon2 + `verifyPassword()` 점진 마이그레이션
-3. **JWKS endpoint 구현** (4h)
-   - SP-014 조건부 Go 기준: `/api/.well-known/jwks.json` + ES256 키쌍 + endpoint grace 운용
-4. **TOTP 통합** (8h)
-   - `otplib` + QR 발급 + 백업 코드 + 관리자 강제 해제
-5. **WebAuthn** (10h)
-   - `@simplewebauthn/server` + Passkey 등록·인증
-6. **Rate Limit** (4h)
-   - PostgreSQL 기반 (SP-021 BullMQ/pgmq 트리거 미충족)
+구현 항목:
+1. **`JwksKey` Prisma 모델** — kid / publicJwk(Json) / privateJwk(암호화 권장) / status (CURRENT/RETIRED) / retireAt
+2. **`/api/.well-known/jwks.json` GET** — `status='CURRENT'` OR `retireAt > NOW()` 키 동시 서빙
+3. **Cache-Control 헤더** — `public, max-age=180, stale-while-revalidate=600`
+4. **ES256 키쌍 발급 헬퍼** — jose `generateKeyPair('ES256')` + `exportJWK`
+5. **키 회전 절차** — 신 키 등록 + 구 키 retireAt = NOW() + max(token TTL, cacheMaxAge) + 60s
+6. **cron 1시간 retireAt 만료 키 제거**
+7. **jose `createRemoteJWKSet(url, { cacheMaxAge: 180_000 })` 사용 site** — instrumentation 또는 v1 토큰 검증
 
-**DOD**: MFA 활성 계정 + 백업 코드 + E2E PASS
+**DOD**: 키 회전 1회 실측 + 회전 직후 oldKey 토큰 검증 OK + cron 동작 + jose 캐시 hit rate ≥ 95%
 
-### 우선순위 2: SP-013/016 물리 측정 (13h)
-별도 환경 가능 시:
+### 우선순위 2: Phase 15 Step 4-6 (22h)
+
+세션 32 Step 1-2 패턴 재사용 (Prisma 모델 → migration.sql 수동 → migrate deploy → API 통합 → Vitest → curl E2E → /ypserver):
+
+- **Step 4 TOTP** (8h, FR-6.1) — `otplib@12.x` + QR 발급 + 백업 코드 + admin 강제 해제
+- **Step 5 WebAuthn** (10h, FR-6.2) — `@simplewebauthn/server@10.x` + `@simplewebauthn/browser@10.x` Passkey 등록·인증
+- **Step 6 Rate Limit** (4h, FR-6.3) — `rate-limiter-flexible@5.x` PG 어댑터
+
+### 우선순위 3: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
 - **SP-016 SeaweedFS 50GB** (8h): weed 설치 + 50GB 디스크 + B2 오프로드
 
-상세 절차는 각 결과 문서 §5 체크리스트 참조.
+### 우선순위 4: Compound Knowledge 1건 추가 (30분, 세션 32 산출)
 
-### 우선순위 3: Compound Knowledge 5건 작성 (2h)
+```
+docs/solutions/2026-04-19-bcrypt-argon2-progressive-rehash-merged-update.md
+```
+세션 32 발견 — Blueprint §7.2.3 예시 코드는 검증 후 별도 prisma.user.update를 호출하지만, 이미 `lastLoginAt` update를 수행 중인 라우트라면 `{lastLoginAt, passwordHash?}` 머지로 round-trip 0개 압축 가능. 세션 32 login route 통합 사례 인용.
+
+### 우선순위 5: 세션 30 Compound Knowledge 5건 작성 — **세션 31 67731da 커밋으로 완료** (변경 없음)
+```
 ```
 docs/solutions/2026-04-19-pg-partial-index-now-incompatibility.md
 docs/solutions/2026-04-19-napi-prebuilt-native-modules.md
@@ -131,15 +141,29 @@ docs/solutions/2026-04-19-jwks-grace-endpoint-vs-client-cache.md
 
 ### 진입점 예시
 ```
-# Phase 15 착수
-/kdyspike --status   # 스파이크 완결 확인
-# → Phase 15 Task 1 "Prisma Session 모델" 착수
+# Phase 15 Step 3 착수 (JWKS endpoint, 4h)
+# 참조: docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md §7.2.1
+#       docs/research/spikes/spike-014-jwks-cache-result.md
+#       docs/handover/260419-session32-phase15-step1-2.md §7.1
+
+# 1. Prisma JwksKey 모델 추가 (세션 32 Session 모델과 동일 패턴)
+# 2. /api/.well-known/jwks.json GET 라우트
+# 3. ES256 키쌍 발급 헬퍼 + 회전 절차
+# 4. jose createRemoteJWKSet 통합 + cron 정리
+# 5. 키 회전 1회 실측 + curl E2E + /ypserver prod --skip-win-build
 
 # 또는 물리 측정
 /kdyspike --resume wal2json  # SP-013
 ```
 
 ## 알려진 이슈 및 주의사항
+
+### 세션 32 신규
+- **Sessions 테이블 미사용 상태** — Phase 15 Step 1에서 모델·인덱스·cleanup만 추가. 첫 INSERT는 Phase 15-D Refresh Rotation 도입 시점. 외부 모니터링이 빈 테이블 경고하지 않도록 주의
+- **`cleanupExpiredSessions()` 미스케줄** — 정의만 됨. node-cron 등록은 후속(Sessions INSERT 시작 시점에 함께)
+- **`@node-rs/argon2` const enum 회피** — `Algorithm.Argon2id` 직접 import는 isolatedModules:true에서 경고 가능. 본 프로젝트는 `const ARGON2ID_ALGORITHM = 2` 상수 캡슐화
+- **자동 재해시 후 첫 검증 1회만 약간 느림** — 1차 로그인은 bcrypt 검증(168ms p95) + argon2 hash(20ms) 동시 수행 → ~190ms. 2차부터 argon2 verify(14ms p95)만
+- **자동 재해시 round-trip 0개 패턴** — Blueprint §7.2.3 예시는 별도 prisma.user.update이지만, lastLoginAt update에 머지하면 단일 트랜잭션으로 압축 가능. CK 후보로 다음 세션 작성 권장
 
 ### 세션 31 신규
 - **글로벌 스킬 git 미추적**: `~/.claude/skills/ypserver/SKILL.md` 수정은 저장소에 없음. 머신 간 동기화는 `kdysync` 필요. 세션 31 §4 safeguard 재적용 시 본 인수인계서 §1 참조
