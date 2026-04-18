@@ -59,7 +59,7 @@ export default function TableDetailPage({
   const DELETE_ONLY = ["edge_function_runs"];
   const blocked = FULL_BLOCK.includes(table);
   const deleteOnly = DELETE_ONLY.includes(table);
-  const hasPk = primaryKey !== null && !compositePk;
+  const hasPk = primaryKey !== null || compositePk;
 
   const canInsert =
     !blocked && !deleteOnly && hasPk &&
@@ -110,9 +110,7 @@ export default function TableDetailPage({
           )}
           {!blocked && !hasPk && (
             <span className="text-xs text-amber-400">
-              {compositePk
-                ? "복합 PK 테이블 — Phase 14b 미지원"
-                : "PK 없는 테이블 — 편집 불가"}
+              PK 없는 테이블 — 편집 불가
             </span>
           )}
           {canInsert && (

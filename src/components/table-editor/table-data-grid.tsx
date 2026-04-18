@@ -61,6 +61,7 @@ export function TableDataGrid({
 }: TableDataGridProps) {
   const [columns, setColumns] = useState<ColumnMeta[]>([]);
   const [primaryKeyName, setPrimaryKeyName] = useState<string | null>(null);
+  const [compositePkColumns, setCompositePkColumns] = useState<string[]>([]);
   const [data, setData] = useState<DataResponse | null>(null);
   const [offset, setOffset] = useState(0);
   const [orderBy, setOrderBy] = useState<string | null>(null);
@@ -78,6 +79,7 @@ export function TableDataGrid({
     }
     setColumns(body.data.columns);
     setPrimaryKeyName(body.data.primaryKey?.column ?? null);
+    setCompositePkColumns(body.data.compositePkColumns ?? []);
   }, [table]);
 
   const fetchRows = useCallback(async () => {
@@ -107,6 +109,7 @@ export function TableDataGrid({
 
   const { submit: submitInlineEdit } = useInlineEditMutation({
     table,
+    compositePkColumns,
     onRowUpdated: () => {
       if (onRowPatched) onRowPatched();
       else fetchRows();
@@ -205,11 +208,15 @@ export function TableDataGrid({
       cell: ({ getValue, row }) => {
         const v = getValue();
         const isSystem = systemColumns.includes(col.name);
+        const isComposite = compositePkColumns.length > 1;
+        const isPkCol = isComposite
+          ? compositePkColumns.includes(col.name)
+          : col.isPrimaryKey;
         const readOnly =
-          col.isPrimaryKey ||
+          isPkCol ||
           isSystem ||
           !policy?.canUpdate ||
-          primaryKeyName === null;
+          (primaryKeyName === null && !isComposite);
         if (readOnly) {
           const text =
             v === null || v === undefined
@@ -228,8 +235,17 @@ export function TableDataGrid({
             </span>
           );
         }
-        const pkVal = row.original[primaryKeyName!];
         const expectedUpdatedAt = row.original["updated_at"];
+        const pkValue =
+          !isComposite && primaryKeyName
+            ? row.original[primaryKeyName]
+            : undefined;
+        const pkValuesMap = isComposite
+          ? compositePkColumns.reduce<Record<string, unknown>>((acc, c) => {
+              acc[c] = row.original[c];
+              return acc;
+            }, {})
+          : undefined;
         return (
           <EditableCell
             value={v}
@@ -237,7 +253,8 @@ export function TableDataGrid({
             readOnly={false}
             onCommit={async (next) => {
               await submitInlineEdit({
-                pkValue: String(pkVal),
+                pkValue: pkValue !== undefined ? String(pkValue) : undefined,
+                pkValuesMap,
                 column: col.name,
                 value: next,
                 expectedUpdatedAt:
@@ -253,7 +270,7 @@ export function TableDataGrid({
       },
     }));
     return actionColumn ? [actionColumn, ...base] : base;
-  }, [columns, orderBy, orderDir, actionColumn, policy, primaryKeyName, systemColumns, submitInlineEdit]);
+  }, [columns, orderBy, orderDir, actionColumn, policy, primaryKeyName, compositePkColumns, systemColumns, submitInlineEdit]);
 
   const tableInstance = useReactTable({
     data: data?.rows ?? [],
