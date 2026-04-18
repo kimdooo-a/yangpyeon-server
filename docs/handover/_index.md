@@ -14,6 +14,13 @@
 
 <!-- 날짜 그룹별로 정리합니다. 최신이 위로 올라갑니다. -->
 
+### 2026-04-19
+
+| 세션 | 파일 | 주요 작업 |
+|------|------|-----------|
+| 31 | [260419-session31-cleanup-safeguard-adr-reflect.md](./260419-session31-cleanup-safeguard-adr-reflect.md) | **로컬 정리 + /ypserver safeguard + 세션 30 결과 ADR/DQ 반영** — /kdyclean 로컬 아티팩트 ~11.4MB 정리 (cadb8ad `git commit --only`로 unrelated 스테이징 회피). **/ypserver §4 PM2 safeguard 신설** (78줄 5서브섹션: 금지→실증사고→대안→체크→복구). `/kdyskillaudit` **PASS** (FAIL 0/WARN 0, `docs/security/skill-audit-2026-04-19.md`). L2 ADR/DQ 배치 반영 — 타 터미널 ADR-019 본문 + Auth Advanced Blueprint §7.2 + CK 5건과 분담, 본 터미널은 **DQ-AC-1/AC-2/4.1/12.4 Resolved** + ADR 통계 6지점 동기화(§0.4/§4.1/§4.2 Accepted 18→19/§4.3 Phase 17/§4.4 트리거 48/§5 forecast 재정렬). 89392f7로 외부 세션 31 병합 완료 |
+| 30 | [260419-session30-spike-priority-set.md](./260419-session30-spike-priority-set.md) | **우선 스파이크 7건 완결 (SP-010~016, 5 실측 + 2 축약)** — 세션 29 권장 1순위 순차 수행. SP-014 JWKS 캐시 / SP-015 Session 인덱스 / SP-011 argon2id / SP-010 PM2 cluster / SP-012 isolated-vm v6 실측 + SP-013 wal2json / SP-016 SeaweedFS 축약. 총 4.5h 소요(목표 29h 대비 85% 단축). **치명적 발견**: PM2 v6.0.14 `delete all --namespace` 필터 무시 버그 → 프로덕션 dashboard 삭제 사고, pm2 resurrect로 복구. Compound Knowledge 후보 5건 식별 |
+
 ### 2026-04-18
 
 | 세션 | 파일 | 주요 작업 |
