@@ -31,8 +31,9 @@ npm run dev
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260418-session25-supabase-parity-wave-1.md   ⭐ 최신 (세션 25 완료)
-docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1 마스터 인덱스
+docs/handover/260418-session26-supabase-parity-wave-2.md   ⭐ 최신 (세션 26 완료)
+docs/handover/260418-session25-supabase-parity-wave-1.md
+docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1+2 마스터 인덱스
 docs/research/2026-04-supabase-parity/_CHECKPOINT_KDYWAVE.md
 docs/solutions/2026-04-18-kdywave-hybrid-vs-monolithic-pattern.md   ⭐ Compound Knowledge 1
 docs/solutions/2026-04-18-pg-extension-vs-self-impl-decision.md     ⭐ Compound Knowledge 2
@@ -56,6 +57,7 @@ docs/MASTER-DEV-PLAN.md
 - 방향 C Vitest (세션 24d): 89개 유닛 테스트 PASS, ADR-003 §5 재활성화
 - 방향 B `/ypserver` 보강 (세션 24e): 5 갭 해소(Windows skip / prisma migrate / drizzle / Compound Knowledge 링크)
 - **세션 25**: Supabase 100점 평가(절대 55/가중 60) + **kdywave Wave 1 완료(33 deep-dive, 26,941줄)**
+- **세션 26**: **kdywave Wave 2 완료(28 매트릭스+1:1, 18,251줄)** — 7 Agent 병렬, 역방향 피드백 0건, 누적 61 문서 / 45,192줄
 
 ### Wave 1 결과 — 14 카테고리 1순위 + 100점 청사진
 | # | 카테고리 | 1순위 결정 | 100점 단계 |
@@ -109,14 +111,14 @@ docs/MASTER-DEV-PLAN.md
 
 ## 추천 다음 작업
 
-### 우선순위 1: kdywave Wave 2 진입 (권장 — 자연스러운 연속) ⭐
+### 우선순위 1: kdywave Wave 3 진입 (권장 — 자연스러운 연속) ⭐
 ```
 /kdywave --resume
 ```
-- Phase 2 Wave 2 — 카테고리 매트릭스 14 + 1:1 비교 우선순위 5-8 = ~28 문서
-- 64 신규 DQ에 글로벌 번호 재할당 (DQ-1.10 ~ DQ-1.74 순)
-- 가중 점수 정규화 + 1순위/2순위 차이 분석
-- Wave 2 완료 후 Wave 3(100점 정의 + FR/NFR) → Wave 4(청사진 14) → Wave 5(로드맵 + 스파이크)
+- Phase 2 Wave 3 — 비전 + FR/NFR + CON/ASM = 11 문서 (CHECKPOINT에 7 Agent pre-plan 기록 완료)
+- V1 (opus) 00-product-vision / V2 (opus) 01-user-stories / R1 (opus) 02-FR / R2 (opus) 03-NFR + 04-CON_ASM
+- M1 (sonnet) 05-100점-definition + 06-operational-persona / M2 (sonnet) 07-dq-matrix + 08-threat-model / M3 (sonnet) 09-multi-tenancy-decision + 10-14-categories-priority
+- Wave 3 완료 후 Wave 4(아키텍처 청사진 20-30) → Wave 5(로드맵 + 스파이크 10-15)
 
 ### 우선순위 2: Wave 1 결과 기반 즉시 코드 작업 가능 항목
 - **DQ-1.3 SeaweedFS 1주 PoC**: Storage 40→90 (단일 솔루션형 카테고리, 빠른 ROI)
@@ -137,9 +139,11 @@ docs/MASTER-DEV-PLAN.md
 
 ## 알려진 이슈 및 주의사항
 
-- **Wave 1만 완료, Wave 2~5 미진입**: ~88 문서 중 33 완료. 다음 세션에서 Wave 2 권장
-- **DQ 번호 충돌 정리됨**: Round 1 신규 DQ는 글로벌 시퀀스(DQ-1.10~1.24)로 재할당. Round 2 신규 49건은 Wave 2 진입 시 (DQ-1.25~1.74) 부여
-- **Wave 1 산출물의 줄 수 (26,941줄)는 다음 세션 컨텍스트에 큰 부담** — Wave 2 진입 시 마스터 인덱스만 로드, deep-dive는 카테고리별 selective read 권장
+- **Wave 1+2 완료, Wave 3~5 미진입**: ~91 문서 중 61 완료 (45,192줄). 다음 세션에서 Wave 3 권장
+- **Wave 2에서 역방향 피드백 0건**: Wave 1 채택안 14/14 모두 민감도 분석 1위 유지 — 후속 Wave 3/4/5 작업 기반 견고
+- **DQ-12.3 추가 확정**: MASTER_KEY=`/etc/luckystyle4u/secrets.env` (root:ypb-runtime 0640) + PM2 `env_file`
+- **정량화된 재고 조건 명시됨**: Garage(3조건) / pg_graphql(4 수요 트리거 중 2+) / Docker(0조건 충족) / AWS KMS(2 트리거 중 1) — 환경 변화 시 트리거만 점검하면 됨
+- **Wave 1+2 누적 줄 수 45,192줄 컨텍스트 부담**: Wave 3 진입 시 README 마스터 + 필요 매트릭스만 selective read 권장. 에이전트별 L3 프롬프트에 읽을 파일 경로 명시 필수
 - **Compound Knowledge 6건 누적**: 세션 24의 4건(csrf-api-settings-guard / nextjs-private-folder-routing / raw-sql-updatedat-bump / timestamp-precision-optimistic-locking) + 세션 25의 2건(kdywave-hybrid-vs-monolithic-pattern / pg-extension-vs-self-impl-decision)
 - **세션 24/24b/24c/24d/24e의 잔여 미커밋**(코드 + scripts + playwright + test-results)은 세션 25 종료 커밋에 포함됨 (재커밋 불필요)
 - **raw SQL UPDATE auto-bump**: `src/app/api/v1/tables/[table]/[pk]/route.ts` PATCH는 `updated_at` 컬럼이 있고 사용자가 명시 설정 안 한 경우 `SET ..., updated_at = NOW()` 자동 주입
