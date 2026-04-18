@@ -73,7 +73,7 @@ function serializePk(pkValues: Record<string, unknown>): string {
   return JSON.stringify(sorted);
 }
 
-/** PATCH /api/v1/tables/[table]/_composite — 복합 PK 행 업데이트 */
+/** PATCH /api/v1/tables/[table]/composite — 복합 PK 행 업데이트 */
 export const PATCH = withRole(
   ["ADMIN", "MANAGER"],
   async (request, user, context) => {
@@ -263,7 +263,7 @@ export const PATCH = withRole(
             writeAuditLogDb({
               timestamp: new Date().toISOString(),
               method: "PATCH",
-              path: `/api/v1/tables/${table}/_composite`,
+              path: `/api/v1/tables/${table}/composite`,
               ip: request.headers.get("x-forwarded-for") ?? "unknown",
               action: "TABLE_ROW_UPDATE_CONFLICT",
               detail: `${user.email} → ${table}(pk=${serializePk(pkValues)}): expected=${expectedUpdatedAt.toISOString()}, actual=${String(current.updated_at)}`,
@@ -286,7 +286,7 @@ export const PATCH = withRole(
       writeAuditLogDb({
         timestamp: new Date().toISOString(),
         method: "PATCH",
-        path: `/api/v1/tables/${table}/_composite`,
+        path: `/api/v1/tables/${table}/composite`,
         ip: request.headers.get("x-forwarded-for") ?? "unknown",
         action: "TABLE_ROW_UPDATE",
         detail: `${user.email} → ${table}(pk=${serializePk(pkValues)}) [locked=${expectedUpdatedAt !== null}]: ${JSON.stringify(redactSensitiveValues(table, diff))}`,
@@ -302,7 +302,7 @@ export const PATCH = withRole(
   },
 );
 
-/** DELETE /api/v1/tables/[table]/_composite — 복합 PK 행 삭제 (ADMIN 전용) */
+/** DELETE /api/v1/tables/[table]/composite — 복합 PK 행 삭제 (ADMIN 전용) */
 export const DELETE = withRole(
   ["ADMIN"],
   async (request, user, context) => {
@@ -393,7 +393,7 @@ export const DELETE = withRole(
       writeAuditLogDb({
         timestamp: new Date().toISOString(),
         method: "DELETE",
-        path: `/api/v1/tables/${table}/_composite`,
+        path: `/api/v1/tables/${table}/composite`,
         ip: request.headers.get("x-forwarded-for") ?? "unknown",
         action: "TABLE_ROW_DELETE",
         detail: `${user.email} → ${table}(pk=${serializePk(pkValues)})`,

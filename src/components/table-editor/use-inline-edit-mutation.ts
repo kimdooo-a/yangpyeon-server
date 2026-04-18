@@ -42,7 +42,7 @@ export function useInlineEditMutation({
       "ok" | "conflict-resolved" | "failed"
     > => {
       const url = isComposite
-        ? `/api/v1/tables/${table}/_composite`
+        ? `/api/v1/tables/${table}/composite`
         : `/api/v1/tables/${table}/${encodeURIComponent(pkValue ?? "")}`;
 
       const body: Record<string, unknown> = {
