@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 33 종료 시점 — Phase 15 Step 3-6 대부분 완료
+## 필수 참조 파일 ⭐ 세션 34 종료 시점 — Phase 15 Step 1~6 + UI 통합 완료
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session33-phase15-step3-4-5.md              ⭐ 최신 (JWKS + TOTP MFA + WebAuthn + Step 6 병합)
+docs/handover/260419-session34-phase15-ui-and-mfa-status.md      ⭐ 최신 (UI 통합 + 라이브 디버깅 2건)
+docs/handover/260419-session33-phase15-step3-4-5.md              (JWKS + TOTP + WebAuthn + Step 6 백엔드)
 docs/handover/260419-session32-phase15-step1-2.md                (세션 32 Prisma Session + argon2id)
 docs/handover/260419-session31-cleanup-safeguard-adr-reflect.md  (세션 31 safeguard + ADR/DQ 반영)
 docs/handover/260419-session30-spike-priority-set.md             (세션 30 스파이크 7건 완결)
@@ -49,7 +50,7 @@ docs/security/skill-audit-2026-04-19.md                          ⭐ /ypserver s
 docs/MASTER-DEV-PLAN.md
 ```
 
-## 현재 상태 (세션 33 종료 시점)
+## 현재 상태 (세션 34 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -57,59 +58,69 @@ docs/MASTER-DEV-PLAN.md
 - **세션 30**: 우선 스파이크 7건 완결 (5 실측 + 2 축약)
 - **세션 31**: safeguard + ADR/DQ 반영 + CK 5건 (타 터미널)
 - **세션 32**: Phase 15 Step 1-2 — Prisma Session + argon2id 자동 재해시
-- **세션 33** ⭐ — Phase 15 Step 3·4·5 서버측 완결 + 타 터미널 Step 6 병합
-  - **Step 3 JWKS**: `JwksKey` Prisma 모델 + `/api/.well-known/jwks.json` + ES256 + kid 분기 + HS256 legacy fallback
-  - **Step 4 TOTP MFA (FR-6.1)**: 3 모델 + `otplib@12.0.1` + `qrcode` + AES-256-GCM 암호화 + 10 recovery codes + 5분 challenge JWT + 5 API routes + E2E 6건 PASS
-  - **Step 5 WebAuthn (FR-6.2)**: 2 모델 + `@simplewebauthn/server@10.0.1` + 4 API routes + login hasPasskey 분기
-  - **Step 6 Rate Limit (FR-6.3)** [타 터미널]: `src/lib/mfa/lock-policy.ts` + `src/lib/rate-limit-guard.ts` + `rate-limit-db.ts` + login/challenge/assert-verify에 `applyRateLimit` 주입
-  - **통합 결과**: tsc 0 / vitest 131→**175 PASS**(+44) / 3 migration 전 적용 / MFA_MASTER_KEY 64 hex 생성·배포
+- **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
+- **세션 34** ⭐ — Phase 15 **UI 통합** + 라이브 디버깅 2건
+  - 신규 통합 페이지 `(protected)/account/security` — TOTP 3-stage stepper + Passkey list/enroll/delete + Disable
+  - 신규 API 2건: `GET /mfa/status` + `DELETE /mfa/webauthn/authenticators/[id]`
+  - 로그인 페이지 MFA Challenge UI — `MfaState` discriminated union + Method Tabs + Passkey `startAuthentication()`
+  - 사이드바 "내 계정" 그룹 신설 + `@simplewebauthn/browser@^10` 설치
+  - **Step 6 라이브 디버깅 2건** (다음 세션 CK 후보):
+    - proxy 인메모리 vs handler DB rate limit 충돌 → `HANDLER_OWNED_RATE_LIMIT_PATHS` 양도
+    - PG TIMESTAMP(3) timezone-naive + JS Date 9시간 오프셋 → `EXTRACT(EPOCH...)` PG 직접 계산
+  - **검증**: tsc 0 / vitest 175 PASS / `/ypserver` 4회 / curl smoke 307·401·200
 
 ## 추천 다음 작업
 
-### 우선순위 1: MFA UI 통합 ⭐ 즉시 착수 가능
+### 우선순위 1: MFA UI 브라우저 검증 ⭐ 즉시 착수 가능 (1-2h)
 
-서버측 Step 3-6 완결. 브라우저 WebAuthn API 연동만 남음:
+서버측·UI 모두 완결. 실제 브라우저 + 사용자 인터랙션으로 round-trip 검증만 남음:
 
-- **설정 페이지** (`/settings/mfa`):
-  - TOTP: `/api/v1/auth/mfa/enroll` 호출 → `qrDataUrl` 표시 → 사용자 Authenticator 앱 스캔 → 6자리 코드 입력 → `/confirm` 호출 → 복구 코드 10개 1회 노출
-  - Passkey: `@simplewebauthn/browser` 설치 → `startRegistration()` → `/register-options` + `/register-verify` 흐름
-  - MFA 해제: password + TOTP 재확인 → `/disable` (DELETE)
-- **로그인 2FA 화면**:
-  - `/login` POST 응답에 `mfaRequired: true, methods: ["totp", "recovery", "passkey"]` 있으면 별도 단계 렌더
-  - methods 리스트 기반 탭(TOTP / Passkey / Recovery) 분기
-  - Passkey: `startAuthentication()` → `/assert-options` + `/assert-verify` 흐름
-  - TOTP/Recovery: 입력 → `/challenge` 흐름
-- **Admin UI** (`/members/[id]`): MFA reset 버튼 (`/api/admin/users/[id]/mfa/reset`)
+1. https://stylelucky4u.com/login (admin 로그인)
+2. `/account/security` 진입
+3. **TOTP enroll**: "MFA 등록 시작" → Authenticator 앱(Google Auth/1Password 등)으로 QR 스캔 → 6자리 입력 → 복구 코드 10개 텍스트 다운로드
+4. 로그아웃 → 다시 로그인 → MFA challenge UI 확인 → TOTP 코드로 인증 → 메인 진입
+5. **Passkey enroll**: `/account/security` → "새 Passkey 등록" → 기기 이름 → Touch ID/Windows Hello/Passkey manager
+6. 로그아웃 → 다시 로그인 → Passkey 탭 → 인증 → 메인 진입
+7. (선택) 복구 코드로 로그인 → 사용한 코드 재사용 거부 확인
 
-**DOD**: 브라우저 실제 WebAuthn authenticator(iCloud Keychain / Google Passkey / YubiKey) full round-trip PASS. 인증·등록·어설션 프로덕션 검증.
+**DOD**: 6 시나리오 모두 PASS. 발견된 이슈는 새 세션 권장사항 1순위로 즉시 수정.
 
-### 우선순위 2: Compound Knowledge 3건 작성 (30분)
+### 우선순위 2: Cleanup cron 일괄 등록 (1h)
 
-세션 33 산출:
+다음 4종 cleanup 함수가 정의만 되고 스케줄 미등록 — `instrumentation.ts` cron bootstrap 또는 신설 `src/lib/cleanup-scheduler.ts`로 통합:
+- `cleanupExpiredSessions` (세션 32, `src/lib/sessions/cleanup.ts`)
+- `cleanupExpiredRateLimitBuckets` (세션 34, `src/lib/rate-limit-db.ts`)
+- `cleanupExpiredJwksKeys` (세션 33, `src/lib/jwks/store.ts`)
+- `cleanupExpiredChallenges` (세션 33, `src/lib/mfa/webauthn.ts`)
+
+권장: 일 1회 03:00 KST 일괄 실행. 실패는 audit log + Sentry 후속.
+
+### 우선순위 3: Compound Knowledge 5건 작성 (1h)
+
+세션 33 산출 3건:
 ```
 docs/solutions/2026-04-19-otplib-v13-breaking-noble-plugin.md
 docs/solutions/2026-04-19-simplewebauthn-v10-api-shape.md
 docs/solutions/2026-04-19-mfa-challenge-token-2fa-pattern.md
 ```
 
-### 우선순위 3: Phase 15 Step 6 Rate Limit 마감 (잔여)
+세션 32 미작성:
+```
+docs/solutions/2026-04-19-bcrypt-argon2-progressive-rehash-merged-update.md
+```
 
-타 터미널이 시작한 `lock-policy` + `rate-limit-guard` + `rate-limit-db` 확장:
-- login endpoint 자체 rate limit (IP + email 양면 카운트) — **이미 적용됨**
-- MFA challenge `applyRateLimit` + `lockedUntil` UI 반영
-- WebAuthn assert-verify rate limit — **이미 적용됨**
-- audit log 액션 추가 (`MFA_LOCKED`, `LOGIN_RATE_LIMITED`)
-- Blueprint §8.3 대조 완결
+세션 34 신규 (라이브 디버깅 2건 — 본 세션 §3 핵심 자산):
+```
+docs/solutions/2026-04-19-pg-timestamp-naive-js-date-tz-offset.md
+docs/solutions/2026-04-19-rate-limit-defense-in-depth-conflict.md
+```
 
 ### 우선순위 4: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
 - **SP-016 SeaweedFS 50GB** (8h): weed 설치 + 50GB 디스크 + B2 오프로드
 
-### 우선순위 5: 세션 32 Compound Knowledge 1건 (30분, 미작성)
-```
-docs/solutions/2026-04-19-bcrypt-argon2-progressive-rehash-merged-update.md
-```
-lastLoginAt update에 passwordHash 조건부 머지로 자동 재해시 round-trip 0개 압축.
+### 우선순위 5: Phase 15-D Refresh Rotation
+세션 32 Sessions 테이블 인프라(미사용) 활성화. opaque refresh token 회전 + revoke + UI "활성 세션" 카드.
 
 ### 우선순위 6: `/kdygenesis --from-wave` 연계
 입력: `07-appendix/03-genesis-handoff.md` _PROJECT_GENESIS.md 초안 (85+ 태스크)
@@ -117,15 +128,25 @@ lastLoginAt update에 passwordHash 조건부 머지로 자동 재해시 round-tr
 
 ### 진입점 예시
 ```
-# MFA UI 구현 (우선순위 1 Step a: TOTP 설정 페이지)
-# 1. @simplewebauthn/browser 설치
-# 2. /settings/mfa 페이지 생성 (클라이언트 컴포넌트)
-# 3. /api/v1/auth/mfa/enroll + confirm 연결
-# 4. 복구 코드 1회 노출 UI (복사 버튼 + 확인 체크)
-# 5. Passkey 등록 (startRegistration → register-options → register-verify)
+# 우선순위 1 — MFA UI 브라우저 검증
+# 1. https://stylelucky4u.com/login 로 admin 로그인
+# 2. 사이드바 "내 계정 > MFA & 보안" 클릭
+# 3. TOTP 등록 흐름 6단계 + Passkey 등록 흐름 (등록 → 로그아웃 → 재로그인)
+# 4. 발견된 UI 이슈 수정 → /ypserver prod --skip-win-build 재배포
+
+# 또는 우선순위 2 — Cleanup cron
+# instrumentation.ts 의 기존 cron 부트스트랩에 4종 cleanup 추가
+# /api/cron/cleanup 엔드포인트 신설 + audit log
 ```
 
 ## 알려진 이슈 및 주의사항
+
+### 세션 34 신규
+- **MFA UI는 코드만 완결, 브라우저 round-trip 미실행** — 실제 WebAuthn `navigator.credentials.create/get()` 호출은 사용자 인터랙션 필요. 다음 세션 우선순위 1
+- **proxy.ts `HANDLER_OWNED_RATE_LIMIT_PATHS` Set** — v1 auth 경로 3건은 handler가 DB-backed로 처리, proxy 인메모리 미적용. 새 v1 auth 경로 추가 시 이 Set 검토
+- **PG TIMESTAMP(3) timezone-naive 함정** — Sessions/RateLimitBucket 등 모두 같은 컬럼 타입. 클라이언트 측 elapsed 계산 금지 — PG `EXTRACT(EPOCH ...)` 직접 위임이 안전
+- **rate-limit-db `$queryRaw`의 `reset_ms` string 반환** — Postgres NUMERIC → Prisma string 직렬화. `parseFloat` 필수
+- **Phase 15 UI 페이지는 (admin) 그룹 밖** — `(protected)/account/security`. USER 포함 모든 사용자 접근. 이 패턴은 사용자별 self-service 모든 페이지의 표준
 
 ### 세션 33 신규
 - **MFA_MASTER_KEY 필수** — WSL2 `~/dashboard/.env`에 64 hex 설정 완료. 서버 재구축 시 동일 키 복원 필요 (기존 TOTP secret 전부 복호화 불가). PM2 `env_file` 또는 `/etc/luckystyle4u/secrets.env` 이전 권장
