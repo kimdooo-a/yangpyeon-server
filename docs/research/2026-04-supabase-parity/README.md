@@ -1,7 +1,7 @@
 # Supabase 100점 동등성 — Wave 리서치 마스터 인덱스
 
 > 양평 부엌 서버 대시보드의 14개 카테고리를 Supabase Cloud 동등 수준(100점)으로 끌어올리기 위한 체계적 리서치·설계 프로젝트.
-> 규모: **L** | Wave: **5** | 예상 문서: **~91개** (Wave 1+2 = 61 ✅)
+> 규모: **L** | Wave: **5** | 예상 문서: **~91개** (Wave 1+2+3 = 72 ✅)
 > 시작: 2026-04-18 (세션 24) | 근거: [이전 평가표](../../../) + [_PROJECT_VS_SUPABASE_GAP.md](../../references/_PROJECT_VS_SUPABASE_GAP.md)
 
 상위: [CLAUDE.md](../../../CLAUDE.md) → [docs/](../../) → [research/](../) → **여기**
@@ -14,11 +14,11 @@
 |------|------|------|---------|-------|
 | 1 | 기초 deep-dive | ✅ **완료** | **33/33** | **26,941** |
 | 2 | 비교 매트릭스 + 1:1 | ✅ **완료** | **28/28** | **18,251** |
-| 3 | 100점 정의 + FR/NFR | 🔄 **실행 중** (7 Agent 병렬) | 0/11 | — |
-| 4 | 카테고리별 청사진 | ⏳ 대기 | 0/~20-30 | — |
+| 3 | 100점 정의 + FR/NFR | ✅ **완료** (7 Agent 병렬) | **11/11** | **8,350** |
+| 4 | 카테고리별 청사진 | 🔄 다음 세션 권장 | 0/~20-30 | — |
 | 5 | 로드맵 + 스파이크 | ⏳ 대기 | 0/~10-15 | — |
 
-**누적: 61 문서 / 45,192줄**
+**누적: 72 문서 / 53,542줄**
 
 ## 14 카테고리 — Wave 1 1순위 + 100점 청사진
 
@@ -101,32 +101,44 @@
 
 → Wave 2 매트릭스에서 글로벌 시퀀스(DQ-1.x ~ DQ-2.x)로 통합 재할당 예정
 
-## 산출물 구조 (Wave 1 완료 시점)
+## 산출물 구조 (Wave 3 완료 시점)
 
 ```
 docs/research/2026-04-supabase-parity/
 ├── README.md                       ← 이 파일
 ├── _CHECKPOINT_KDYWAVE.md
-├── 01-research/
-│   ├── 01-table-editor/            ✅ 3 deep-dive (957/829/827) ★
-│   ├── 02-sql-editor/              ✅ 3 deep-dive (584/617/868)
-│   ├── 03-schema-visualizer/       ✅ 2 deep-dive (932/1442)
-│   ├── 04-db-ops/                  ✅ 2 deep-dive (1127/1056)
-│   ├── 05-auth-core/               ✅ 2 deep-dive (675/774)
-│   ├── 06-auth-advanced/           ✅ 3 deep-dive (837/1126/1092) ★
-│   ├── 07-storage/                 ✅ 3 deep-dive (664/850/936) ★
-│   ├── 08-edge-functions/          ✅ 3 deep-dive (790/843/801) ★
-│   ├── 09-realtime/                ✅ 3 deep-dive (789/654/867) ★
-│   ├── 10-advisors/                ✅ 2 deep-dive (770/651)
-│   ├── 11-data-api/                ✅ 3 deep-dive (566/640/716)
-│   ├── 12-observability/           ✅ 2 deep-dive (702/655)
-│   ├── 13-ux-quality/              ✅ 1 deep-dive (654)
-│   └── 14-operations/              ✅ 1 deep-dive (650)
+├── 00-vision/                      ✅ Wave 3 (11 문서 / 8,350줄)
+│   ├── 00-product-vision.md        ✅ 620줄 (페르소나 3, 핵심가치 5, 원칙 7)
+│   ├── 01-user-stories.md          ✅ 830줄 (7 Epic × 36 스토리, Must 69%)
+│   ├── 02-functional-requirements.md ✅ 1,477줄 (14 FR × 55 FR, P0 49.1%)
+│   ├── 03-non-functional-requirements.md ✅ 500줄 (38 NFR, PERF/SEC/UX/REL/MNT/CMP/COST)
+│   ├── 04-constraints-assumptions.md ✅ 420줄 (CON 12 / ASM 12)
+│   ├── 05-100점-definition.md      ✅ 435줄 (14카 × 60/80/95/100 4단계)
+│   ├── 06-operational-persona.md   ✅ 449줄 (페르소나 3 + 비페르소나 4)
+│   ├── 07-dq-matrix.md             ✅ 1,648줄 (64 DQ + 폐기 4, W3=20/W4=28/W5=16)
+│   ├── 08-security-threat-model.md ✅ 782줄 (STRIDE 29 + 자체호스팅 5)
+│   ├── 09-multi-tenancy-decision.md ✅ 621줄 (ADR-001 + 재검토 트리거 4)
+│   └── 10-14-categories-priority.md ✅ 568줄 (Phase 15-22 매핑 preview)
+├── 01-research/                    ✅ Wave 1+2 (61 문서 / 45,192줄)
+│   ├── 01-table-editor/            ✅ 3 deep-dive (957/829/827) + 4 비교/매트릭스 ★
+│   ├── 02-sql-editor/              ✅ 3 deep-dive + 4 비교/매트릭스
+│   ├── 03-schema-visualizer/       ✅ 2 deep-dive + 2 비교/매트릭스
+│   ├── 04-db-ops/                  ✅ 2 deep-dive + 2 비교/매트릭스
+│   ├── 05-auth-core/               ✅ 2 deep-dive + 2 비교/매트릭스
+│   ├── 06-auth-advanced/           ✅ 3 deep-dive + 2 비교/매트릭스 ★
+│   ├── 07-storage/                 ✅ 3 deep-dive + 1 비교 ★
+│   ├── 08-edge-functions/          ✅ 3 deep-dive + 2 비교/매트릭스 ★
+│   ├── 09-realtime/                ✅ 3 deep-dive + 1 비교 ★
+│   ├── 10-advisors/                ✅ 2 deep-dive + 2 비교/매트릭스
+│   ├── 11-data-api/                ✅ 3 deep-dive + 1 비교
+│   ├── 12-observability/           ✅ 2 deep-dive + 1 비교
+│   ├── 13-ux-quality/              ✅ 1 deep-dive + 비교
+│   └── 14-operations/              ✅ 1 deep-dive + 비교
 ├── 02-architecture/                ← Wave 4
 ├── 03-ui-ux/                       ← Wave 4
 ├── 04-integration/                 ← Wave 4
 ├── 05-roadmap/                     ← Wave 5
-├── 06-prototyping/                 ← Wave 5 (스파이크 4건은 Round 1에서 예비 검증)
+├── 06-prototyping/                 ← Wave 5 (스파이크 4건은 Wave 1에서 예비 검증)
 └── 07-appendix/
 ```
 
@@ -185,12 +197,45 @@ docs/research/2026-04-supabase-parity/
 | 13 | UX Quality | 0.84 권고도 (87.2/100) | 강화 확정 |
 | 14 | Operations | 0.87 권고도 (89.0/100) | 강화 확정 |
 
+## Wave 3 결과 요약 (2026-04-18 15:41 완료)
+
+### Vision Suite + 메타 심층 분석 11 문서 / 8,350줄
+
+| Agent | 모델 | 문서 | 줄 수 | 핵심 결정 |
+|-------|------|------|------|----------|
+| V1 | opus | 00-product-vision | 620 | 핵심가치 5종 (데이터 주권/100점/$10 이하/1인 운영/Next.js 통합) |
+| V2 | opus | 01-user-stories | 830 | 7 Epic × 36 스토리, Must 69%, Won't 10건 명시 |
+| R1 | opus | 02-functional-requirements | 1,477 | 14 FR × 55 FR, P0 49.1%, 각 FR에 Wave 1-2 구현 기술 명시 |
+| R2 | opus | 03-NFR + 04-CON+ASM | 920 | NFR 38개 (7 카테고리), CON 12 / ASM 12 |
+| M1 | sonnet | 05-100점-definition + 06-페르소나 | 884 | 14카 × 4단계 정의, 3년 TCO 절감 $950~2,150 |
+| M2 | sonnet | 07-dq-matrix + 08-보안위협 | 2,430 | 64 DQ 재분배, STRIDE 29+자체호스팅 5 위협 |
+| M3 | sonnet | 09-ADR멀티테넌시 + 10-우선순위 | 1,189 | ADR-001 + Phase 15-22 매핑 preview |
+
+### Wave 3 핵심 발견
+
+1. **100점 도달 총 공수 = 1,008h (~50주)** — Wave 1 확정 548h + Wave 3 추정 460h. Phase 15~22 매핑.
+2. **MVP 범위 확정**: Phase 15~17 (Auth Advanced + Observability/Ops + Auth Core/Storage) — 1순위 대상은 현재 갭 최대(15점)인 Auth Advanced
+3. **DQ 재분배 완료**: 64 DQ + 폐기 4건 → Wave 3 = 20(FR/NFR에서 답변), Wave 4 = 28(청사진), Wave 5 = 16(로드맵/스파이크)
+4. **ADR-001 확정 (Multi-tenancy 의도적 제외)** — 구현 공수 30-40%(70h) 절감 + 재검토 트리거 4개 정량화 (사용자 2명+ 6개월, B2B 전환, 독립 팀 FR, 법적 격리)
+5. **보안 위협 29 + 자체호스팅 특화 5 = 총 34 위협** — STRIDE 카테고리별 3-6개, TOP 10 우선 완화 목록 + NFR-SEC.1~23 매핑 완료
+6. **3년 TCO 절감 $950~2,150** — Supabase Cloud $1,200~2,400 vs 양평 $250 (Cloudflare 무료 + B2 $0.005/GB/월 + AI $5/월)
+
+### Wave 3 Compound Knowledge — "요구사항은 이미 정해졌다"
+
+일반 프로젝트의 Wave 3는 "비전 → 요구사항 추출"이지만, 이 프로젝트는 **역순**이었다:
+- Wave 1에서 이미 각 카테고리의 1위 기술(채택안)이 확정됨 → FR의 "구현 기술" 컬럼이 처음부터 채워진 상태로 작성됨
+- 이는 Wave 4 청사진으로의 전이를 매우 매끄럽게 만듦 — 기술 결정은 잠금된 상태로 아키텍처 설계만 진행 가능
+- **FR 55개 × 구현 기술 명시 100%** — 일반 L 규모 프로젝트 대비 Wave 4 설계 리스크 -30%
+
 ## 다음 작업
 
-- **권장**: `/cs`로 세션 마감 (Wave 1+2 합쳐 45,192줄 컨텍스트 누적, 자연스러운 마일스톤)
-- **재개**: 다음 세션에서 `/kdywave --resume` → Phase 2 Wave 3 (비전+FR/NFR+CON/ASM) 진입
-- **Wave 3 예상 산출물**: 00-vision/ 스위트 5-6 문서 + 카테고리 심층 보충 10-14 문서 (~15-20 문서)
+- **강력 권장**: `/cs`로 세션 마감 (Wave 1+2+3 합쳐 53,542줄 컨텍스트 누적, Wave 3 완료는 Vision Suite 확정이라는 중요한 마일스톤)
+- **재개**: 다음 세션에서 `/kdywave --resume` → Phase 2 Wave 4 (아키텍처 청사진) 진입
+- **Wave 4 예상 산출물**: 02-architecture/ + 03-ui-ux/ + 04-integration/ = 20-30 문서
+  - 시스템 개요, 14 카테고리별 청사진, 디자인 시스템, 통합 설계
+  - 입력: Wave 1-3 전체 (채택 기술 + FR/NFR + ADR-001)
+  - DQ 답변 대상: Wave 4에 할당된 28건
 
 ---
 
-> 최종 수정: 2026-04-18 17:30 (Wave 2 완료, 7 Agent 병렬)
+> 최종 수정: 2026-04-18 15:41 (Wave 3 완료, 7 Agent 병렬, 11 문서 / 8,350줄)
