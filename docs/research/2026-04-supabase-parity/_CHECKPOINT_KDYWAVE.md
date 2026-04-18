@@ -1,10 +1,12 @@
 ---
 skill: kdywave
-status: in-progress
+status: completed
 last_completed_phase: 2
-last_completed_wave: 4
+last_completed_wave: 5
 wave_4_started: 2026-04-18T19:00:00+09:00
 wave_4_completed: 2026-04-18T22:15:00+09:00
+wave_5_started: 2026-04-18T23:00:00+09:00
+wave_5_completed: 2026-04-18T24:00:00+09:00
 started: 2026-04-18T08:38:00+09:00
 wave_2_completed: 2026-04-18T17:30:00+09:00
 wave_3_completed: 2026-04-18T15:41:00+09:00
@@ -14,18 +16,31 @@ output_dir: docs/research/2026-04-supabase-parity/
 wave_4_result:
   total_docs: 26
   total_lines: 32918
-  arch_docs: 17
-  arch_lines: 21964
-  uiux_docs: 5
-  uiux_lines: 5841
-  integration_docs: 4
-  integration_lines: 5113
   agents_executed: 11
-  rounds: 3
   backward_feedback: 0
+wave_5_result:
+  total_docs: 25
+  total_lines: 20128
+  roadmap_docs: 13
+  roadmap_lines: 10629
+  prototyping_docs: 9
+  prototyping_lines: 6621
+  appendix_docs: 3
+  appendix_lines: 2878
+  agents_executed: 11  # 세션 28-1 R1-A/R2/R3/S1/S2 (5) + 세션 28-2 R1/R2/R3/R4/P1/A1 (6)
+  sessions: 2
+  backward_feedback: 0
+  dq_coverage: "64/64 + 폐기 4 = 100%"
+  new_spikes: 22  # SP-010 ~ SP-031
+  priority_spikes: 7
+  deferred_spikes: 15
+  kpi_count: 127
+  risk_register: 35
+  tech_debt_items: 22
+  mvp_fr_count: 27
 cumulative:
-  total_docs: 98
-  total_lines: 86460
+  total_docs: 123
+  total_lines: 106588
 ---
 
 # kdywave 체크포인트 — Supabase 100점 동등성 연구
@@ -148,7 +163,35 @@ cumulative:
     - UI/UX와 아키텍처 독립 병렬 가능 (Tier 2에서 컴포넌트 이름 계약 고정 덕분)
     - 역방향 피드백 0건 — Wave 1-3 채택안 전부 강화 재확인
 
-### Wave 5: 로드맵·스파이크 ⏳ (~10-15 문서)
+### Wave 5: 로드맵·스파이크·부록 ✅ 완료 (25 문서 / 20,128줄 / 11 Agent / 2 세션)
 
-## Phase 3: Wave 검증 ⏳
-## Phase 4: 완료 & 인계 ⏳
+#### 세션 28-1 (5 Agent / 10 문서 / 8,129줄)
+- **R1-A (sonnet)**: 05-roadmap/00-release-plan.md (807줄)
+- **R2 (sonnet)**: 05-roadmap/02-tech-debt-strategy.md (602줄) + 03-risk-register.md (1,056줄) = 1,658줄
+- **R3 (sonnet)**: 05-roadmap/04-go-no-go-checklist.md (494줄) + 05-rollout-strategy.md (1,056줄) = 1,550줄
+- **S1 (sonnet)**: 06-prototyping/spike-005-edge-functions-deep.md (1,151줄) + spike-007-seaweedfs-50gb.md (1,391줄) = 2,542줄
+- **S2 (sonnet)**: 06-prototyping/spike-008-wal2json-pg-matrix.md (532줄) + spike-009-totp-webauthn-mvp.md (598줄) + spike-010-pgmq-vs-bullmq.md (570줄) = 1,700줄
+
+#### 세션 28-2 (6 Agent / 15 문서 / 11,871줄) — `--resume wave 5`
+- **R1 (opus, 3 문서, 3,058줄)**: 00-roadmap-overview.md 665 / 01-release-plan.md 1,200 / 02-milestones.md 1,193 — 50주×870h, 9 코드명, M1~M16
+- **R2 (sonnet, 2 문서, 1,088줄)**: 03-mvp-scope.md 548 (MVP FR 27건, 122h) / 04-tech-debt-strategy.md 540 (TD 22건, 20% 할당)
+- **R3 (sonnet, 2 문서, 1,440줄)**: 05-risk-mitigation.md 853 (R-01~R-30, Top 10) / 06-cost-tco-analysis.md 587 ($950~2,150 절감, ROI 280~760%)
+- **R4 (sonnet, 1 문서, 1,028줄)**: 07-success-metrics-kpi.md — 127 KPI, 38 NFR 전수, Supabase 24 기능 대조
+- **P1 (sonnet, 4 문서, 2,379줄)**: 06-prototyping/01-spike-portfolio.md 444 (22건 신규, 100% DQ 매핑) / 02-priority-set.md 621 (SP-010~016) / 03-deferred-set.md 703 (SP-017~031) / 04-execution-protocol.md 611
+- **A1 (opus, 3 문서, 2,878줄)**: 07-appendix/01-glossary.md 1,149 (용어 230+) / 02-dq-final-resolution.md 757 (DQ 64건 100%) / 03-genesis-handoff.md 972 (태스크 85+)
+
+#### Wave 5 Compound Knowledge
+1. **이중 관점 문서화 정당성**: 동일 주제(릴리스/부채/리스크)에 "상세 레지스트리(28-1)" + "전략·관리(28-2)" 두 관점 병존 — 서로 다른 목적(실행 중 참조 vs 의사결정용)
+2. **22 스파이크 × 19 DQ 매핑 커버**: Wave 5 16건 DQ + 관련 ADR 재검토 트리거 3건 = 100%
+3. **MVP 착수 조건 충족**: SP-010~016 우선 스파이크 7건 (4주, 29h) → Phase 15 (Auth Advanced 22h) 병행 착수 가능
+
+## Phase 3: Wave 검증 ✅
+- 산출물 완전성: 25/25 문서 모두 생성 확인, 최소 줄 수 초과 달성 (목표 ~8,100줄 → 실측 20,128줄 = +148%)
+- 스코어링/DQ/일관성: Wave 1-4 채택안 100% 강화 확인 — **역방향 피드백 0건**
+- DQ 전수: 64/64 = 100% 해결 + 폐기 4건 재확인
+
+## Phase 4: 완료 & 인계 ✅
+- 마스터 인덱스 README.md 전면 갱신 (25 문서 인덱싱)
+- kdygenesis 연계 준비: `07-appendix/03-genesis-handoff.md`의 `_PROJECT_GENESIS.md` 초안 활용
+- 다음 권장 액션: (1) `/kdyspike --full` 우선 스파이크 7건 (4주) → (2) Phase 15 Auth Advanced 착수
+- 역방향 피드백 모드: 향후 `/kdywave --feedback` 필요 시 재개 가능

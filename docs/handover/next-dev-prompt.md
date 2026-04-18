@@ -26,22 +26,26 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> (`/login` 페이지 사용, 백엔드는 `/api/v1/auth/login` Bearer) |
 
-## 필수 참조 파일
+## 필수 참조 파일 ⭐ kdywave 완주 상태
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260418-session28-supabase-parity-wave-4.md   ⭐ 최신 (세션 28 완료)
+docs/handover/260418-session29-supabase-parity-wave-5.md   ⭐ 최신 (세션 29 kdywave 완주)
+docs/handover/260418-session28-supabase-parity-wave-4.md
 docs/handover/260418-session25c-tunnel-complete-playwright.md
 docs/handover/260418-session27-supabase-parity-wave-3.md
 docs/handover/260418-session26-supabase-parity-wave-2.md
 docs/handover/260418-session25-supabase-parity-wave-1.md
-docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1+2+3+4 마스터 인덱스
-docs/research/2026-04-supabase-parity/_CHECKPOINT_KDYWAVE.md
+docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1+2+3+4+5 마스터 인덱스
+docs/research/2026-04-supabase-parity/_CHECKPOINT_KDYWAVE.md  ⭐ status=completed
 docs/research/2026-04-supabase-parity/00-vision/           ⭐ Wave 3 산출물 11 문서
 docs/research/2026-04-supabase-parity/02-architecture/     ⭐ Wave 4 Tier 1+2 산출물 17 문서
-docs/research/2026-04-supabase-parity/03-ui-ux/            ⭐ Wave 4 Tier 3 UI/UX 5 문서 (1건 스텁)
+docs/research/2026-04-supabase-parity/03-ui-ux/            ⭐ Wave 4 Tier 3 UI/UX 5 문서
 docs/research/2026-04-supabase-parity/04-integration/      ⭐ Wave 4 Tier 3 통합 4 문서
+docs/research/2026-04-supabase-parity/05-roadmap/          ⭐ Wave 5 로드맵 13 문서
+docs/research/2026-04-supabase-parity/06-prototyping/      ⭐ Wave 5 스파이크 9 문서 (22건 신규)
+docs/research/2026-04-supabase-parity/07-appendix/         ⭐ Wave 5 부록 3 문서 (glossary·DQ·genesis)
 docs/solutions/2026-04-18-kdywave-hybrid-vs-monolithic-pattern.md   ⭐ Compound Knowledge 1
 docs/solutions/2026-04-18-pg-extension-vs-self-impl-decision.md     ⭐ Compound Knowledge 2
 docs/handover/260418-session24-phase-14c-alpha.md
@@ -50,7 +54,7 @@ docs/handover/260417-session23-phase-14c-updated-at-fix.md
 docs/MASTER-DEV-PLAN.md
 ```
 
-## 현재 상태 (세션 28 종료 시점)
+## 현재 상태 (세션 29 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~13 전부 완료
@@ -62,52 +66,51 @@ docs/MASTER-DEV-PLAN.md
 - Phase 14c-β (세션 24b): 복합 PK 지원 + Next.js private folder fix + TIMESTAMP(3) 정렬 (ADR-005)
 - Phase 14c-γ (세션 24c): 권한 매트릭스 E2E 13 시나리오 PASS (ADR-006)
 - 방향 C Vitest (세션 24d): 89개 유닛 테스트 PASS, ADR-003 §5 재활성화
-- 방향 B `/ypserver` 보강 (세션 24e): 5 갭 해소(Windows skip / prisma migrate / drizzle / Compound Knowledge 링크)
-- **세션 25**: Supabase 100점 평가(절대 55/가중 60) + **kdywave Wave 1 완료(33 deep-dive, 26,941줄)**
-- **세션 26**: **kdywave Wave 2 완료(28 매트릭스+1:1, 18,251줄)** — 7 Agent 병렬, 역방향 피드백 0건, 누적 61 문서 / 45,192줄
-- **세션 27**: **kdywave Wave 3 완료(비전+FR/NFR+DQ 재분배, 11 문서 / 8,350줄)** — 7 Agent 병렬(V/R opus, M sonnet). 100점 총 공수 **1,008h(~50주)**, 3년 TCO **$950~2,150 절감**, MVP=Phase 15~17. ADR-001 Multi-tenancy 의도적 제외(재검토 트리거 4). 누적 **72 문서 / 53,542줄**
-- **세션 25-A** (2026-04-18, 세션 25와 동시 진행): 세션 24 권장 4건 병렬 — Compound Knowledge 4건 + Playwright 인프라 + runReadwrite 33 케이스(vitest 89→131) + **VIEWER 확장 구현**(table-policy SELECT 분기 + GET 핸들러 USER 포함 + 9 테스트). 5525bd2에 통합 commit
-- **세션 25-B**: 25-A 후속 3단계 — git push, `/ypserver prod` 배포 + viewer-curl **V1~V9 라이브 매트릭스 전 PASS**, Cloudflare Tunnel QUIC→HTTP/2 폴백 부분 수정(~30%→~50%, 100% 미달, KT 회선 패킷 drop 진단 완료). solution doc `2026-04-18-cloudflare-tunnel-quic-tuning-partial-fix.md`
-- **세션 25-C** (2026-04-18): 위임 5건 중 #1 sysctl 적용(#2 systemd는 기 완료 발견). `/etc/sysctl.d/99-cloudflared.conf` (tcp_keepalive 7200→60, rmem/wmem 16MB) + `pm2 restart cloudflared`. **curl 28/28 edge 관통**(v1 / 307 + v2 /login 200) + 측정 프로토콜 v2 표준화. **Playwright 6/6 실패** — S1 /login 530 cascade. 결론 "100% 보증 아님, 확률적 매우 높음". **VIEWER UI 사이드바 불일치 1건 발견**(MANAGER_PLUS_PATHS에 /tables 포함 → USER disclosure 불일치). Compound Knowledge quic-tuning-partial-fix.md "100% 측정의 한계" 섹션 추가 + 남은 위임 #3(multi-instance) 재고 승격
-- **세션 28**: **kdywave Wave 4 완료(아키텍처 청사진 26 문서 / 31,846줄)** — 11 Agent / 3 Tier(A1 opus 3 + B1~B7 sonnet 14 + U1/I1/I2 sonnet 9). 평균 1,225줄/문서(Wave 3 대비 +61%). ADR-002~010+ 누적, 14 카테고리 blueprint 전체 + UI/UX 5 + 통합 4. 1건 스텁(`03-ui-ux/04-editor-components.md` TOC 16줄) 이관. **누적 Wave 1+2+3+4 = 98 문서 / 85,388줄**(예상 91 초과)
+- 방향 B `/ypserver` 보강 (세션 24e): 5 갭 해소
+- 세션 25: Supabase 100점 평가 + kdywave Wave 1 완료 (33/26,941)
+- 세션 26: kdywave Wave 2 완료 (28/18,251)
+- 세션 27: kdywave Wave 3 완료 (11/8,350)
+- 세션 25-A/B/C: VIEWER 확장 + Tunnel 안정화
+- 세션 28: kdywave Wave 4 완료 (26/32,918)
+- **세션 29: kdywave Wave 5 완료 (25/20,128) — Phase 0-4 전체 완주** ⭐
 
-### Wave 1 결과 — 14 카테고리 1순위 + 100점 청사진
-| # | 카테고리 | 1순위 결정 | 100점 단계 |
-|---|---------|----------|-----------|
-| 1 | Table Editor | TanStack v8 + 14c-α 자체구현 | 14c-α/β/14d/14e |
-| 2 | SQL Editor | sqlpad + Outerbase + Supabase Studio 3중 흡수 | 14c~14f, 40일 |
-| 3 | Schema Viz | schemalint + 자체 RLS + Trigger 편집기 | /database/{policies,functions,triggers} 신설, 50h |
-| 4 | DB Ops | node-cron 자체 + wal-g | RPO 60s, RTO 30분, 68h |
-| 5 | Auth Core | jose + Lucia 패턴 + Auth.js Provider/Hook | 6 Phase, 30h |
-| 6 | Auth Advanced ★ | TOTP + WebAuthn + PG Rate Limit (전부 동시) | Phase 15-17 = 60점 |
-| 7 | Storage ★ | SeaweedFS 단독 | 40→90~95 |
-| 8 | Edge Functions ★ | 3층 하이브리드 (isolated-vm v6 + Deno + Sandbox) | 45→92~95 |
-| 9 | Realtime ★ | wal2json + supabase-realtime 포팅 | 55→100 |
-| 10 | Advisors | 3-Layer (schemalint + squawk + splinter 38룰) | 80h |
-| 11 | Data API | REST 강화 + pgmq + SQLite 보조 (GraphQL 보류) | 45→80~85 |
-| 12 | Observability | node:crypto envelope + jose JWKS ES256 | Vault + JWKS + Infrastructure |
-| 13 | UX Quality | AI SDK v6 + Anthropic BYOK + 자체 MCP | ~$5/월 |
-| 14 | Operations | Capistrano-style + PM2 cluster + canary | 자체 + 자동 symlink 롤백 |
+### kdywave 최종 결과 (2026-04-18 완주)
 
-★ = 사전 스파이크 4건 모두 "조건부 GO"
+| Wave | 문서 | 줄 수 | 특징 |
+|------|------|-------|------|
+| 1 | 33 | 26,941 | 14 카테고리 기초 deep-dive, 1순위 결정 |
+| 2 | 28 | 18,251 | 비교 매트릭스 + 1:1 비교, 역방향 피드백 0 |
+| 3 | 11 | 8,350 | 비전·FR/NFR·DQ 재분배, MVP=Phase 15-17 |
+| 4 | 26 | 32,918 | 아키텍처 청사진 3 Tier |
+| 5 | 25 | 20,128 | 로드맵·스파이크·부록, Phase 0-4 완주 |
+| **합계** | **123** | **106,588** | 계획 ~105 대비 **+17%** |
 
-### Wave 1 DQ 현황
-- **잠정 답변 9건**: DQ-1.1~1.9 (각 카테고리 1순위 결정)
-- **신규 DQ 64건**: Wave 2 매트릭스에서 글로벌 시퀀스로 통합 재할당 예정
+### Wave 5 핵심 산출물 상세
+
+**05-roadmap/ (13 문서 / 10,629줄)**
+- 9 릴리스 코드명: Nocturne → Cerulean → Obsidian → Crimson → Verdant → Amber → Ivory → Azure → Centurion
+- M1~M16 마일스톤 (50주 텍스트 간트)
+- MVP: Phase 15-17, 122h, MVP FR 27건 매핑
+- 리스크: R-001~035 전수, Top 10 Critical
+- TD: 22건, 20% 할당 원칙
+- KPI: 127개 (14카×4단계, 38 NFR 전수)
+- 3년 TCO: Supabase $1,200~2,400 vs 양평 $250 = **$950~2,150 절감**
+
+**06-prototyping/ (9 문서 / 6,621줄)**
+- 22 신규 스파이크 (SP-010~031) + 기존 9건 = **31 스파이크 전체 인덱싱**
+- 우선 세트 SP-010~016 (29h, 4주)
+- 지연 세트 SP-017~031 (63h, 조건부 트리거)
+- 5단계 실행 프로토콜 + kdyspike 연계
+
+**07-appendix/ (3 문서 / 2,878줄)**
+- 용어집 230+ 항목 (용어 182 + 약어 50)
+- DQ 64건 전수 최종 Resolution (100%) + 재검토 트리거 45건 인덱스
+- kdygenesis 인수인계: `_PROJECT_GENESIS.md` 초안 + 85+ 태스크
 
 ### 배포 상태 ✅
-- **원격 main**: 세션 28에서 Wave 4 26 문서 + 메타 일괄 단일 커밋
-- **프로덕션(WSL2 PM2)**: 세션 28은 코드 변경 없음 — 재배포 불필요
-- **세션 24/24b/24c/24d/24e의 미커밋 잔재**는 세션 25 종료 커밋에 통합됨 (세션 27 `.gitignore`에 `test-results/` + `playwright-report/` 추가로 이후 재발 방지)
-
-### 검증 결과 (세션 25)
-| 항목 | 결과 |
-|------|------|
-| 33/33 deep-dive 500줄+ 계약 | ✅ |
-| 10차원 스코어링 + 앵커링 ("왜 N점, 왜 N±1점이 아닌가") | ✅ |
-| 참고 자료 10+ (URL) | ✅ |
-| TODO/TBD 0건 | ✅ (1건 코드 예시 안 마일스톤 표시는 본문 미완성 아님) |
-| 사전 스파이크 4건 | ✅ 모두 "조건부 GO" |
+- **원격 main**: 세션 29에서 Wave 5 25 문서 + README + CHECKPOINT + 메타 일괄 단일 커밋
+- **프로덕션(WSL2 PM2)**: 세션 29는 코드 변경 없음 — 재배포 불필요
+- **Cloudflare Tunnel**: 세션 25-C sysctl 적용 후 curl 28/28 성공, Playwright 산발 1건 재발 기록. "확률적 매우 높음" 결론
 
 ## 현재 DB 구조 (변경 없음)
 
@@ -123,74 +126,83 @@ docs/MASTER-DEV-PLAN.md
 
 ## 추천 다음 작업
 
-### 우선순위 1: kdywave Wave 5 진입 (권장 — 자연스러운 연속) ⭐
+### 우선순위 1: 우선 스파이크 7건 순차 실행 (4주, 29h) ⭐
 ```
-/kdywave --resume
+/kdyspike --full "pgmq vs BullMQ PoC"    # SP-010 (4h)
+/kdyspike --full "PM2 cluster:4 benchmark"   # SP-011 (4h)
+/kdyspike --full "node:crypto envelope perf"  # SP-012 (4h)
+/kdyspike --full "jose JWKS grace period"    # SP-013 (3h)
+/kdyspike --full "AI SDK v6 cost telemetry"  # SP-014 (4h)
+/kdyspike --full "canary 5% traffic 실측"    # SP-015 (5h)
+/kdyspike --full "wal-g RPO 60초 검증"       # SP-016 (5h)
 ```
-- Phase 2 Wave 5 — 로드맵 + 스파이크 **10~15 문서**
-- 입력: Wave 4의 14 category blueprint + adr-log + integration 4 + Wave 3의 Phase 15-22 매핑 + 미해결 DQ 16
-- 산출: Phase별 주간 단위 로드맵 / risk register / 선행 스파이크 목록 / "Go/No-Go" 체크리스트
+- 입력: `06-prototyping/02-spike-priority-set.md` (SP-010~016 상세 스펙)
+- 산출: 각 스파이크별 PoC 결과 + 의사결정 + 다음 단계
+- Phase 15 착수 전 필수 (특히 SP-009 TOTP+WebAuthn MVP는 Phase 15 직전 위치)
 
-### 우선순위 2: Wave 4 스텁 보완 (15~30분)
-- `03-ui-ux/04-editor-components.md` 5 섹션 본문 작성 (Monaco / xyflow / AI Assistant / Diff / 공통 UX)
-- 다른 blueprint 참조 링크 보강
+### 우선순위 2: Phase 15 Auth Advanced MVP (22h) ⭐
+- SP-009(TOTP+WebAuthn MVP) 결과 반영 후 착수
+- 청사진: `02-architecture/03-auth-advanced-blueprint.md`
+- 구성:
+  1. `otplib` 통합 + TOTP QR 발급 (8h)
+  2. `@simplewebauthn/server` + WebAuthn 등록·인증 (10h)
+  3. Rate Limit (PostgreSQL 기반, Redis 트리거 조건 미충족 유지) (4h)
+- DOD: MFA 활성 계정 생성 + 백업 코드 + 관리자 강제 해제 + E2E PASS
 
-### 우선순위 3: MVP 즉시 착수 (Wave 4 청사진 기반 구현 상세 확보됨)
-- **DQ-1.3 SeaweedFS 1주 PoC**: Storage 40→90 (단일 솔루션형, 빠른 ROI) — `07-storage-blueprint.md` 참조
-- **DQ-1.1 Phase 15 otplib TOTP**: Auth Advanced 15→27 (30h 단일 Phase) — `03-auth-advanced-blueprint.md` 참조
-- **DQ-1.7 pgmq 도입 spec 작성**: Data API Queue 0→90 — `15-data-api-blueprint.md` 참조
+### 우선순위 3: `/kdygenesis` 연계로 태스크 자동화
+- 입력: `07-appendix/03-genesis-handoff.md`의 `_PROJECT_GENESIS.md` 초안
+- 85+ 태스크를 oxidation하여 주간 단위 실행 플로우 자동 생성
+- `/kdygenesis --from-wave` 명령어로 진입
 
-### 우선순위 3: Playwright 안정성 보강 (세션 25-C 후속) ⭐
+### 우선순위 4: Phase 14c-γ USER-as-VIEWER UI 픽스 (남은 소과제)
+- 세션 25-C 발견: `src/components/layout/sidebar.tsx` line 96 `MANAGER_PLUS_PATHS`에 `/tables` 포함 → USER 롤 사이드바에 테이블 메뉴 미노출
+- Wave 4 `09-table-editor-blueprint.md` 참조
+- 수정 옵션:
+  - (A) `/tables`만 `VIEWER_READONLY_PATHS` 신설로 이관
+  - (B) 사이드바 라벨 동적 (USER는 "읽기 전용" 배지)
+  - (C) 현 상태 유지 + ADR-007 "Navigation disclosure 최소화" 정당화
+
+### 우선순위 5: Playwright 안정성 보강 (세션 25-C 후속)
 - `playwright.config.ts`에 `retries: 2` 추가 → 산발 530 흡수
 - `login()` 헬퍼에 `response.status() === 530` 체크 + 지수 백오프 재시도
-- 100 trial 대규모 측정(5s × 100 = ~8분)으로 Tunnel 안정성 정량 % 확정 (현 28 샘플로는 90% 이상 자신감이지만 99% 주장은 샘플 부족)
+- 100 trial 대규모 측정으로 Tunnel 안정성 정량 % 확정
 - 재실행 후 전 PASS 확인 시 β/γ 스펙 확장
 
-### 우선순위 4: Cloudflare Tunnel 후속 — 재평가 (세션 25-C 결과 반영)
-1. ~~WSL2 sysctl~~ — 세션 25-C 완료
-2. ~~WSL systemd 활성화~~ — 진단 결과 기 완료 확인
-3. **cloudflared 다중 인스턴스** — Playwright 530 재발로 **재고 대상 승격** (2인스턴스 round-robin으로 산발 drop 완화 가능)
-4. Cloudflare WARP — 선택
-5. auto-restart cron — 현재 불필요
-
-### 우선순위 5: Phase 14c-γ USER-as-VIEWER 분리 spec + 사이드바 수정
-- 세션 24c에서 권한 매트릭스 13 시나리오 PASS, USER role SELECT 허용 정책은 별도 spec 이관 (ADR-006)
-- 세션 25-A에서 VIEWER 확장 구현 + 25-B 라이브 매트릭스 전 PASS 확인됨
-- **세션 25-C에서 사이드바 불일치 발견** (`src/components/layout/sidebar.tsx` line 96 `MANAGER_PLUS_PATHS`에 `/tables` 포함 → USER 롤이 사이드바에서 테이블 메뉴 미노출, URL 직접 입력만 가능). 수정 옵션 (A) `/tables`만 빼서 `VIEWER_READONLY_PATHS` 신설 / (B) 사이드바 라벨 동적 / (C) 현 상태 + ADR-007 "Navigation disclosure 최소화" 정당화
+### 우선순위 6: 추가 선택 작업
+- Cloudflare Tunnel 다중 인스턴스 (세션 25-C에서 재고 승격)
+- Phase 14c-γ UI 픽스
+- `/kdywave --feedback` (향후 신규 기술 등장 시 재개 가능)
 
 ### 진입점 예시
 ```
-/kdywave --resume                       # Wave 4 진입 (권장)
-/kdyguide --start                        # 현 상태 브리핑 + 방향 추천
-/kdyguide --route "SeaweedFS PoC"        # Wave 1 결과 즉시 코드화
-/kdyguide --route "TOTP Phase 15"        # Auth Advanced MVP 착수
+/kdyspike --full "SP-010 pgmq PoC"      # 우선 스파이크 시작
+/kdygenesis --from-wave                   # 태스크 자동화 연계
+/kdyguide --start                         # 현 상태 브리핑 + 방향 추천
 ```
 
 ## 알려진 이슈 및 주의사항
 
-- **Wave 1+2+3 완료, Wave 4~5 미진입**: ~91 문서 중 **72 완료** (53,542줄, 79%). 다음 세션에서 Wave 4(청사진) 권장
-- **Wave 2에서 역방향 피드백 0건**: Wave 1 채택안 14/14 모두 민감도 분석 1위 유지 — Wave 4 기반 견고
-- **Wave 3 입력 집약**: ADR-001(Multi-tenancy 제외) + 55 FR + 38 NFR + 64 DQ 재분배 완료 — Wave 4에서 청사진 설계에 직접 투입 가능
-- **DQ-12.3 추가 확정**: MASTER_KEY=`/etc/luckystyle4u/secrets.env` (root:ypb-runtime 0640) + PM2 `env_file`
-- **정량화된 재고 조건 명시됨**: Garage(3조건) / pg_graphql(4 수요 트리거 중 2+) / Docker(0조건 충족) / AWS KMS(2 트리거 중 1) — 환경 변화 시 트리거만 점검하면 됨
-- **Wave 1+2 누적 줄 수 45,192줄 컨텍스트 부담**: Wave 3 진입 시 README 마스터 + 필요 매트릭스만 selective read 권장. 에이전트별 L3 프롬프트에 읽을 파일 경로 명시 필수
-- **Compound Knowledge 7건 누적**: 세션 24의 4건(csrf-api-settings-guard / nextjs-private-folder-routing / raw-sql-updatedat-bump / timestamp-precision-optimistic-locking) + 세션 25의 2건(kdywave-hybrid-vs-monolithic-pattern / pg-extension-vs-self-impl-decision) + **세션 25-B 1건(cloudflare-tunnel-quic-tuning-partial-fix — HTTP/2 폴백으로 ~30%→~50% 부분 수정 + 결정적 진단)**
-- **세션 24/24b/24c/24d/24e의 잔여 미커밋**(코드 + scripts + playwright + test-results)은 세션 25 종료 커밋에 포함됨 (재커밋 불필요)
-- **raw SQL UPDATE auto-bump**: `src/app/api/v1/tables/[table]/[pk]/route.ts` PATCH는 `updated_at` 컬럼이 있고 사용자가 명시 설정 안 한 경우 `SET ..., updated_at = NOW()` 자동 주입
-- **`/ypserver` 5 갭 해소 (세션 24e)**: Windows build skip / prisma migrate / drizzle migrate / Compound Knowledge 링크 추가됨
+- **kdywave 완주**: Phase 0-4 전체 완료. 123 문서 / 106,588줄. `_CHECKPOINT_KDYWAVE.md status=completed`. 향후 신규 기술 등장 시 `/kdywave --feedback` 재개 가능
+- **Wave 5 이중 관점 문서화**: 05-roadmap/의 4 파일 쌍(00/02/03/04/05)은 세션 28-1(상세 레지스트리) + 28-2(전략·관리) 서로 다른 운영 목적. 병합 금지
+- **MVP 착수 조건 충족**: 우선 스파이크 7건 (4주, 29h) + Phase 15 (22h) = 총 51h, 4-6주 내 MVP 가능
+- **22 신규 스파이크 × 19 DQ 100% 매핑** (`06-prototyping/01-spike-portfolio.md`)
+- **DQ-12.3 MASTER_KEY**: `/etc/luckystyle4u/secrets.env` (root:ypb-runtime 0640) + PM2 `env_file`
+- **Compound Knowledge 누적 7건 + Wave 5 내부 5건**: (외부) csrf-api-settings-guard / nextjs-private-folder-routing / raw-sql-updatedat-bump / timestamp-precision-optimistic-locking / kdywave-hybrid-vs-monolithic-pattern / pg-extension-vs-self-impl-decision / cloudflare-tunnel-quic-tuning-partial-fix. (Wave 5 내부) 이중 관점 문서화 / 22 스파이크 × 19 DQ 매핑 / MVP 착수 조건 / 역방향 피드백 0건 정당성 / +148% 의미
+- **raw SQL UPDATE auto-bump**: `src/app/api/v1/tables/[table]/[pk]/route.ts` PATCH
+- **`/ypserver` 5 갭 해소 (세션 24e)**
 - **CSRF 경로 구분**: `/api/v1/*`만 CSRF 면제. `/api/auth/*`는 Referer/Origin 필수
 - **WSL auto-shutdown + /tmp 휘발**: E2E 스크립트는 단일 호출 내부로 통합 필수
 - **`DATABASE_URL?schema=public` 비호환**: psql 직접 호출 시 `sed 's/?schema=public//'` 전처리 필요
-- **Cloudflare Tunnel 간헐 530**: 세션 25-B HTTP/2 폴백 + retries/keepAlive + 세션 25-C `/etc/sysctl.d/99-cloudflared.conf` (tcp_keepalive 7200→60/75→10/9→6, rmem/wmem 212KB→16MB) 적용 → **curl 28/28 성공** (안정성 대폭 개선). 다만 Playwright 실행 시점에 **산발 530 1건 재발** → 100% 보증 아닌 "확률적 매우 높음"으로 결론. KT 회선 drop이 완전 소실이 아니라 빈도 격감. 운영 가이드: 1차 조치 `pm2 restart cloudflared` (30~40초 edge propagation lag 530 정상), 회귀 감시는 `bash scripts/tunnel-measure-v2.sh` (edge 관통 기준)
+- **Cloudflare Tunnel 간헐 530**: 세션 25-B/C 완화, "100% 보증 아님, 확률적 매우 높음". 회귀 감시 `bash scripts/tunnel-measure-v2.sh` (edge 관통 기준)
 - **Vercel plugin 훅 false positive**: 프로젝트 Vercel 미사용 → 세션 시작 가이드대로 스킵
 - **information_schema 롤 필터링**: `app_readonly`에서 `table_constraints`/`key_column_usage` 0행 → introspection은 `pg_catalog` 사용
 - **Windows `next build` 불가**: WSL2 빌드가 진실 소스 (`/ypserver --skip-win-build` 옵션 사용)
 - **proxy.ts `runtime` 선언 금지**: Next.js 16 proxy.ts는 암시적 Node.js 런타임
-- ~~**Cloudflare Tunnel WSL2 재기동**: systemd 비활성 환경에서 Windows 재시작 시 `pm2 resurrect` 또는 systemd 활성 검토~~ — **세션 25-C 진단에서 기 완료 확인**. `/etc/wsl.conf` `[boot] systemd=true` + `pm2-smart.service` enabled (ExecStart=`pm2 resurrect`) → Windows 재시작 시 dashboard + cloudflared 자동 복구
+- ~~**Cloudflare Tunnel WSL2 재기동**~~ — 세션 25-C 진단에서 기 완료 확인
 
 ## 사용자 기록 (메모리)
 
-- [자율 실행 우선](../../../../Users/smart/.claude/projects/E--00-develop-260406-luckystyle4u-server/memory/feedback_autonomy.md) — 분기 질문 금지, 권장안 즉시 채택 (파괴적 행동만 예외). 세션 24/25에서 활발히 적용
+- [자율 실행 우선](../../../../Users/smart/.claude/projects/E--00-develop-260406-luckystyle4u-server/memory/feedback_autonomy.md) — 분기 질문 금지, 권장안 즉시 채택 (파괴적 행동만 예외)
 
 ---
 [← handover/_index.md](./_index.md)

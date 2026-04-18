@@ -16,9 +16,61 @@
 | 2 | 비교 매트릭스 + 1:1 | ✅ **완료** | **28/28** | **18,251** |
 | 3 | 100점 정의 + FR/NFR | ✅ **완료** (7 Agent 병렬) | **11/11** | **8,350** |
 | 4 | 카테고리별 청사진 | ✅ **완료** (11 Agent / 3 Tier 병렬) | **26/26** | **32,918** |
-| 5 | 로드맵 + 스파이크 | ⏳ 대기 | 0/~10-15 | — |
+| 5 | 로드맵 + 스파이크 + 부록 | ✅ **완료** (2 세션 / 11 Agent 병렬) | **25/25** | **20,128** |
 
-**누적: 98 문서 / 86,460줄**
+**누적: 123 문서 / 106,588줄** (계획 ~105 문서 대비 +17% 초과 달성)
+
+### Wave 5 최종 산출물 (2026-04-18 완료)
+
+Wave 5는 두 세션(28-1 + 28-2)에서 병합 완료. 동일 주제 복수 문서는 **"관점 상보"** 로 병존.
+
+#### 05-roadmap/ (13 문서 / 10,629줄)
+
+| # | 파일 | 줄 수 | 작성자 | 역할 |
+|---|------|------|-------|------|
+| 00 | `00-roadmap-overview.md` | 665 | 28-2 R1 opus | **지도 문서** — Phase 15-22 전체 타임라인·의존성 DAG·MVP 경계 |
+| 00 | `00-release-plan.md` | 807 | 28-1 R1-A sonnet | 릴리스 계획 초판 (v0.1~v1.0 구조) |
+| 01 | `01-release-plan.md` | 1,200 | 28-2 R1 opus | **정본 릴리스 계획** — 9 코드명(Nocturne→Centurion), Canary, 릴리스 노트 템플릿 |
+| 02 | `02-milestones.md` | 1,193 | 28-2 R1 opus | **M1~M16 마일스톤** — 크리티컬 패스, 50주 텍스트 간트 |
+| 02 | `02-tech-debt-strategy.md` | 602 | 28-1 R2 sonnet | 기술부채 초판 (TD 20건, ADR 재검토 트리거 22건 연계) |
+| 03 | `03-mvp-scope.md` | 548 | 28-2 R2 sonnet | **MVP 정의** — Phase 15-17 / 122h / MVP FR 27건 매핑 |
+| 03 | `03-risk-register.md` | 1,056 | 28-1 R2 sonnet | **리스크 레지스터 상세** — R-001~R-035 전수 |
+| 04 | `04-go-no-go-checklist.md` | 494 | 28-1 R3 sonnet | **Phase/릴리스 게이트** — Entry/Exit/릴리스 게이트 체크리스트 |
+| 04 | `04-tech-debt-strategy.md` | 540 | 28-2 R2 sonnet | **기술부채 정본** — TD 22건, 6단계 관리 프로세스, 20% 할당 원칙 |
+| 05 | `05-risk-mitigation.md` | 853 | 28-2 R3 sonnet | **리스크 완화 전략** — Top 10 Critical, 대시보드, BCP 3단계 |
+| 05 | `05-rollout-strategy.md` | 1,056 | 28-1 R3 sonnet | **롤아웃 전략** — Capistrano-style + PM2 cluster:4 + canary 통합 |
+| 06 | `06-cost-tco-analysis.md` | 587 | 28-2 R3 sonnet | **3년 TCO** — Supabase $1,200~2,400 vs 양평 $250 = $950~2,150 절감 |
+| 07 | `07-success-metrics-kpi.md` | 1,028 | 28-2 R4 sonnet | **KPI 127개** — 14카×4단계, 38 NFR 전수 매핑, Supabase 24 기능 대조 |
+
+#### 06-prototyping/ (9 문서 / 6,621줄)
+
+| 파일 | 줄 수 | 작성자 | 역할 |
+|------|------|-------|------|
+| `01-spike-portfolio.md` | 444 | 28-2 P1 sonnet | **포트폴리오** — 기존 9건 + 신규 22건(SP-010~031), DQ 16건 100% 매핑 |
+| `02-spike-priority-set.md` | 621 | 28-2 P1 sonnet | **우선 세트** SP-010~016 상세 (29h, 4주) |
+| `03-spike-deferred-set.md` | 703 | 28-2 P1 sonnet | **지연 세트** SP-017~031 상세 (63h, 조건부 트리거) |
+| `04-spike-execution-protocol.md` | 611 | 28-2 P1 sonnet | **실행 프로토콜** — 5단계 라이프사이클, kdyspike 연계, result 표준 양식 |
+| `spike-005-edge-functions-deep.md` | 1,151 | 28-1 S1 sonnet | **Edge Fn 3층 심화** — Phase 19 진입 전 필수, 16h |
+| `spike-007-seaweedfs-50gb.md` | 1,391 | 28-1 S1 sonnet | **SeaweedFS 50GB** — Phase 17 진입 전 필수, 12h |
+| `spike-008-wal2json-pg-version-matrix.md` | 532 | 28-1 S2 sonnet | **wal2json × PG 14/15/16/17 매트릭스** (Phase 19) |
+| `spike-009-totp-webauthn-mvp.md` | 598 | 28-1 S2 sonnet | **TOTP+WebAuthn MVP** (Phase 15 직전) |
+| `spike-010-pgmq-vs-bullmq.md` | 570 | 28-1 S2 sonnet | **pgmq vs BullMQ** — DQ-4.3 Redis 트리거 정량화 |
+
+#### 07-appendix/ (3 문서 / 2,878줄)
+
+| 파일 | 줄 수 | 작성자 | 역할 |
+|------|------|-------|------|
+| `01-glossary.md` | 1,149 | 28-2 A1 opus | **용어집** 230+ 항목 (용어 182 + 약어 50) |
+| `02-dq-final-resolution.md` | 757 | 28-2 A1 opus | **DQ 64건 전수 최종 답변** (Wave 5 19건 상세 + 재검토 트리거 45건 인덱스) |
+| `03-genesis-handoff.md` | 972 | 28-2 A1 opus | **kdygenesis 인수인계** — `_PROJECT_GENESIS.md` 초안 + 85+ 태스크 |
+
+### Wave 5 Compound Knowledge
+
+1. **이중 관점 문서화**: 릴리스/부채/리스크 3 주제는 세션 28-1(상세 레지스트리)과 28-2(전략·관리) 두 관점이 병존 — 상호 보완
+2. **스파이크 층화**: 포트폴리오 overview (28-2) + 5건 상세 실행 스펙 (28-1) = 22건 신규 + 9건 기존 = **31 스파이크 전체 인덱싱**
+3. **DQ 답변 완결**: 64 DQ 전수 해결 + 폐기 4건 = 68건 모두 Resolution 등록
+4. **역방향 피드백 0건**: Wave 1-4 채택안이 Wave 5 로드맵·리스크·KPI 전부에서 강화 재확인
+5. **MVP 진입 준비 완료**: Phase 15 (Auth Advanced 22h) 착수 전 필수 스파이크 7건 우선 세트로 4주 내 실행 가능
 
 ## 14 카테고리 — Wave 1 1순위 + 100점 청사진
 
