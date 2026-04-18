@@ -9,6 +9,8 @@ import {
   REFRESH_MAX_AGE,
 } from "@/lib/jwt-v1";
 import { errorResponse } from "@/lib/api-response";
+import { issueMfaChallenge, CHALLENGE_MAX_AGE } from "@/lib/mfa/challenge";
+import { applyRateLimit } from "@/lib/rate-limit-guard";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -25,6 +27,16 @@ export async function POST(request: NextRequest) {
   }
 
   const { email, password } = parsed.data;
+
+  // Step 6 Rate Limit: IP 와 email 별도 카운트. 둘 중 먼저 초과한 쪽 적용.
+  // 임계값: 분당 10회 — login 정상 사용자는 1~3회 시도. 초과 시 brute-force 의심.
+  const blocked = await applyRateLimit(request, {
+    scope: "v1Login",
+    maxRequests: 10,
+    windowMs: 60 * 1000,
+    identifier: { dimension: "email", value: email },
+  });
+  if (blocked) return blocked;
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !user.isActive) {
@@ -47,6 +59,38 @@ export async function POST(request: NextRequest) {
     where: { id: user.id },
     data: updateData,
   });
+
+  // 2차 인증 확장 판단: TOTP 활성 또는 Passkey 등록 중 하나라도 있으면 MFA 필요.
+  // Phase 15 Step 4/5 / FR-6.1, FR-6.2.
+  const [enrollment, passkeyCount] = await Promise.all([
+    prisma.mfaEnrollment.findUnique({
+      where: { userId: user.id },
+      select: { confirmedAt: true },
+    }),
+    prisma.webAuthnAuthenticator.count({ where: { userId: user.id } }),
+  ]);
+  const hasTotp = user.mfaEnabled && Boolean(enrollment?.confirmedAt);
+  const hasPasskey = passkeyCount > 0;
+
+  if (hasTotp || hasPasskey) {
+    const methods: ("totp" | "recovery" | "passkey")[] = [];
+    if (hasTotp) methods.push("totp", "recovery");
+    if (hasPasskey) methods.push("passkey");
+
+    const challenge = await issueMfaChallenge(user.id);
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          mfaRequired: true,
+          methods,
+          challenge,
+          challengeExpiresIn: CHALLENGE_MAX_AGE,
+        },
+      },
+      { status: 200 },
+    );
+  }
 
   const accessToken = await createAccessToken({
     userId: user.id,
