@@ -467,7 +467,8 @@
 | **영향** | NFR-PERF.1, 인프라 복잡도 |
 | **Wave 할당** | Wave 5 |
 | **담당 문서** | 05-roadmap/ 확장 조건 |
-| **현재 상태** | 잠정답변 (fork 유지) |
+| **현재 상태** | ✅ **Resolved (조건부 Go)** — 2026-04-19 (세션 30, SP-010) |
+| **확정 답변** | **동시 접속 > 30 또는 CPU 지속 > 60% 도달 시 cluster:4로 전환**. 실측: fork RPS 54,692 → cluster:4 RPS 76,489 = **+39.9%** (목표 +30% 초과). SQLITE_BUSY 0/1968 = **0.000%** (WAL + busy_timeout=5000ms). **⚠ 운영 규칙 (신규)**: `pm2 delete all [--namespace X]` 절대 금지 — PM2 v6.0.14 namespace 필터 무시 버그로 프로덕션 삭제 사고 실증. `/ypserver` §4 safeguard 추가 완료. 상세: `docs/research/spikes/spike-010-pm2-cluster-result.md` |
 | **폐기 사유** | — |
 
 ---
@@ -793,7 +794,8 @@
 | **영향** | NFR-SEC.10, NFR-PERF.4 |
 | **Wave 할당** | Wave 5 |
 | **담당 문서** | 05-roadmap/ 마이그레이션 타이밍 |
-| **현재 상태** | 미답변 |
+| **현재 상태** | ✅ **Resolved** — 2026-04-19 (세션 30, SP-011) |
+| **확정 답변** | Phase 17 Auth Core 완성 시점에 **@node-rs/argon2 점진 마이그레이션**. 실측: bcrypt(12) p95 172ms → argon2id default p95 19.8ms = **13× faster** (spec 예상 5× 초과). prebuilt binary 3.3초 설치(node-gyp 불필요). 1000 사용자 점진 마이그레이션 오류 0. 사실관계 수정: 프로젝트 현행은 bcryptjs 아님 → **bcrypt@6.0.0** (N-API). 상세: `docs/research/spikes/spike-011-argon2-result.md` · **ADR-019** |
 | **폐기 사유** | — |
 
 ---
@@ -807,7 +809,8 @@
 | **영향** | FR-AUTH.2, NFR-MAINT.4 |
 | **Wave 할당** | Wave 5 |
 | **담당 문서** | 05-roadmap/ DB 마이그레이션 |
-| **현재 상태** | 미답변 |
+| **현재 상태** | ✅ **Resolved** — 2026-04-19 (세션 30, SP-015) |
+| **확정 답변** | **일반 복합 인덱스 `(userId, expiresAt)` + cleanup job(일 1회)** 채택. PG partial index `WHERE "expiresAt" > NOW()`는 NOW()가 STABLE이라 IMMUTABLE 제약 위반 — **불가**. 실측: PG 복합 인덱스만으로 p95 **48μs** (목표 2ms의 40배 여유), 1M 행 extrapolation 0.065ms. Seq Scan 대비 106배 향상. SQLite 실측 p95 0.053ms로 동급. 상세: `docs/research/spikes/spike-015-session-index-result.md` · Compound Knowledge `docs/solutions/2026-04-19-pg-partial-index-now-incompatibility.md` |
 | **폐기 사유** | — |
 
 ---
@@ -1443,7 +1446,8 @@
 | **영향** | NFR-PERF.9, NFR-COMPAT.3 |
 | **Wave 할당** | Wave 5 |
 | **담당 문서** | 05-roadmap/ P2 백로그 |
-| **현재 상태** | 잠정답변 (P2 대기) |
+| **현재 상태** | ✅ **Resolved (현 시점 불필요)** — 2026-04-19 (세션 30, SP-014) |
+| **확정 답변** | **현재 불필요 / 트리거 2건 충족 시 재도입**. 실측: jose `cacheMaxAge=180s` 클라이언트 캐시만으로 **p95 0.189ms, hit rate 99.0%** (목표 <5ms의 26× 여유). Tunnel RTT p95 148.7ms 기여분은 hit 99%에서 실효 지연 1.62ms로 1%만 영향 → Workers 캐시 ROI 낮음. **재도입 트리거**: (1) hit rate < 95% 지속, (2) Tunnel miss 지연 > 500ms 관측. **⚠ 중요**: jose cacheMaxAge는 **클라이언트 캐시**만 제어, 키 회전 grace는 **JWKS 엔드포인트 구·신 키 동시 서빙**으로 구현해야 함. 상세: `docs/research/spikes/spike-014-jwks-cache-result.md` · Compound Knowledge `docs/solutions/2026-04-19-jwks-grace-endpoint-vs-client-cache.md` |
 | **폐기 사유** | — |
 
 ---

@@ -217,6 +217,14 @@ Wave 4 청사진 14개 Blueprint에서 답변된 28건을 테이블로 정리한
 
 **문서 영향**: ADR-015 "cluster:4 고정" 기존 결정 재확인. DQ 매트릭스 상 "fork 유지" 잠정 답변을 "cluster:4 확정"으로 상향 정정. `02-functional-requirements.md` FR-OPS.3에 반영됨.
 
+**세션 30 (2026-04-19) SP-010 실측 보강**:
+- Node `cluster` 모듈 fork vs cluster:4 RPS = **×1.40 (+39.9%)** · autocannon 50 conn × 10s
+- SQLite WAL 4 worker_threads 10s × 50 writes/s = SQLITE_BUSY **0.000% (0/1968)**
+- node-cron 중복 방지는 PG `pg_try_advisory_lock` 공식 보증으로 축약
+- **즉시 전환 여부**: 현재 트래픽 기준 **Phase 16 이전에는 fork 유지** 권장. Phase 16 착수 시점에 재측정 후 전환
+- **치명적 운영 규칙**: `pm2 delete all` 명령 금지 (namespace 필터 무시 버그, `dashboard`/`cloudflared` 삭제 사고 발생 → `pm2 resurrect`로 복구)
+- 상세: `docs/research/spikes/spike-010-pm2-cluster-result.md`, `docs/solutions/2026-04-19-pm2-delete-all-namespace-bug.md`
+
 ---
 
 ### DQ-4.2 [DB Ops] pg_cron 도입
@@ -378,6 +386,14 @@ Wave 4 청사진 14개 Blueprint에서 답변된 28건을 테이블로 정리한
 
 **문서 영향**: ADR-013에 "3분 grace TTL + stale-while-revalidate 600" 명시. `04-observability-blueprint.md §7` 캐시 전략 섹션 상세화.
 
+**세션 30 (2026-04-19) SP-014 실측 보강**:
+- jose `createRemoteJWKSet({ cacheMaxAge: 180_000 })`: 검증 p95 **0.189ms**, hit rate **99.0%**
+- Cloudflare Tunnel RTT (stylelucky4u.com): p95 148.7ms (기준 100ms 48% 초과하나 hit 99%로 실효 영향 1%)
+- **실효 지연**: 0.99 × 0.189 + 0.01 × 148.5 ≈ **1.62ms** → NFR-PERF.9 50ms 대비 30배 여유
+- Workers 캐시 도입 현 시점 **불필요** (재검토 트리거 유지)
+- **중요 명료화**: "3분 grace"는 jose 클라이언트 `cacheMaxAge`만으로 성립하지 않는다. JWKS 엔드포인트가 `SigningKey.retireAt > NOW()` 조건으로 **구·신 키 모두 응답에 포함**해야 grace 성립. Phase 17 Auth Core 구현 시 이 정책 필수.
+- 상세: `docs/research/spikes/spike-014-jwks-cache-result.md`, `docs/solutions/2026-04-19-jwks-grace-endpoint-vs-client-cache.md`
+
 ---
 
 ### DQ-12.5 [Observability] Capacitor JWKS 방식
@@ -417,6 +433,17 @@ Wave 4 청사진 14개 Blueprint에서 답변된 28건을 테이블로 정리한
 
 **문서 영향**: `06-auth-core-blueprint.md §5`에 "argon2id 마이그레이션 플레이북" 섹션 추가. ADR-022(예상) 신규 추가: "argon2id 전환 결정".
 
+**세션 30 (2026-04-19) SP-011 실측 보강 + 사실관계 정정**:
+- **사실관계 정정**: 프로젝트 현행은 `bcryptjs`가 아니라 **`bcrypt@^6.0.0`** (N-API native). Wave 1~5 문서의 "bcryptjs" 표기는 오기 — 후속 일괄 수정 필요
+- **성능 실측**: argon2id(default) vs bcrypt(cost=12)
+  - hash: 19.8ms vs 172.2ms p95 → **8.7× 빠름**
+  - verify: 13.6ms vs 167.8ms p95 → **12.3× 빠름**
+  - spec 예상 5× 대폭 초과
+- WSL2 Ubuntu 24.04 + Node v24.14.1에서 `@node-rs/argon2` prebuilt binary **3.3초** 설치 (node-gyp 빌드 없음)
+- 1000 사용자 점진 마이그레이션 시뮬레이션: 오류 **0/1000**
+- **ADR-019** (argon2id 전환) 정식 등록 — 기존 제안 번호 ADR-022는 본 결정과 동일
+- 상세: `docs/research/spikes/spike-011-argon2-result.md`, `docs/solutions/2026-04-19-napi-prebuilt-native-modules.md`
+
 ---
 
 ### DQ-AC-2 [Auth Core] Session 테이블 인덱스 전략 (SQLite → PG)
@@ -439,6 +466,20 @@ Wave 4 청사진 14개 Blueprint에서 답변된 28건을 테이블로 정리한
 **근거**: ADR-006, `01-research/05-auth-core/01-deep-lucia.md §629`, PG EXPLAIN 가이드.
 
 **재검토 트리거**: (1) Session 테이블 row 수 100만 초과 → 파티셔닝 검토, (2) PG 버전업으로 인덱스 최적화 기능 추가, (3) Session 조회 p95 > 50ms.
+
+**세션 30 (2026-04-19) SP-015 실측 보강**:
+- PostgreSQL 16.13 + 100,000 행 Session 테이블 실측
+  - 일반 복합 인덱스 `(userId, expiresAt)`: Bitmap Heap Scan + Bitmap Index Scan, p95 **48μs** (1000 iter)
+  - 인덱스 drop 후 Seq Scan: p95 5,105μs (**106× 저하** — 인덱스 필수성 실증)
+- SQLite(better-sqlite3 + WAL): p95 **53μs** (동일 쿼리)
+- **중요 발견**: `CREATE INDEX ... WHERE "expiresAt" > NOW()` 실행 시 **ERROR: functions in index predicate must be marked IMMUTABLE** (NOW()는 STABLE). PG partial index on TTL 조건은 원천 불가능 → **cleanup job 대안 채택**:
+  ```sql
+  DELETE FROM "Session" WHERE "expiresAt" < NOW() - INTERVAL '1 day';
+  -- node-cron 또는 pg_cron으로 일 1회 야간 실행
+  ```
+- 일반 복합 인덱스만으로 목표 `p95 < 2ms`의 **40× 여유** 달성 — partial index 자체가 불필요
+- 1M extrapolation p95 ≈ 65μs (log10 증가) — 파티셔닝 불필요
+- 상세: `docs/research/spikes/spike-015-session-index-result.md`, `docs/solutions/2026-04-19-pg-partial-index-now-incompatibility.md`
 
 **문서 영향**: `02-data-model-erd.md §6.3`에 "Session 마이그레이션 플랜" 추가. `06-auth-core-blueprint.md §6` 인덱스 전략 명시.
 
@@ -524,7 +565,7 @@ Wave 5 16건 DQ 답변이 어떤 Blueprint / ADR / FR을 수정/추가/갱신하
 | DQ-1.13 (AG Grid) | — | ADR-002 재검토 트리거 주석 | `09-table-editor-blueprint.md §결론` | — | — |
 | DQ-1.14 (Enterprise) | — | ADR-002 (영구 비도입) | — | CON-7 인용 | — |
 | DQ-3.3 (임베드) | — | ADR-004 재검토 트리거 | `12-schema-visualizer-blueprint.md §1` | — | — |
-| DQ-4.1 (cluster) | — | ADR-015 cluster:4 재확인 | `05-operations-blueprint.md §3` | FR-OPS.3 | — |
+| DQ-4.1 (cluster) | — | ADR-015 §세션 30 보완 (PM2 delete all 금지) | `05-operations-blueprint.md §3` | FR-OPS.3 | **SP-010 완료** (+39.9% RPS, SQLITE_BUSY 0%) |
 | DQ-4.2 (pg_cron) | — | ADR-005 영구 비도입 재확인 | `13-db-ops-blueprint.md §3` | — | — |
 | DQ-4.3 (BullMQ) | — | ADR-012 Redis 거부 재확인 | `15-data-api-blueprint.md §3` | — | — |
 | DQ-4.22 (복원속도) | — | — | — | NFR-BACKUP.8 주석 | **SP-022** (wal-g 벤치) |
@@ -533,10 +574,10 @@ Wave 5 16건 DQ 답변이 어떤 Blueprint / ADR / FR을 수정/추가/갱신하
 | DQ-ADV-1 (PG 마이그) | — | ADR-011 분기 구조 | `14-advisors-blueprint.md §4` | — | **SP-027** 연동 |
 | DQ-RT-3 (presence_diff) | — | ADR-010 presence 상세 | `11-realtime-blueprint.md §5` | FR-RT.2 | **SP-025** (Presence) |
 | DQ-RT-6 (PG 18) | — | ADR-010 재검토 트리거 #1 | — | — | **SP-027** (PG 18) |
-| DQ-12.4 (JWKS 캐시) | — | ADR-013 grace TTL 명시 | `04-observability-blueprint.md §7` | NFR-PERF.9 | — |
+| DQ-12.4 (JWKS 캐시) | — | ADR-013 §세션 30 보완 (grace=endpoint 정책) | `04-observability-blueprint.md §7`, `03-auth-advanced-blueprint.md §JWKS` | NFR-PERF.9 | **SP-014 완료** (p95 0.189ms, hit 99%) |
 | DQ-12.5 (Capacitor) | — | ADR-013 §8 추가 | `04-observability-blueprint.md §8` | FR-MOBILE.1 | — |
-| DQ-AC-1 (argon2) | **ADR-022** (예상) | ADR-006 재검토 트리거 #1 | `06-auth-core-blueprint.md §5` | NFR-SEC.10 | **SP-028** (argon2 벤치) |
-| DQ-AC-2 (Session) | — | ADR-006 인덱스 플랜 | `06-auth-core-blueprint.md §6`, `02-data-model-erd.md §6.3` | NFR-MAINT.4 | — |
+| DQ-AC-1 (argon2) | **ADR-019** (세션 30 등록, 기존 "ADR-022"로 지칭) | ADR-006 §세션 30 보완 | `06-auth-core-blueprint.md §5`, `03-auth-advanced-blueprint.md §패스워드` | NFR-SEC.10 | **SP-011 완료** (13× faster) |
+| DQ-AC-2 (Session) | — | ADR-006 §세션 30 보완 (cleanup job 대안) | `06-auth-core-blueprint.md §6`, `02-data-model-erd.md §6.3` | NFR-MAINT.4 | **SP-015 완료** (p95 48μs) |
 | DQ-OPS-1 (Docker) | — | ADR-015 재검토 트리거 재확인 | `05-operations-blueprint.md §4` | — | — |
 | DQ-OPS-3 (Node 버전) | — | — | `05-operations-blueprint.md §5` | NFR-MAINT.8 | — |
 | DQ-OPS-4 (DR 호스트) | — | — | `05-operations-blueprint.md §6` | NFR-AVAIL.1 | — |
