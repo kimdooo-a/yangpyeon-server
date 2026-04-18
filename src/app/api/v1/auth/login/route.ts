@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyPasswordHash } from "@/lib/password";
+import { verifyPasswordHash, needsRehash, hashPassword } from "@/lib/password";
 import { loginSchema } from "@/lib/schemas/auth";
 import {
   createAccessToken,
@@ -36,10 +36,16 @@ export async function POST(request: NextRequest) {
     return errorResponse("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다", 401);
   }
 
-  // lastLoginAt 업데이트
+  // lastLoginAt 업데이트 + (bcrypt → argon2id 점진 마이그레이션) Phase 17 / SP-011 / ADR-019
+  const updateData: { lastLoginAt: Date; passwordHash?: string } = {
+    lastLoginAt: new Date(),
+  };
+  if (needsRehash(user.passwordHash)) {
+    updateData.passwordHash = await hashPassword(password);
+  }
   await prisma.user.update({
     where: { id: user.id },
-    data: { lastLoginAt: new Date() },
+    data: updateData,
   });
 
   const accessToken = await createAccessToken({
