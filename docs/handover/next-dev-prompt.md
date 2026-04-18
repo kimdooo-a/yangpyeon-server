@@ -61,6 +61,8 @@ docs/MASTER-DEV-PLAN.md
 - **세션 25**: Supabase 100점 평가(절대 55/가중 60) + **kdywave Wave 1 완료(33 deep-dive, 26,941줄)**
 - **세션 26**: **kdywave Wave 2 완료(28 매트릭스+1:1, 18,251줄)** — 7 Agent 병렬, 역방향 피드백 0건, 누적 61 문서 / 45,192줄
 - **세션 27**: **kdywave Wave 3 완료(비전+FR/NFR+DQ 재분배, 11 문서 / 8,350줄)** — 7 Agent 병렬(V/R opus, M sonnet). 100점 총 공수 **1,008h(~50주)**, 3년 TCO **$950~2,150 절감**, MVP=Phase 15~17. ADR-001 Multi-tenancy 의도적 제외(재검토 트리거 4). 누적 **72 문서 / 53,542줄**
+- **세션 25-A** (2026-04-18, 세션 25와 동시 진행): 세션 24 권장 4건 병렬 — Compound Knowledge 4건 + Playwright 인프라 + runReadwrite 33 케이스(vitest 89→131) + **VIEWER 확장 구현**(table-policy SELECT 분기 + GET 핸들러 USER 포함 + 9 테스트). 5525bd2에 통합 commit
+- **세션 25-B**: 25-A 후속 3단계 — git push, `/ypserver prod` 배포 + viewer-curl **V1~V9 라이브 매트릭스 전 PASS**, Cloudflare Tunnel QUIC→HTTP/2 폴백 부분 수정(~30%→~50%, 100% 미달, KT 회선 패킷 drop 진단 완료). solution doc `2026-04-18-cloudflare-tunnel-quic-tuning-partial-fix.md`
 
 ### Wave 1 결과 — 14 카테고리 1순위 + 100점 청사진
 | # | 카테고리 | 1순위 결정 | 100점 단계 |
@@ -155,14 +157,14 @@ docs/MASTER-DEV-PLAN.md
 - **DQ-12.3 추가 확정**: MASTER_KEY=`/etc/luckystyle4u/secrets.env` (root:ypb-runtime 0640) + PM2 `env_file`
 - **정량화된 재고 조건 명시됨**: Garage(3조건) / pg_graphql(4 수요 트리거 중 2+) / Docker(0조건 충족) / AWS KMS(2 트리거 중 1) — 환경 변화 시 트리거만 점검하면 됨
 - **Wave 1+2 누적 줄 수 45,192줄 컨텍스트 부담**: Wave 3 진입 시 README 마스터 + 필요 매트릭스만 selective read 권장. 에이전트별 L3 프롬프트에 읽을 파일 경로 명시 필수
-- **Compound Knowledge 6건 누적**: 세션 24의 4건(csrf-api-settings-guard / nextjs-private-folder-routing / raw-sql-updatedat-bump / timestamp-precision-optimistic-locking) + 세션 25의 2건(kdywave-hybrid-vs-monolithic-pattern / pg-extension-vs-self-impl-decision)
+- **Compound Knowledge 7건 누적**: 세션 24의 4건(csrf-api-settings-guard / nextjs-private-folder-routing / raw-sql-updatedat-bump / timestamp-precision-optimistic-locking) + 세션 25의 2건(kdywave-hybrid-vs-monolithic-pattern / pg-extension-vs-self-impl-decision) + **세션 25-B 1건(cloudflare-tunnel-quic-tuning-partial-fix — HTTP/2 폴백으로 ~30%→~50% 부분 수정 + 결정적 진단)**
 - **세션 24/24b/24c/24d/24e의 잔여 미커밋**(코드 + scripts + playwright + test-results)은 세션 25 종료 커밋에 포함됨 (재커밋 불필요)
 - **raw SQL UPDATE auto-bump**: `src/app/api/v1/tables/[table]/[pk]/route.ts` PATCH는 `updated_at` 컬럼이 있고 사용자가 명시 설정 안 한 경우 `SET ..., updated_at = NOW()` 자동 주입
 - **`/ypserver` 5 갭 해소 (세션 24e)**: Windows build skip / prisma migrate / drizzle migrate / Compound Knowledge 링크 추가됨
 - **CSRF 경로 구분**: `/api/v1/*`만 CSRF 면제. `/api/auth/*`는 Referer/Origin 필수
 - **WSL auto-shutdown + /tmp 휘발**: E2E 스크립트는 단일 호출 내부로 통합 필수
 - **`DATABASE_URL?schema=public` 비호환**: psql 직접 호출 시 `sed 's/?schema=public//'` 전처리 필요
-- **Cloudflare Tunnel 간헐 530**: PM2 재시작 직후 발생 가능 → `pm2 restart cloudflared`로 복구
+- **Cloudflare Tunnel 간헐 530**: 세션 25-B에서 HTTP/2 폴백 + retries/keepAlive 튜닝 적용(`~/.cloudflared/config.yml`) → 안정성 ~30%→~50% **부분 개선**. 100% 미달은 KT 회선 edge↔connector 패킷 drop. 1차 조치 `pm2 restart cloudflared` (cloudflared restart 직후 30~40초 edge propagation lag 530 정상)
 - **Vercel plugin 훅 false positive**: 프로젝트 Vercel 미사용 → 세션 시작 가이드대로 스킵
 - **information_schema 롤 필터링**: `app_readonly`에서 `table_constraints`/`key_column_usage` 0행 → introspection은 `pg_catalog` 사용
 - **Windows `next build` 불가**: WSL2 빌드가 진실 소스 (`/ypserver --skip-win-build` 옵션 사용)
