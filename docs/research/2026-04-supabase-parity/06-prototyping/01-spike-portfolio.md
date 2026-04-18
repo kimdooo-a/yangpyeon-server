@@ -82,6 +82,20 @@ Wave 1~4에서 완료된 스파이크 목록. 모두 Go 판정을 받아 현재 
 
 Wave 5에서 실행할 신규 스파이크 22건. 번호는 SP-010부터 시작(SP-001~009는 기존 예약).
 
+### 3.0 세션 30 (2026-04-19) 실행 결과 — 우선 세트 7건
+
+| SP | 판정 | 소요 | 결과 문서 |
+|----|------|------|-----------|
+| SP-010 PM2 cluster | 조건부 Go (+39.9%, BUSY 0%) | 1.2h | [spike-010-pm2-cluster-result.md](../../spikes/spike-010-pm2-cluster-result.md) |
+| SP-011 argon2id | Go (13× faster) — **ADR-019** | 0.6h | [spike-011-argon2-result.md](../../spikes/spike-011-argon2-result.md) |
+| SP-012 isolated-vm v6 | Go (Node v24 cold 0.9ms) — ADR-009 트리거 1 해소 | 0.7h | [spike-012-isolated-vm-v6-result.md](../../spikes/spike-012-isolated-vm-v6-result.md) |
+| SP-013 wal2json | Pending (축약, 물리 측정 별도 세션) | 축약 | [spike-013-wal2json-slot-result.md](../../spikes/spike-013-wal2json-slot-result.md) |
+| SP-014 JWKS 캐시 | 조건부 Go (p95 0.189ms, hit 99%) | 1.2h | [spike-014-jwks-cache-result.md](../../spikes/spike-014-jwks-cache-result.md) |
+| SP-015 Session 인덱스 | Go (p95 48μs, cleanup 대안) | 0.8h | [spike-015-session-index-result.md](../../spikes/spike-015-session-index-result.md) |
+| SP-016 SeaweedFS 50GB | Pending (축약, 물리 측정 별도 세션) | 축약 | [spike-016-seaweedfs-50gb-result.md](../../spikes/spike-016-seaweedfs-50gb-result.md) |
+
+Compound Knowledge 5건: `docs/solutions/2026-04-19-{pm2-delete-all-namespace-bug, pg-partial-index-now-incompatibility, napi-prebuilt-native-modules, isolated-vm-v6-node24-wsl2-verified, jwks-grace-endpoint-vs-client-cache}.md`
+
 | ID | 제목 | 카테고리 | 관련 DQ | 관련 ADR | 예상 공수(h) | 우선순위 | 의존 릴리스 | 세트 |
 |----|------|---------|---------|---------|------------|---------|-----------|------|
 | SP-010 | PM2 cluster:4 vs fork 벤치마크 | Operations | DQ-4.1 | ADR-015 | 4 | 고 | v0.1 | 우선 |

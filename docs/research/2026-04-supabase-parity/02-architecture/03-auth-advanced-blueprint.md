@@ -1475,6 +1475,123 @@ export class JWTService {
 }
 ```
 
+### 7.2.1 JWKS 엔드포인트 grace 운용 정책 (세션 30 / SP-014 추가)
+
+**중요**: "3분 grace"는 jose 클라이언트의 `cacheMaxAge: 180_000` 옵션만으로 성립하지 않는다. SP-014 실험(`docs/research/spikes/spike-014-jwks-cache-result.md`)에서 다음이 실증됐다:
+
+```
+JWKS 응답이 oldKey → newKey로 단일 교체되면
+→ jose 캐시 만료 시점부터 oldKey로 서명된 토큰 = ERR_JWKS_NO_MATCHING_KEY
+```
+
+**올바른 구현** — JWKS 엔드포인트가 구·신 키를 동시에 서빙:
+
+```typescript
+// src/app/api/.well-known/jwks.json/route.ts
+export async function GET() {
+  const keys = await prisma.jwksKey.findMany({
+    where: {
+      OR: [
+        { status: 'CURRENT' },
+        { retireAt: { gt: new Date() } },  // grace 대기 키
+      ],
+    },
+  });
+  return Response.json(
+    { keys: keys.map(k => k.publicJwk) },
+    {
+      headers: {
+        'Cache-Control': 'public, max-age=180, stale-while-revalidate=600',
+      },
+    }
+  );
+}
+```
+
+**키 회전 절차**:
+1. 신 키 등록 `status='CURRENT'`, 구 키 `status='RETIRED'` + `retireAt = NOW() + max(token TTL, cacheMaxAge) + 60s margin`
+2. JWKS 응답이 자동으로 두 키 포함
+3. cron 1시간마다 `retireAt < NOW()` 건 제거
+
+**실측 성능 (SP-014)**:
+- jose `cacheMaxAge: 180_000` 적용 시 검증 p95 **0.189ms**, hit rate **99.0%**
+- Cloudflare Tunnel RTT p95 148ms (miss 1%) → 실효 지연 **1.62ms**
+- NFR-PERF.9 50ms p95 기준 **30× 여유** → Cloudflare Workers 앞단 캐시 **현 시점 불필요**
+
+Compound Knowledge: `docs/solutions/2026-04-19-jwks-grace-endpoint-vs-client-cache.md`
+
+### 7.2.2 Session 테이블 인덱스 정책 (세션 30 / SP-015 추가)
+
+Session 테이블(`sessions`)의 활성 조회 쿼리 `WHERE user_id = ? AND revoked_at IS NULL AND expires_at > NOW()` 에 대해:
+
+**원래 설계 가정 (무효)**: PG partial index with NOW() 조건
+```sql
+-- ❌ ERROR: functions in index predicate must be marked IMMUTABLE
+CREATE INDEX idx_sessions_active ON sessions (user_id, expires_at)
+  WHERE expires_at > NOW();
+```
+
+**채택 설계** — 일반 복합 인덱스 + cleanup job:
+```sql
+CREATE INDEX idx_sessions_user_exp ON sessions (user_id, revoked_at, expires_at);
+
+-- cleanup (node-cron 일 1회 야간)
+DELETE FROM sessions WHERE expires_at < NOW() - INTERVAL '1 day';
+```
+
+**SP-015 실측**:
+- 100,000 행 기준 p95 **48μs** (PG 16.13, Bitmap Index Scan)
+- 목표 `p95 < 2ms`의 **40× 여유**
+- 1M extrapolation p95 ≈ 65μs (log10 증가)
+
+Compound Knowledge: `docs/solutions/2026-04-19-pg-partial-index-now-incompatibility.md`
+
+### 7.2.3 패스워드 해시 — argon2id 전환 (세션 30 / SP-011 / ADR-019 추가)
+
+**현행**: `bcrypt@^6.0.0` (N-API native). (**사실관계 정정**: Wave 1~5 문서의 "bcryptjs" 표기는 오기)
+
+**Phase 17 전환**: `@node-rs/argon2` 도입 + 점진 마이그레이션
+
+```typescript
+// src/lib/auth/password.ts (Phase 17)
+import { hash as argonHash, verify as argonVerify, Algorithm } from '@node-rs/argon2';
+import bcrypt from 'bcrypt';
+
+export async function verifyPassword(
+  user: { id: string; passwordHash: string },
+  password: string
+): Promise<boolean> {
+  if (user.passwordHash.startsWith('$2')) {
+    // bcrypt 검증 + argon2 재해시
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (ok) {
+      const newHash = await argonHash(password, { algorithm: Algorithm.Argon2id });
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newHash },
+      });
+    }
+    return ok;
+  }
+  return argonVerify(user.passwordHash, password);
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  return argonHash(password, { algorithm: Algorithm.Argon2id });
+}
+```
+
+**핵심**: User 스키마 변경 **불필요** — 접두사(`$2` vs `$argon2id$`)로 자동 구분.
+
+**SP-011 실측 (Phase 15/16/17 전제)**:
+- argon2id(default) p95 hash **19.8ms** / verify **13.6ms**
+- bcrypt(cost=12) p95 hash 172.2ms / verify 167.8ms
+- **12~13× faster**
+- 1000 사용자 점진 마이그레이션 오류 **0/1000**
+- WSL2 Ubuntu 24.04 설치 3.3초 (prebuilt)
+
+상세: ADR-019, `docs/solutions/2026-04-19-napi-prebuilt-native-modules.md`
+
 ---
 
 ## 8. NFR 매핑
