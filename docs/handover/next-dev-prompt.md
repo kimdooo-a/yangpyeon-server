@@ -50,7 +50,8 @@ docs/MASTER-DEV-PLAN.md
 - Phase 14a (세션 18): Table Editor 읽기 전용
 - Phase 14b (세션 21 구현, 세션 22 DOD curl E2E 통과): Table Editor CRUD
 - Phase 14c 1순위 (세션 23): `@updatedAt` DB DEFAULT 근본 수정
-- **Phase 14c-α (세션 24 완료)**: 인라인 셀 편집 + 낙관적 잠금 — `expected_updated_at` 바디 필드 + 409 CONFLICT + Sonner 3액션 토스트 + raw SQL UPDATE auto-bump. ADR-004 채택. 프로덕션 E2E C1~C6 전 PASS.
+- Phase 14c-α (세션 24): 인라인 셀 편집 + 낙관적 잠금 — ADR-004 + raw SQL auto-bump + E2E C1~C6 PASS
+- **Phase 14c-β (세션 24 연장 완료)**: 복합 PK 지원 — 신규 `/composite` 엔드포인트 + 바디 `pk_values` map + UI 훅 분기. ADR-005. 세션 중 2 근본 수정 (Next.js private folder rename, TIMESTAMP(3) 정밀도). curl E2E B1~B9 전 PASS.
 
 ### 배포 상태 ✅
 - **원격 main**: 세션 23 `a00beca` 이후 세션 24에서 11 커밋 추가
@@ -83,18 +84,17 @@ docs/MASTER-DEV-PLAN.md
 
 ## 추천 다음 작업
 
-### 우선순위 1: Phase 14c-β — 복합 PK 지원 ⭐
-세션 24 α의 `expected_updated_at` 패턴을 복합 PK 경로에 확장:
-1. `[pk]` → `[...pk]` 동적 라우트 또는 `?pk.col1=val1&pk.col2=val2` 쿼리스트링
-2. WHERE 빌더가 복수 컬럼 `AND col1=$N AND col2=$M` 생성
-3. `introspect().compositePk=true` 분기에서 현재 400 반환 → 정상 경로로 교체
-4. E2E: 복합 PK 테이블은 프로젝트에 현재 없음 → test 테이블 seed 또는 `_prisma_migrations` 읽기 전용 확인으로 간접 검증
-
-### 우선순위 2: Phase 14c-γ — VIEWER 계정 + 권한 매트릭스 E2E
+### 우선순위 1: Phase 14c-γ — VIEWER 계정 + 권한 매트릭스 E2E ⭐
 1. VIEWER role seed 스크립트
 2. Playwright 설치 (`npm i -D @playwright/test` + `npx playwright install`)
 3. MANAGER/ADMIN/VIEWER 3롤 × (SELECT/INSERT/UPDATE/DELETE) 매트릭스 자동 검증
 4. 세션 24의 `phase-14c-alpha-ui.spec.ts` 실행 가동
+
+### 우선순위 2: Compound Knowledge 추출 (세션 24에서 4건 누적)
+- `docs/solutions/2026-04-18-raw-sql-updatedat-bump.md` — Prisma `@updatedAt` 클라이언트 한계 + raw SQL auto-bump
+- `docs/solutions/2026-04-18-nextjs-private-folder-routing.md` ⭐ — `_` prefix = private folder
+- `docs/solutions/2026-04-18-timestamp-precision-optimistic-locking.md` ⭐ — pg TIMESTAMP(3) 정밀도 + 낙관적 잠금
+- `docs/solutions/2026-04-18-subagent-driven-pragmatism.md` — 완전 코드 플랜에서 reviewer dispatch 축약
 
 ### 우선순위 3: 본 세션 보류 방향 (사용자 "모두 순차적" 지시의 잔여)
 - **방향 B** `/ypserver` 스킬 보강 (5 갭: Windows build 스킵 / prisma 복사 / migrate deploy / drizzle migrate / Compound Knowledge 내재화)

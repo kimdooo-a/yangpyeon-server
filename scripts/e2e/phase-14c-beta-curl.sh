@@ -6,7 +6,9 @@
 #   wsl -d Ubuntu -u postgres -- psql -d luckystyle4u -c "
 #     DROP TABLE IF EXISTS _test_composite;
 #     CREATE TABLE _test_composite (tenant_id UUID NOT NULL, item_key TEXT NOT NULL,
-#       value TEXT, updated_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (tenant_id, item_key));
+#       value TEXT, updated_at TIMESTAMP(3) DEFAULT NOW(), PRIMARY KEY (tenant_id, item_key));
+#       -- TIMESTAMP(3)가 중요: Prisma schema의 실제 테이블과 동일한 ms 정밀도. TIMESTAMP(µs)면
+#       -- pg 드라이버 ISO 직렬화 시 ms 절단으로 낙관적 잠금 비교가 어긋남.
 #     GRANT SELECT, INSERT, UPDATE, DELETE ON _test_composite TO app_readwrite;
 #     GRANT SELECT ON _test_composite TO app_readonly;"
 # Teardown:

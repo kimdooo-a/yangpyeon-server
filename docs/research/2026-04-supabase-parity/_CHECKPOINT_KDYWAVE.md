@@ -56,9 +56,21 @@ output_dir: docs/research/2026-04-supabase-parity/
 - 사용자 승인: L 규모 + 4개 사전 스파이크 우선 표시 (Postgres CDC, isolated-vm v2, MinIO, WebAuthn)
 
 ## Phase 2: Wave 실행 루프 🔄
-### Wave 1: 기초 deep-dive 🔄 (~28 문서, Round 1+2 분할)
-  - Round 1 (5 Agent, 스파이크 우선): Storage / Edge Functions / Realtime / Auth Advanced / Table Editor
-  - Round 2 (5 Agent, 후속): SQL Editor / Schema Viz / DB Ops / Auth Core / Advisors / Data API / Observability / UX / Operations
+### Wave 1: 기초 deep-dive 🔄 (~33 문서, Round 1+2 분할)
+  - **Round 1 ✅ (5 Agent, 15 deep-dive, 12,862줄)** — 2026-04-18 09:09 완료
+    - Storage: SeaweedFS 4.25 / Garage 3.72 / MinIO 3.09 → DQ-1.3 = SeaweedFS (40→90~95점)
+    - Edge Functions: Deno embed 4.22 / isolated-vm v6 3.85 / Vercel Sandbox 3.55 → DQ-1.4 = 3층 하이브리드 (45→92~95)
+    - Realtime: wal2json 4.05 / supabase-realtime port 3.95 / ElectricSQL 3.85 → DQ-1.5 = 01+03 하이브리드 (55→100)
+    - Auth Advanced: WebAuthn 4.64 / TOTP 4.60 / Rate Limit 4.52 → DQ-1.1 = 동시 지원, DQ-1.2 = PostgreSQL/Prisma (15→60)
+    - Table Editor: TanStack v8 + 14c-α 자체구현 (현 노선 유지) → DQ-1.9 답 (75→100, 14c-α/β/14d/14e 4단)
+    - 사전 스파이크 4건 모두 "조건부 GO" 결론
+    - 신규 DQ 15건 등록 (DQ-1.10~1.24, 글로벌 시퀀스)
+  - **Round 2 🔄 (5 Agent, 18 deep-dive)** — 진행 중
+    - F: SQL Editor (3) — sqlpad / outerbase / Supabase Studio 패턴
+    - G: Schema Viz + DB Ops (4) — Prisma Studio + drizzle-kit / pg_cron + wal-g
+    - H: Auth Core + Advisors (4) — Lucia + Auth.js v6 / splinter + squawk
+    - I: Data API (3) — pg_graphql + PostGraphile + pgmq
+    - J: Observability + UX + Operations (4) — pgsodium / Vercel AI SDK / GitHub Actions
 ### Wave 2: 비교 매트릭스 ⏳ (~28 문서)
 ### Wave 3: 비전·요구사항 ⏳ (~6 문서)
 ### Wave 4: 아키텍처 청사진 ⏳ (~14 문서)
