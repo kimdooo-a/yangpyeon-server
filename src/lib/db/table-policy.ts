@@ -1,6 +1,6 @@
 import type { Role } from "@/generated/prisma/client";
 
-export type TableOperation = "INSERT" | "UPDATE" | "DELETE";
+export type TableOperation = "SELECT" | "INSERT" | "UPDATE" | "DELETE";
 
 export interface PolicyDecision {
   allowed: boolean;
@@ -14,11 +14,12 @@ const FULL_BLOCK = new Set([
   "_prisma_migrations",
 ]);
 
-/** 역사 자산 — DELETE(ADMIN)만 허용, INSERT/UPDATE 차단 */
+/** 역사 자산 — DELETE(ADMIN)만 허용, INSERT/UPDATE 차단. SELECT는 운영자(ADMIN/MANAGER)만. */
 const DELETE_ONLY = new Set(["edge_function_runs"]);
 
 /**
  * Phase 14b: 테이블×작업×역할 기반 CRUD 허용 여부.
+ * Phase 14c-VIEWER: SELECT 작업 추가 — USER 롤이 비민감 테이블 SELECT 허용.
  * 1차 권한 검사(withRole)를 통과한 뒤 호출한다.
  */
 export function checkTablePolicy(
@@ -29,15 +30,21 @@ export function checkTablePolicy(
   if (FULL_BLOCK.has(table)) {
     return {
       allowed: false,
-      reason: `${table}은 Table Editor에서 편집할 수 없습니다 (전용 페이지 사용)`,
+      reason: `${table}은 Table Editor에서 접근할 수 없습니다 (전용 페이지 사용)`,
     };
   }
 
   if (DELETE_ONLY.has(table)) {
+    if (operation === "SELECT") {
+      if (role !== "ADMIN" && role !== "MANAGER") {
+        return { allowed: false, reason: "운영자 권한이 필요합니다" };
+      }
+      return { allowed: true };
+    }
     if (operation !== "DELETE") {
       return {
         allowed: false,
-        reason: `${table}은 삭제만 가능합니다`,
+        reason: `${table}은 조회와 삭제만 가능합니다`,
       };
     }
     if (role !== "ADMIN") {
@@ -47,6 +54,9 @@ export function checkTablePolicy(
   }
 
   // 일반 업무 테이블
+  if (operation === "SELECT") {
+    return { allowed: true };
+  }
   if (operation === "DELETE" && role !== "ADMIN") {
     return { allowed: false, reason: "삭제는 ADMIN만 가능합니다" };
   }

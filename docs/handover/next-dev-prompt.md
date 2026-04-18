@@ -15,10 +15,9 @@
 
 ```bash
 npm run dev
-# WSL2 배포 — /ypserver 스킬 한계 인지(prisma migrate deploy 미포함). 수동 절차:
-#   wsl -e bash -c "rm -rf ~/dashboard/prisma && cp -r /mnt/e/<proj>/prisma ~/dashboard/"
-#   wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && npx prisma migrate deploy"
-#   /ypserver prod (Phase 1 실패 시 WSL Phase 2-2 수동 복사+빌드+pm2 restart로 대체)
+# WSL2 배포 — /ypserver prod (세션 24e에서 5 갭 보강 완료):
+#   /ypserver prod                      # Phase 1~5 자동 (Windows 빌드 → 복사 → migrate → PM2)
+#   /ypserver prod --skip-win-build     # Windows 빌드 항상 실패 환경에서 사용
 ```
 
 | 서비스 | URL |
@@ -32,106 +31,132 @@ npm run dev
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260418-session24-phase-14c-alpha.md              ⭐ 최신 (세션 24 완료)
-docs/superpowers/specs/2026-04-18-phase-14c-alpha-inline-edit-optimistic-locking-design.md
-docs/superpowers/plans/2026-04-18-phase-14c-alpha-inline-edit-optimistic-locking-plan.md
-docs/research/decisions/ADR-004-phase-14c-alpha-optimistic-locking.md
+docs/handover/260418-session25-supabase-parity-wave-1.md   ⭐ 최신 (세션 25 완료)
+docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1 마스터 인덱스
+docs/research/2026-04-supabase-parity/_CHECKPOINT_KDYWAVE.md
+docs/solutions/2026-04-18-kdywave-hybrid-vs-monolithic-pattern.md   ⭐ Compound Knowledge 1
+docs/solutions/2026-04-18-pg-extension-vs-self-impl-decision.md     ⭐ Compound Knowledge 2
+docs/handover/260418-session24-phase-14c-alpha.md
+docs/handover/260418-session24-phase-14c-beta.md
 docs/handover/260417-session23-phase-14c-updated-at-fix.md
-docs/solutions/2026-04-17-prisma-migration-windows-wsl-gap.md
-docs/solutions/2026-04-17-curl-e2e-recipe-dashboard.md
 docs/MASTER-DEV-PLAN.md
 ```
 
-## 현재 상태 (세션 24 종료 시점)
+## 현재 상태 (세션 25 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~13 전부 완료
 - Phase 14-S (세션 15~16): Supabase 이식 Phase A+B
 - Phase 14a (세션 18): Table Editor 읽기 전용
-- Phase 14b (세션 21 구현, 세션 22 DOD curl E2E 통과): Table Editor CRUD
+- Phase 14b (세션 21~22): Table Editor CRUD + curl E2E DOD
 - Phase 14c 1순위 (세션 23): `@updatedAt` DB DEFAULT 근본 수정
-- Phase 14c-α (세션 24): 인라인 셀 편집 + 낙관적 잠금 — ADR-004 + raw SQL auto-bump + E2E C1~C6 PASS
-- **Phase 14c-β (세션 24 연장 완료)**: 복합 PK 지원 — 신규 `/composite` 엔드포인트 + 바디 `pk_values` map + UI 훅 분기. ADR-005. 세션 중 2 근본 수정 (Next.js private folder rename, TIMESTAMP(3) 정밀도). curl E2E B1~B9 전 PASS.
+- Phase 14c-α (세션 24): 인라인 셀 편집 + 낙관적 잠금 (ADR-004)
+- Phase 14c-β (세션 24b): 복합 PK 지원 + Next.js private folder fix + TIMESTAMP(3) 정렬 (ADR-005)
+- Phase 14c-γ (세션 24c): 권한 매트릭스 E2E 13 시나리오 PASS (ADR-006)
+- 방향 C Vitest (세션 24d): 89개 유닛 테스트 PASS, ADR-003 §5 재활성화
+- 방향 B `/ypserver` 보강 (세션 24e): 5 갭 해소(Windows skip / prisma migrate / drizzle / Compound Knowledge 링크)
+- **세션 25**: Supabase 100점 평가(절대 55/가중 60) + **kdywave Wave 1 완료(33 deep-dive, 26,941줄)**
+
+### Wave 1 결과 — 14 카테고리 1순위 + 100점 청사진
+| # | 카테고리 | 1순위 결정 | 100점 단계 |
+|---|---------|----------|-----------|
+| 1 | Table Editor | TanStack v8 + 14c-α 자체구현 | 14c-α/β/14d/14e |
+| 2 | SQL Editor | sqlpad + Outerbase + Supabase Studio 3중 흡수 | 14c~14f, 40일 |
+| 3 | Schema Viz | schemalint + 자체 RLS + Trigger 편집기 | /database/{policies,functions,triggers} 신설, 50h |
+| 4 | DB Ops | node-cron 자체 + wal-g | RPO 60s, RTO 30분, 68h |
+| 5 | Auth Core | jose + Lucia 패턴 + Auth.js Provider/Hook | 6 Phase, 30h |
+| 6 | Auth Advanced ★ | TOTP + WebAuthn + PG Rate Limit (전부 동시) | Phase 15-17 = 60점 |
+| 7 | Storage ★ | SeaweedFS 단독 | 40→90~95 |
+| 8 | Edge Functions ★ | 3층 하이브리드 (isolated-vm v6 + Deno + Sandbox) | 45→92~95 |
+| 9 | Realtime ★ | wal2json + supabase-realtime 포팅 | 55→100 |
+| 10 | Advisors | 3-Layer (schemalint + squawk + splinter 38룰) | 80h |
+| 11 | Data API | REST 강화 + pgmq + SQLite 보조 (GraphQL 보류) | 45→80~85 |
+| 12 | Observability | node:crypto envelope + jose JWKS ES256 | Vault + JWKS + Infrastructure |
+| 13 | UX Quality | AI SDK v6 + Anthropic BYOK + 자체 MCP | ~$5/월 |
+| 14 | Operations | Capistrano-style + PM2 cluster + canary | 자체 + 자동 symlink 롤백 |
+
+★ = 사전 스파이크 4건 모두 "조건부 GO"
+
+### Wave 1 DQ 현황
+- **잠정 답변 9건**: DQ-1.1~1.9 (각 카테고리 1순위 결정)
+- **신규 DQ 64건**: Wave 2 매트릭스에서 글로벌 시퀀스로 통합 재할당 예정
 
 ### 배포 상태 ✅
-- **원격 main**: 세션 23 `a00beca` 이후 세션 24에서 11 커밋 추가
-- **프로덕션(WSL2 PM2)**: `src` + `tsconfig.json` 복사 + `npm run build` + `pm2 restart dashboard` 완료. PID 308/1351 이후 안정.
-- **스키마 변경 없음**: 세션 23 migration 활용
-- **프로덕션 엔드포인트 정상**: `/login` 200, `/api/v1/tables/folders` PATCH(락 O/X 양쪽) 정상
+- **원격 main**: 세션 24e `66895a4` 이후 세션 25에서 단일 마무리 커밋 추가
+- **프로덕션(WSL2 PM2)**: 세션 25는 코드 변경 없음 — 재배포 불필요
+- **세션 24/24b/24c/24d/24e의 미커밋 잔재**(playwright.config.ts, vitest, src/, scripts/, 4 solutions, test-results/)는 세션 25 종료 커밋에 통합
 
-### 세션 24 검증 결과 (curl E2E 전 PASS)
-| 시나리오 | 결과 |
-|----------|------|
-| C1 정상 PATCH (락 일치) | ✅ 200 |
-| C2 CONFLICT | ✅ 409 + current |
-| C3 NOT_FOUND | ✅ 404 |
-| C4 LEGACY (락 미제공) | ✅ 200 |
-| C5 MALFORMED | ✅ 400 INVALID_EXPECTED_UPDATED_AT |
-| C6 감사 로그 영속 | ✅ UPDATE=10, UPDATE_CONFLICT=1 |
-| Playwright E1~E6 | ⚠ Playwright 미설치 — 다음 세션 과제 |
+### 검증 결과 (세션 25)
+| 항목 | 결과 |
+|------|------|
+| 33/33 deep-dive 500줄+ 계약 | ✅ |
+| 10차원 스코어링 + 앵커링 ("왜 N점, 왜 N±1점이 아닌가") | ✅ |
+| 참고 자료 10+ (URL) | ✅ |
+| TODO/TBD 0건 | ✅ (1건 코드 예시 안 마일스톤 표시는 본문 미완성 아님) |
+| 사전 스파이크 4건 | ✅ 모두 "조건부 GO" |
 
 ## 현재 DB 구조 (변경 없음)
 
 ### PostgreSQL (Prisma) — 10 테이블 + 롤 2종
 - 10 테이블: User, Folder, File, SqlQuery, EdgeFunction, EdgeFunctionRun, Webhook, CronJob, ApiKey, LogDrain
-- 롤: `app_readonly` (세션 16) + `app_readwrite` (세션 21)
+- 롤: `app_readonly` + `app_readwrite`
 - `updated_at` 컬럼: 9/10 테이블 (EdgeFunctionRun 제외) — 전부 `DEFAULT CURRENT_TIMESTAMP`
-- **raw SQL UPDATE 시 auto-bump 적용됨** (세션 24 API 수정)
+- raw SQL UPDATE 시 auto-bump 적용
 
 ### SQLite (Drizzle) — data/dashboard.db
 - audit_logs, metrics_history, ip_whitelist
-- 신규 감사 로그 action: `TABLE_ROW_UPDATE_CONFLICT`
+- 감사 로그 action: TABLE_ROW_INSERT/UPDATE/DELETE/UPDATE_CONFLICT/PERMISSION_DENIED 등
 
 ## 추천 다음 작업
 
-### 우선순위 1: Phase 14c-γ — VIEWER 계정 + 권한 매트릭스 E2E ⭐
-1. VIEWER role seed 스크립트
-2. Playwright 설치 (`npm i -D @playwright/test` + `npx playwright install`)
-3. MANAGER/ADMIN/VIEWER 3롤 × (SELECT/INSERT/UPDATE/DELETE) 매트릭스 자동 검증
-4. 세션 24의 `phase-14c-alpha-ui.spec.ts` 실행 가동
+### 우선순위 1: kdywave Wave 2 진입 (권장 — 자연스러운 연속) ⭐
+```
+/kdywave --resume
+```
+- Phase 2 Wave 2 — 카테고리 매트릭스 14 + 1:1 비교 우선순위 5-8 = ~28 문서
+- 64 신규 DQ에 글로벌 번호 재할당 (DQ-1.10 ~ DQ-1.74 순)
+- 가중 점수 정규화 + 1순위/2순위 차이 분석
+- Wave 2 완료 후 Wave 3(100점 정의 + FR/NFR) → Wave 4(청사진 14) → Wave 5(로드맵 + 스파이크)
 
-### 우선순위 2: Compound Knowledge 추출 (세션 24에서 4건 누적)
-- `docs/solutions/2026-04-18-raw-sql-updatedat-bump.md` — Prisma `@updatedAt` 클라이언트 한계 + raw SQL auto-bump
-- `docs/solutions/2026-04-18-nextjs-private-folder-routing.md` ⭐ — `_` prefix = private folder
-- `docs/solutions/2026-04-18-timestamp-precision-optimistic-locking.md` ⭐ — pg TIMESTAMP(3) 정밀도 + 낙관적 잠금
-- `docs/solutions/2026-04-18-subagent-driven-pragmatism.md` — 완전 코드 플랜에서 reviewer dispatch 축약
+### 우선순위 2: Wave 1 결과 기반 즉시 코드 작업 가능 항목
+- **DQ-1.3 SeaweedFS 1주 PoC**: Storage 40→90 (단일 솔루션형 카테고리, 빠른 ROI)
+- **DQ-1.7 pgmq 도입 spec 작성**: Data API Queue 영역 0→90 (확장 1줄 설치)
+- **DQ-1.1 Phase 15 (otplib TOTP)**: Auth Advanced 15→27 (단일 Phase, 30h)
 
-### 우선순위 3: 본 세션 보류 방향 (사용자 "모두 순차적" 지시의 잔여)
-- **방향 B** `/ypserver` 스킬 보강 (5 갭: Windows build 스킵 / prisma 복사 / migrate deploy / drizzle migrate / Compound Knowledge 내재화)
-- **방향 C** Vitest 도입 (ADR-003 §5 재활성화, identifier/coerce/table-policy/runReadwrite 유닛 테스트)
+### 우선순위 3: Phase 14c-γ USER-as-VIEWER 분리 spec
+- 세션 24c에서 권한 매트릭스 13 시나리오 PASS했으나 USER role의 SELECT 허용 정책은 별도 spec 이관됨 (ADR-006)
+- 다음 세션에서 spec 작성 → 구현
 
 ### 진입점 예시
 ```
-/kdyguide --start                          # 현 상태 브리핑 + 방향 추천
-/kdyguide --route "복합 PK 지원 구현"        # β 빠른 라우팅
-/kdyguide --route "Playwright 설치 후 E2E"  # γ 진입
+/kdywave --resume                       # Wave 2 진입 (권장)
+/kdyguide --start                        # 현 상태 브리핑 + 방향 추천
+/kdyguide --route "SeaweedFS PoC"        # Wave 1 결과 즉시 코드화
+/kdyguide --route "USER-as-VIEWER spec"  # Phase 14c-γ 후속
 ```
 
 ## 알려진 이슈 및 주의사항
 
-- **raw SQL UPDATE auto-bump** (세션 24 신규): `src/app/api/v1/tables/[table]/[pk]/route.ts` PATCH는 `updated_at` 컬럼이 있고 사용자가 명시 설정 안 한 경우 `SET ..., updated_at = NOW()`를 자동 주입. Phase 14c-β 복합 PK에도 동일 로직 유지 필요.
-- **Playwright 미설치**: 세션 24가 `scripts/e2e/phase-14c-alpha-ui.spec.ts`를 작성했으나 실행 불가. 다음 세션에서 설치 + 실행.
-- **tsconfig `scripts` exclude**: Playwright 미설치 상태 tsc 통과용. 설치 후에는 `"scripts"` 제외 제거 가능.
-- **`/ypserver` 스킬 한계**: Phase 1 Windows build 항상 실패, prisma/Drizzle 마이그레이션 단계 부재. 수동 보완 절차 — Compound Knowledge `2026-04-17-prisma-migration-windows-wsl-gap.md` 참조
-- **CSRF 경로 구분**: `/api/v1/*`만 CSRF 면제. `/api/auth/*`(예: login-v2)는 Referer/Origin 필수. Compound Knowledge `2026-04-17-curl-e2e-recipe-dashboard.md` 참조
-- **WSL auto-shutdown + /tmp 휘발**: 여러 `wsl -e bash -c` 호출 사이에 인스턴스 종료 가능. E2E 스크립트는 단일 호출 내부로 통합 필수
+- **Wave 1만 완료, Wave 2~5 미진입**: ~88 문서 중 33 완료. 다음 세션에서 Wave 2 권장
+- **DQ 번호 충돌 정리됨**: Round 1 신규 DQ는 글로벌 시퀀스(DQ-1.10~1.24)로 재할당. Round 2 신규 49건은 Wave 2 진입 시 (DQ-1.25~1.74) 부여
+- **Wave 1 산출물의 줄 수 (26,941줄)는 다음 세션 컨텍스트에 큰 부담** — Wave 2 진입 시 마스터 인덱스만 로드, deep-dive는 카테고리별 selective read 권장
+- **Compound Knowledge 6건 누적**: 세션 24의 4건(csrf-api-settings-guard / nextjs-private-folder-routing / raw-sql-updatedat-bump / timestamp-precision-optimistic-locking) + 세션 25의 2건(kdywave-hybrid-vs-monolithic-pattern / pg-extension-vs-self-impl-decision)
+- **세션 24/24b/24c/24d/24e의 잔여 미커밋**(코드 + scripts + playwright + test-results)은 세션 25 종료 커밋에 포함됨 (재커밋 불필요)
+- **raw SQL UPDATE auto-bump**: `src/app/api/v1/tables/[table]/[pk]/route.ts` PATCH는 `updated_at` 컬럼이 있고 사용자가 명시 설정 안 한 경우 `SET ..., updated_at = NOW()` 자동 주입
+- **`/ypserver` 5 갭 해소 (세션 24e)**: Windows build skip / prisma migrate / drizzle migrate / Compound Knowledge 링크 추가됨
+- **CSRF 경로 구분**: `/api/v1/*`만 CSRF 면제. `/api/auth/*`는 Referer/Origin 필수
+- **WSL auto-shutdown + /tmp 휘발**: E2E 스크립트는 단일 호출 내부로 통합 필수
 - **`DATABASE_URL?schema=public` 비호환**: psql 직접 호출 시 `sed 's/?schema=public//'` 전처리 필요
-- **Cloudflare Tunnel 간헐 530**: PM2 재시작 직후 발생 가능. `pm2 restart cloudflared`로 복구. QUIC 버퍼 튜닝 권장. 세션 24에서도 배포 직후 재발 → 재기동 1회로 복구.
-- **Vercel plugin 훅 false positive**: 프로젝트 Vercel 미사용. 세션 시작 가이드대로 스킵
-- **information_schema 롤 필터링**: `app_readonly`에서 `table_constraints`/`key_column_usage` 0행. introspection은 `pg_catalog` 사용
-- **프로젝트 단위 테스트 러너 부재**: Vitest 미설치. 순수 함수가 API 통합 경로로만 검증됨
-- **Windows `next build` 불가**: `lightningcss-win32-x64-msvc` optional bin 미설치. WSL2 빌드가 진실 소스
+- **Cloudflare Tunnel 간헐 530**: PM2 재시작 직후 발생 가능 → `pm2 restart cloudflared`로 복구
+- **Vercel plugin 훅 false positive**: 프로젝트 Vercel 미사용 → 세션 시작 가이드대로 스킵
+- **information_schema 롤 필터링**: `app_readonly`에서 `table_constraints`/`key_column_usage` 0행 → introspection은 `pg_catalog` 사용
+- **Windows `next build` 불가**: WSL2 빌드가 진실 소스 (`/ypserver --skip-win-build` 옵션 사용)
 - **proxy.ts `runtime` 선언 금지**: Next.js 16 proxy.ts는 암시적 Node.js 런타임
-- **Cloudflare Tunnel WSL2 재기동**: systemd 비활성 환경에서 Windows 재시작 시 PM2 데몬 자체가 사라질 수 있음 — `pm2 resurrect` 또는 WSL systemd 활성 검토
-
-## 세션 24 Compound Knowledge 후보 (미작성 — 다음 세션 추출)
-
-- `docs/solutions/2026-04-18-raw-sql-updatedat-bump.md` — Prisma `@updatedAt` 클라이언트 한계 + raw SQL 경로에서 낙관적 잠금 구현 시 서버측 auto-bump 필수
-- `docs/solutions/2026-04-18-subagent-driven-pragmatism.md` — 플랜에 완전 코드 포함 시 subagent reviewer 2회 dispatch 대신 controller diff 검증이 효율적
+- **Cloudflare Tunnel WSL2 재기동**: systemd 비활성 환경에서 Windows 재시작 시 `pm2 resurrect` 또는 systemd 활성 검토
 
 ## 사용자 기록 (메모리)
 
-- [자율 실행 우선](../../../../Users/smart/.claude/projects/E--00-develop-260406-luckystyle4u-server/memory/feedback_autonomy.md) — 분기 질문 금지, 권장안 즉시 채택 (파괴적 행동만 예외). 세션 24 시작 시 사용자 명시 지시.
+- [자율 실행 우선](../../../../Users/smart/.claude/projects/E--00-develop-260406-luckystyle4u-server/memory/feedback_autonomy.md) — 분기 질문 금지, 권장안 즉시 채택 (파괴적 행동만 예외). 세션 24/25에서 활발히 적용
 
 ---
 [← handover/_index.md](./_index.md)

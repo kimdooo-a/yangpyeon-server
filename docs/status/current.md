@@ -104,6 +104,7 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && rm -rf src .next && cp
 | 24c | 2026-04-18 | Phase 14c-γ 권한 매트릭스 E2E — ADMIN/MANAGER/USER × 4op = 13 시나리오 전 PASS. 테스트 계정 seed via /api/settings/users + teardown 비활성. ADR-006. USER-as-VIEWER(SELECT 허용) 별도 spec 이관 | [2026-04](../logs/2026-04.md) | (handover skip — current/journal로 충분) |
 | 24d | 2026-04-18 | 방향 C Vitest 도입 — 3 라이브러리 유닛 테스트 89개 전 PASS(identifier 10 / coerce 25 / table-policy 54). npm scripts(test/watch/coverage) + vitest.config. ADR-003 §5 재활성화 | [2026-04](../logs/2026-04.md) | (handover skip) |
 | 24e | 2026-04-18 | 방향 B `/ypserver` 스킬 보강 — 5 갭 해소: Phase 1 `--skip-win-build` 옵션, Phase 2-2 `prisma migrate deploy`, `cp -r prisma`, Phase 2-4 Drizzle `npm run db:migrate`, Compound Knowledge 링크. 글로벌 `~/.claude/skills/ypserver/SKILL.md` 갱신(git 미추적) | [2026-04](../logs/2026-04.md) | (skill 파일 직접 갱신) |
+| 25 | 2026-04-18 | **Supabase 100점 평가 + kdywave Wave 1 완료** — 14 카테고리 평가표(절대 55 / 가중 60) → `/kdywave -- 각 카테고리별 100점 목표 연구` → Phase 0/1 자율 압축 → Round 1+2 분할 5+5 Agent 병렬 발사. **33 deep-dive / 26,941줄 / 9 DQ 잠정 답변(DQ-1.1~1.9) / 64 신규 DQ**. 사전 스파이크 4건(Postgres CDC / isolated-vm v6 / SeaweedFS+CF Tunnel / WebAuthn @ stylelucky4u.com) 모두 "조건부 GO". Compound Knowledge 2건(단일 vs 하이브리드 9:5 / PG 확장 vs 자체구현 7건 기준) 추출. 다음 세션 `/kdywave --resume`으로 Wave 2 진입 권장 | [2026-04](../logs/2026-04.md) | [인수인계서](../handover/260418-session25-supabase-parity-wave-1.md) |
 
 ## 이슈/메모
 - KT 회선 포트 80/443 차단 → Cloudflare Tunnel 필수

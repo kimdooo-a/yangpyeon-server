@@ -56,7 +56,7 @@ output_dir: docs/research/2026-04-supabase-parity/
 - 사용자 승인: L 규모 + 4개 사전 스파이크 우선 표시 (Postgres CDC, isolated-vm v2, MinIO, WebAuthn)
 
 ## Phase 2: Wave 실행 루프 🔄
-### Wave 1: 기초 deep-dive 🔄 (~33 문서, Round 1+2 분할)
+### Wave 1: 기초 deep-dive ✅ (33 문서, ~26,941줄, 14 카테고리 전부)
   - **Round 1 ✅ (5 Agent, 15 deep-dive, 12,862줄)** — 2026-04-18 09:09 완료
     - Storage: SeaweedFS 4.25 / Garage 3.72 / MinIO 3.09 → DQ-1.3 = SeaweedFS (40→90~95점)
     - Edge Functions: Deno embed 4.22 / isolated-vm v6 3.85 / Vercel Sandbox 3.55 → DQ-1.4 = 3층 하이브리드 (45→92~95)
@@ -65,12 +65,18 @@ output_dir: docs/research/2026-04-supabase-parity/
     - Table Editor: TanStack v8 + 14c-α 자체구현 (현 노선 유지) → DQ-1.9 답 (75→100, 14c-α/β/14d/14e 4단)
     - 사전 스파이크 4건 모두 "조건부 GO" 결론
     - 신규 DQ 15건 등록 (DQ-1.10~1.24, 글로벌 시퀀스)
-  - **Round 2 🔄 (5 Agent, 18 deep-dive)** — 진행 중
-    - F: SQL Editor (3) — sqlpad / outerbase / Supabase Studio 패턴
-    - G: Schema Viz + DB Ops (4) — Prisma Studio + drizzle-kit / pg_cron + wal-g
-    - H: Auth Core + Advisors (4) — Lucia + Auth.js v6 / splinter + squawk
-    - I: Data API (3) — pg_graphql + PostGraphile + pgmq
-    - J: Observability + UX + Operations (4) — pgsodium / Vercel AI SDK / GitHub Actions
+  - **Round 2 ✅ (5 Agent, 18 deep-dive, ~14,079줄)** — 2026-04-18 14:46 완료
+    - F: SQL Editor — supabase-studio 4.70 / outerbase 4.06 / sqlpad 3.45 → 100점 4단(14c~14f, 40일)
+    - G: Schema Viz + DB Ops — schemalint 4.42 / wal-g 4.41 / Trigger·Function 4.31 / node-cron 4.32 / 자체 RLS 4.18 → /database/{policies,functions,triggers} 신설, RPO 60초
+    - H: Auth Core + Advisors — splinter port 4.00 / squawk+schemalint 3.88 / Lucia 패턴 3.50 / Auth.js 패턴 3.45 → 3-Layer Advisor + 자체 Session 테이블
+    - I: Data API — pgmq 4.34 / PostGraphile 4.31 / pg_graphql 4.21 → pg_graphql 1순위(보류) + pgmq+SQLite 채택, 45→80~85
+    - J: Observability + UX + Ops — node:crypto envelope 0.86 / JWKS 0.88 / AI SDK v6 0.84 / Capistrano 0.87 → 모두 단일 솔루션 채택
+  - **Wave 1 종합 결론**:
+    - DQ-1.1~1.9 모두 잠정 답변 확정
+    - 신규 DQ 64건 등록 (Wave 2~5에서 답변)
+    - **Compound Knowledge**: 카테고리는 "하이브리드 필수형(9)" vs "단일 솔루션형(5)" 두 그룹 — Wave 4 청사진의 분류 축
+
+### Wave 2: 비교 매트릭스 + 1:1 비교 🔄 — 다음 세션 권장
 ### Wave 2: 비교 매트릭스 ⏳ (~28 문서)
 ### Wave 3: 비전·요구사항 ⏳ (~6 문서)
 ### Wave 4: 아키텍처 청사진 ⏳ (~14 문서)
