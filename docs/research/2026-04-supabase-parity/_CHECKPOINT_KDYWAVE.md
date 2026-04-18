@@ -3,12 +3,23 @@ skill: kdywave
 status: in-progress
 last_completed_phase: 2
 last_completed_wave: 3
+wave_4_started: 2026-04-18T19:00:00+09:00
 started: 2026-04-18T08:38:00+09:00
 wave_2_completed: 2026-04-18T17:30:00+09:00
 wave_3_completed: 2026-04-18T15:41:00+09:00
 scale: L
 total_waves: 5
 output_dir: docs/research/2026-04-supabase-parity/
+wave_4_plan:
+  total_docs: 26
+  arch_docs: 17
+  uiux_docs: 5
+  integration_docs: 4
+  agents: 11
+  rounds: 3
+  tier_1: "A1 opus — system-overview + adr-log + data-model-erd"
+  tier_2: "B1~B7 sonnet × 7 — 15 카테고리 blueprint 병렬"
+  tier_3: "U1 + I1 + I2 sonnet × 3 — UI/UX 5 + Integration 4 병렬"
 ---
 
 # kdywave 체크포인트 — Supabase 100점 동등성 연구
@@ -109,7 +120,24 @@ output_dir: docs/research/2026-04-supabase-parity/
   - ADR-001 확정: Multi-tenancy 의도적 제외 + 재검토 트리거 4개 정량화
   - 누적: Wave 1+2+3 = **72 문서 / 53,542줄**
 
-### Wave 4: 아키텍처 청사진 ⏳ (~20-30 문서) — 다음 세션 권장
+### Wave 4: 아키텍처 청사진 🔄 진행 중 (계획 26 문서 / 11 에이전트)
+  - **Tier 1 선행 (A1 opus, 3 문서)** 🚀 발사
+    - 02-architecture/00-system-overview.md — 전체 시스템 "지도"
+    - 02-architecture/01-adr-log.md — 누적 ADR (ADR-002~ 최소 10건)
+    - 02-architecture/02-data-model-erd.md — Prisma + SQLite 통합 ERD
+  - **Tier 2 병렬 (B1~B7 sonnet × 7, 15 카테고리 Blueprint)** ⏳
+    - B1 보안: 03-auth-advanced + 06-auth-core
+    - B2 운영: 04-observability + 05-operations
+    - B3 compute: 07-storage + 10-edge-functions
+    - B4 editor: 08-sql-editor + 09-table-editor
+    - B5 data delivery: 11-realtime + 15-data-api
+    - B6 DB 관리: 12-schema-visualizer + 13-db-ops + 14-advisors
+    - B7 cross-cutting: 16-ux-quality
+  - **Tier 3 병렬 (U1 + I1 + I2 sonnet × 3, UI/UX 5 + Integration 4)** ⏳
+    - U1: 03-ui-ux/ 전체 5 문서
+    - I1: 04-integration/00-overview + 01-postgres-extensions
+    - I2: 04-integration/02-cloudflare-deployment + 03-external-services
+
 ### Wave 5: 로드맵·스파이크 ⏳ (~10-15 문서)
 
 ## Phase 3: Wave 검증 ⏳
