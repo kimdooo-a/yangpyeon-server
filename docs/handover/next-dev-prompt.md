@@ -31,10 +31,12 @@ npm run dev
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260418-session26-supabase-parity-wave-2.md   ⭐ 최신 (세션 26 완료)
+docs/handover/260418-session27-supabase-parity-wave-3.md   ⭐ 최신 (세션 27 완료)
+docs/handover/260418-session26-supabase-parity-wave-2.md
 docs/handover/260418-session25-supabase-parity-wave-1.md
-docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1+2 마스터 인덱스
+docs/research/2026-04-supabase-parity/README.md            ⭐ Wave 1+2+3 마스터 인덱스
 docs/research/2026-04-supabase-parity/_CHECKPOINT_KDYWAVE.md
+docs/research/2026-04-supabase-parity/00-vision/           ⭐ Wave 3 산출물 11 문서
 docs/solutions/2026-04-18-kdywave-hybrid-vs-monolithic-pattern.md   ⭐ Compound Knowledge 1
 docs/solutions/2026-04-18-pg-extension-vs-self-impl-decision.md     ⭐ Compound Knowledge 2
 docs/handover/260418-session24-phase-14c-alpha.md
@@ -43,7 +45,7 @@ docs/handover/260417-session23-phase-14c-updated-at-fix.md
 docs/MASTER-DEV-PLAN.md
 ```
 
-## 현재 상태 (세션 25 종료 시점)
+## 현재 상태 (세션 27 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~13 전부 완료
@@ -58,6 +60,7 @@ docs/MASTER-DEV-PLAN.md
 - 방향 B `/ypserver` 보강 (세션 24e): 5 갭 해소(Windows skip / prisma migrate / drizzle / Compound Knowledge 링크)
 - **세션 25**: Supabase 100점 평가(절대 55/가중 60) + **kdywave Wave 1 완료(33 deep-dive, 26,941줄)**
 - **세션 26**: **kdywave Wave 2 완료(28 매트릭스+1:1, 18,251줄)** — 7 Agent 병렬, 역방향 피드백 0건, 누적 61 문서 / 45,192줄
+- **세션 27**: **kdywave Wave 3 완료(비전+FR/NFR+DQ 재분배, 11 문서 / 8,350줄)** — 7 Agent 병렬(V/R opus, M sonnet). 100점 총 공수 **1,008h(~50주)**, 3년 TCO **$950~2,150 절감**, MVP=Phase 15~17. ADR-001 Multi-tenancy 의도적 제외(재검토 트리거 4). 누적 **72 문서 / 53,542줄**
 
 ### Wave 1 결과 — 14 카테고리 1순위 + 100점 청사진
 | # | 카테고리 | 1순위 결정 | 100점 단계 |
@@ -84,9 +87,9 @@ docs/MASTER-DEV-PLAN.md
 - **신규 DQ 64건**: Wave 2 매트릭스에서 글로벌 시퀀스로 통합 재할당 예정
 
 ### 배포 상태 ✅
-- **원격 main**: 세션 24e `66895a4` 이후 세션 25에서 단일 마무리 커밋 추가
-- **프로덕션(WSL2 PM2)**: 세션 25는 코드 변경 없음 — 재배포 불필요
-- **세션 24/24b/24c/24d/24e의 미커밋 잔재**(playwright.config.ts, vitest, src/, scripts/, 4 solutions, test-results/)는 세션 25 종료 커밋에 통합
+- **원격 main**: 세션 27에서 Wave 3 11 문서 + 메타 + `.gitignore` 보강 단일 커밋
+- **프로덕션(WSL2 PM2)**: 세션 27은 코드 변경 없음 — 재배포 불필요
+- **세션 24/24b/24c/24d/24e의 미커밋 잔재**는 세션 25 종료 커밋에 통합됨 (세션 27 기준 `.gitignore`에 `test-results/` + `playwright-report/` 추가로 이후 재발 방지)
 
 ### 검증 결과 (세션 25)
 | 항목 | 결과 |
@@ -111,36 +114,44 @@ docs/MASTER-DEV-PLAN.md
 
 ## 추천 다음 작업
 
-### 우선순위 1: kdywave Wave 3 진입 (권장 — 자연스러운 연속) ⭐
+### 우선순위 1: kdywave Wave 4 진입 (권장 — 자연스러운 연속) ⭐
 ```
 /kdywave --resume
 ```
-- Phase 2 Wave 3 — 비전 + FR/NFR + CON/ASM = 11 문서 (CHECKPOINT에 7 Agent pre-plan 기록 완료)
-- V1 (opus) 00-product-vision / V2 (opus) 01-user-stories / R1 (opus) 02-FR / R2 (opus) 03-NFR + 04-CON_ASM
-- M1 (sonnet) 05-100점-definition + 06-operational-persona / M2 (sonnet) 07-dq-matrix + 08-threat-model / M3 (sonnet) 09-multi-tenancy-decision + 10-14-categories-priority
-- Wave 3 완료 후 Wave 4(아키텍처 청사진 20-30) → Wave 5(로드맵 + 스파이크 10-15)
+- Phase 2 Wave 4 — 카테고리별 아키텍처 청사진 **20~30 문서**
+- 입력: Wave 3의 55 FR + 38 NFR + CON/ASM 12씩 + ADR-001 + DQ 매트릭스 + Phase 15-22 매핑
+- 중심축: Wave 1+2 Compound Knowledge 2건(하이브리드 9:5 / 1:1 계층 분리) + Wave 3 `14-categories-priority.md`
+- Wave 4 완료 후 Wave 5(로드맵 + 스파이크 10~15)
 
-### 우선순위 2: Wave 1 결과 기반 즉시 코드 작업 가능 항목
-- **DQ-1.3 SeaweedFS 1주 PoC**: Storage 40→90 (단일 솔루션형 카테고리, 빠른 ROI)
-- **DQ-1.7 pgmq 도입 spec 작성**: Data API Queue 영역 0→90 (확장 1줄 설치)
-- **DQ-1.1 Phase 15 (otplib TOTP)**: Auth Advanced 15→27 (단일 Phase, 30h)
+### 우선순위 2: MVP 즉시 착수 가능 영역 (Wave 4 대기 없이도 가능)
+- **DQ-1.3 SeaweedFS 1주 PoC**: Storage 40→90 (단일 솔루션형, 빠른 ROI)
+- **DQ-1.1 Phase 15 otplib TOTP**: Auth Advanced 15→27 (30h 단일 Phase)
+- **DQ-1.7 pgmq 도입 spec 작성**: Data API Queue 0→90 (확장 1줄)
 
-### 우선순위 3: Phase 14c-γ USER-as-VIEWER 분리 spec
-- 세션 24c에서 권한 매트릭스 13 시나리오 PASS했으나 USER role의 SELECT 허용 정책은 별도 spec 이관됨 (ADR-006)
-- 다음 세션에서 spec 작성 → 구현
+### 우선순위 3: Cloudflare Tunnel 후속 5건 (세션 25-B 위임)
+1. WSL2 `sysctl` `tcp_keepalive` + `rmem`/`wmem`
+2. WSL systemd 활성화 (idle shutdown 방지)
+3. `cloudflared` 다중 인스턴스
+4. Cloudflare WARP
+5. auto-restart cron
+
+### 우선순위 4: Phase 14c-γ USER-as-VIEWER 분리 spec
+- 세션 24c에서 권한 매트릭스 13 시나리오 PASS, USER role SELECT 허용 정책은 별도 spec 이관 (ADR-006)
+- 세션 25-A에서 VIEWER 확장 구현 + 25-B 라이브 매트릭스 전 PASS 확인됨 → spec 문서화만 남음
 
 ### 진입점 예시
 ```
-/kdywave --resume                       # Wave 2 진입 (권장)
+/kdywave --resume                       # Wave 4 진입 (권장)
 /kdyguide --start                        # 현 상태 브리핑 + 방향 추천
 /kdyguide --route "SeaweedFS PoC"        # Wave 1 결과 즉시 코드화
-/kdyguide --route "USER-as-VIEWER spec"  # Phase 14c-γ 후속
+/kdyguide --route "TOTP Phase 15"        # Auth Advanced MVP 착수
 ```
 
 ## 알려진 이슈 및 주의사항
 
-- **Wave 1+2 완료, Wave 3~5 미진입**: ~91 문서 중 61 완료 (45,192줄). 다음 세션에서 Wave 3 권장
-- **Wave 2에서 역방향 피드백 0건**: Wave 1 채택안 14/14 모두 민감도 분석 1위 유지 — 후속 Wave 3/4/5 작업 기반 견고
+- **Wave 1+2+3 완료, Wave 4~5 미진입**: ~91 문서 중 **72 완료** (53,542줄, 79%). 다음 세션에서 Wave 4(청사진) 권장
+- **Wave 2에서 역방향 피드백 0건**: Wave 1 채택안 14/14 모두 민감도 분석 1위 유지 — Wave 4 기반 견고
+- **Wave 3 입력 집약**: ADR-001(Multi-tenancy 제외) + 55 FR + 38 NFR + 64 DQ 재분배 완료 — Wave 4에서 청사진 설계에 직접 투입 가능
 - **DQ-12.3 추가 확정**: MASTER_KEY=`/etc/luckystyle4u/secrets.env` (root:ypb-runtime 0640) + PM2 `env_file`
 - **정량화된 재고 조건 명시됨**: Garage(3조건) / pg_graphql(4 수요 트리거 중 2+) / Docker(0조건 충족) / AWS KMS(2 트리거 중 1) — 환경 변화 시 트리거만 점검하면 됨
 - **Wave 1+2 누적 줄 수 45,192줄 컨텍스트 부담**: Wave 3 진입 시 README 마스터 + 필요 매트릭스만 selective read 권장. 에이전트별 L3 프롬프트에 읽을 파일 경로 명시 필수

@@ -2,9 +2,10 @@
 skill: kdywave
 status: in-progress
 last_completed_phase: 2
-last_completed_wave: 2
+last_completed_wave: 3
 started: 2026-04-18T08:38:00+09:00
 wave_2_completed: 2026-04-18T17:30:00+09:00
+wave_3_completed: 2026-04-18T15:41:00+09:00
 scale: L
 total_waves: 5
 output_dir: docs/research/2026-04-supabase-parity/
@@ -92,16 +93,23 @@ output_dir: docs/research/2026-04-supabase-parity/
     - **"1:1 비교는 계층 분리를 드러낸다"** — wal2json vs supabase-realtime, isolated-vm vs Deno, splinter vs squawk 모두 "경쟁이 아니라 역할 분담" 결론, Wave 4 청사진의 계층 설계에 직접 반영
     - **Compound Knowledge 재검증**: Wave 1의 "하이브리드 9 : 단일 5" 분류가 Wave 2 매트릭스 점수 분포에서도 그대로 유지 — Wave 4 청사진 구조 축 확정
 
-### Wave 3: 비전·요구사항 🔄 실행 중 (11 문서, 7 Agent 병렬) — 2026-04-18 세션 26
-  - **V1 (opus)**: 00-product-vision.md
-  - **V2 (opus)**: 01-user-stories.md
-  - **R1 (opus)**: 02-functional-requirements.md
-  - **R2 (opus)**: 03-non-functional-requirements.md + 04-constraints-assumptions.md
-  - **M1 (sonnet)**: 05-100점-definition.md + 06-operational-persona.md
-  - **M2 (sonnet)**: 07-dq-matrix.md + 08-security-threat-model.md
-  - **M3 (sonnet)**: 09-multi-tenancy-decision.md + 10-14-categories-priority.md
-  - 출력: 00-vision/00~10-*.md
-### Wave 4: 아키텍처 청사진 ⏳ (~20-30 문서)
+### Wave 3: 비전·요구사항 ✅ 완료 (11 문서, 8,350줄, 7 Agent 병렬) — 2026-04-18 15:41 완료
+  - **V1 (opus, 620줄)**: 00-product-vision.md — A1~A7 전체, 페르소나 3인(김도영/박민수/이수진), 핵심 가치 5종
+  - **V2 (opus, 830줄)**: 01-user-stories.md — 7 Epic × 36 스토리 (Must 69%, Gherkin 완비), Won't 10건 명시
+  - **R1 (opus, 1,477줄)**: 02-functional-requirements.md — 14 FR 카테고리 × 55 FR (P0 49.1%, P1 40%, P2 10.9%)
+  - **R2 (opus, 920줄)**: 03-NFR(500줄, 38 NFR) + 04-CON+ASM(420줄, CON 12 / ASM 12)
+  - **M1 (sonnet, 884줄)**: 05-100점-definition(435줄, 14카 × 4단계 60/80/95/100) + 06-operational-persona(449줄, 페르소나 3 + 비페르소나 4)
+  - **M2 (sonnet, 2,430줄)**: 07-dq-matrix(1,648줄, 64 DQ 전수 + 폐기 4건, Wave 3=20 / 4=28 / 5=16) + 08-security-threat-model(782줄, STRIDE 29 위협 + 자체호스팅 특화 5)
+  - **M3 (sonnet, 1,189줄)**: 09-multi-tenancy-decision(621줄, ADR-001 + 재검토 트리거 4) + 10-14-categories-priority(568줄, Phase 15-22 매핑 preview)
+- **Wave 3 종합 결론**:
+  - 100점 도달 총 공수 추정: Wave 1 확정 548h + Wave 3 추정 460h = **1,008h (~50주)**
+  - 3년 TCO 절감: Supabase Cloud $1,200~2,400 vs 양평 $250 = **$950~2,150 절감**
+  - MVP 범위: Phase 15~17 (Auth Advanced + Observability/Ops + Auth Core/Storage)
+  - DQ 재분배 완료: Wave 3에서 20건 답변 (FR/NFR에 반영), Wave 4 28건, Wave 5 16건
+  - ADR-001 확정: Multi-tenancy 의도적 제외 + 재검토 트리거 4개 정량화
+  - 누적: Wave 1+2+3 = **72 문서 / 53,542줄**
+
+### Wave 4: 아키텍처 청사진 ⏳ (~20-30 문서) — 다음 세션 권장
 ### Wave 5: 로드맵·스파이크 ⏳ (~10-15 문서)
 
 ## Phase 3: Wave 검증 ⏳
