@@ -2,8 +2,15 @@
 # Phase 14c-β 복합 PK 지원 — E2E
 # 실행: wsl -e bash -c "bash /mnt/e/00_develop/260406_luckystyle4u_server/scripts/e2e/phase-14c-beta-curl.sh"
 #
-# Setup: _test_composite 임시 테이블 생성 (postgres 수퍼유저 필요)
-# Teardown: 스크립트 종료 시 테이블 DROP
+# Setup/Teardown은 외부에서 수행 (비대화형 sudo 제약 회피):
+#   wsl -d Ubuntu -u postgres -- psql -d luckystyle4u -c "
+#     DROP TABLE IF EXISTS _test_composite;
+#     CREATE TABLE _test_composite (tenant_id UUID NOT NULL, item_key TEXT NOT NULL,
+#       value TEXT, updated_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY (tenant_id, item_key));
+#     GRANT SELECT, INSERT, UPDATE, DELETE ON _test_composite TO app_readwrite;
+#     GRANT SELECT ON _test_composite TO app_readonly;"
+# Teardown:
+#   wsl -d Ubuntu -u postgres -- psql -d luckystyle4u -c "DROP TABLE _test_composite;"
 
 DASH_EMAIL='kimdooo@stylelucky4u.com'
 DASH_PASS='<ADMIN_PASSWORD>'
@@ -13,20 +20,7 @@ rm -f "$COOKIE"
 
 echo "===== Phase 14c-β E2E ====="
 
-# --- Setup: _test_composite 테이블 생성 ---
-sudo -u postgres psql -d luckystyle4u <<'SQL' 2>&1 | tail -3
-DROP TABLE IF EXISTS _test_composite;
-CREATE TABLE _test_composite (
-  tenant_id UUID NOT NULL,
-  item_key TEXT NOT NULL,
-  value TEXT,
-  updated_at TIMESTAMP DEFAULT NOW(),
-  PRIMARY KEY (tenant_id, item_key)
-);
-GRANT SELECT, INSERT, UPDATE, DELETE ON _test_composite TO app_readwrite;
-GRANT SELECT ON _test_composite TO app_readonly;
-SQL
-echo "SETUP: _test_composite 테이블 생성"
+echo "SETUP: _test_composite 테이블은 외부에서 준비됨 전제"
 echo
 
 # --- 로그인 ---
@@ -50,12 +44,12 @@ INSERT_RES=$(curl -s -b "$COOKIE" -X POST "$DASH_BASE/api/v1/tables/_test_compos
   -H 'Content-Type: application/json' \
   -d "{\"values\":{\"tenant_id\":{\"action\":\"set\",\"value\":\"$TENANT_ID\"},\"item_key\":{\"action\":\"set\",\"value\":\"k1\"},\"value\":{\"action\":\"set\",\"value\":\"initial\"}}}")
 INITIAL_UPDATED_AT=$(echo "$INSERT_RES" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["data"]["row"]["updated_at"])' 2>/dev/null)
-[ -z "$INITIAL_UPDATED_AT" ] && { echo "FAIL: seed INSERT — $INSERT_RES"; sudo -u postgres psql -d luckystyle4u -c "DROP TABLE _test_composite;"; exit 1; }
+[ -z "$INITIAL_UPDATED_AT" ] && { echo "FAIL: seed INSERT — $INSERT_RES"; exit 1; }
 echo "OK: seed (tenant_id=$TENANT_ID, item_key=k1, updated_at=$INITIAL_UPDATED_AT)"
 echo
 
 # --- B1 정상 PATCH (락 일치) ---
-B1=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/_composite" \
+B1=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/composite" \
   -H 'Content-Type: application/json' \
   -d "{\"pk_values\":{\"tenant_id\":\"$TENANT_ID\",\"item_key\":\"k1\"},\"values\":{\"value\":{\"action\":\"set\",\"value\":\"B1\"}},\"expected_updated_at\":\"$INITIAL_UPDATED_AT\"}" \
   -w "\n__HTTP__%{http_code}")
@@ -67,7 +61,7 @@ fi
 echo
 
 # --- B2 CONFLICT (구 timestamp) ---
-B2=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/_composite" \
+B2=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/composite" \
   -H 'Content-Type: application/json' \
   -d "{\"pk_values\":{\"tenant_id\":\"$TENANT_ID\",\"item_key\":\"k1\"},\"values\":{\"value\":{\"action\":\"set\",\"value\":\"B2\"}},\"expected_updated_at\":\"$INITIAL_UPDATED_AT\"}" \
   -w "\n__HTTP__%{http_code}")
@@ -80,7 +74,7 @@ echo
 
 # --- B3 NOT_FOUND (존재하지 않는 pk_values) ---
 FAKE_TENANT=$(python3 -c 'import uuid; print(uuid.uuid4())')
-B3=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/_composite" \
+B3=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/composite" \
   -H 'Content-Type: application/json' \
   -d "{\"pk_values\":{\"tenant_id\":\"$FAKE_TENANT\",\"item_key\":\"nope\"},\"values\":{\"value\":{\"action\":\"set\",\"value\":\"x\"}}}" \
   -w "\n__HTTP__%{http_code}")
@@ -92,7 +86,7 @@ fi
 echo
 
 # --- B4 PK_VALUES_INCOMPLETE ---
-B4=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/_composite" \
+B4=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/composite" \
   -H 'Content-Type: application/json' \
   -d "{\"pk_values\":{\"tenant_id\":\"$TENANT_ID\"},\"values\":{\"value\":{\"action\":\"set\",\"value\":\"x\"}}}" \
   -w "\n__HTTP__%{http_code}")
@@ -104,7 +98,7 @@ fi
 echo
 
 # --- B5 UNKNOWN_PK_COLUMN ---
-B5=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/_composite" \
+B5=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/_test_composite/composite" \
   -H 'Content-Type: application/json' \
   -d "{\"pk_values\":{\"tenant_id\":\"$TENANT_ID\",\"item_key\":\"k1\",\"bogus\":\"x\"},\"values\":{\"value\":{\"action\":\"set\",\"value\":\"x\"}}}" \
   -w "\n__HTTP__%{http_code}")
@@ -115,8 +109,8 @@ else
 fi
 echo
 
-# --- B6 NOT_COMPOSITE (단일 PK 테이블에 /_composite 호출) ---
-B6=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/folders/_composite" \
+# --- B6 NOT_COMPOSITE (단일 PK 테이블에 /composite 호출) ---
+B6=$(curl -s -b "$COOKIE" -X PATCH "$DASH_BASE/api/v1/tables/folders/composite" \
   -H 'Content-Type: application/json' \
   -d "{\"pk_values\":{\"id\":\"whatever\"},\"values\":{\"name\":{\"action\":\"set\",\"value\":\"x\"}}}" \
   -w "\n__HTTP__%{http_code}")
@@ -140,7 +134,7 @@ fi
 echo
 
 # --- B8 DELETE (복합 PK) ---
-B8=$(curl -s -b "$COOKIE" -X DELETE "$DASH_BASE/api/v1/tables/_test_composite/_composite" \
+B8=$(curl -s -b "$COOKIE" -X DELETE "$DASH_BASE/api/v1/tables/_test_composite/composite" \
   -H 'Content-Type: application/json' \
   -d "{\"pk_values\":{\"tenant_id\":\"$TENANT_ID\",\"item_key\":\"k1\"}}" \
   -w "\n__HTTP__%{http_code}")
@@ -163,6 +157,5 @@ else
 fi
 echo
 
-# --- Teardown ---
-sudo -u postgres psql -d luckystyle4u -c "DROP TABLE _test_composite;" > /dev/null
-echo "TEARDOWN: _test_composite 테이블 DROP"
+# --- Teardown: 외부에서 별도 수행 (스크립트 종료 후) ---
+echo "TEARDOWN: 외부 DROP 수행 필요 (`wsl -d Ubuntu -u postgres -- psql -d luckystyle4u -c 'DROP TABLE _test_composite;'`)"
