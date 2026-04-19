@@ -1,19 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /**
- * 세션 39 — cleanupExpiredSessions 는 PG 서버측 NOW()-INTERVAL 로 filter 를 위임하여
- * Prisma 7 + adapter-pg + TIMESTAMP(3) timezone-naive 조합에서의 9시간 KST 오프셋을 우회.
- * `$queryRaw` + `$executeRaw` 만 모킹.
+ * 세션 40 — TIMESTAMPTZ 마이그레이션 후에도 Prisma 7 adapter-pg 의 binding-side
+ * TZ 시프트가 별도 존재함이 E2E 에서 재확인됨. 정공법은 SELECT 의 cutoff 를
+ * PG 측 `NOW() - INTERVAL '1 day'` 로 위임. DELETE 는 ORM `deleteMany` 사용.
  */
-const { mockQueryRaw, mockExecuteRaw } = vi.hoisted(() => ({
+const { mockQueryRaw, mockDeleteMany } = vi.hoisted(() => ({
   mockQueryRaw: vi.fn(),
-  mockExecuteRaw: vi.fn(),
+  mockDeleteMany: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     $queryRaw: mockQueryRaw,
-    $executeRaw: mockExecuteRaw,
+    session: {
+      deleteMany: mockDeleteMany,
+    },
   },
 }));
 
@@ -58,83 +60,67 @@ describe("buildSessionExpireAuditDetail — 만료 세션 감사 payload", () =>
   });
 });
 
-describe("cleanupExpiredSessions — 만료 1일 경과 세션 정리 (raw SQL)", () => {
-  it("만료 세션 entries + 삭제 건수 반환", async () => {
+describe("cleanupExpiredSessions — raw SELECT (PG NOW()-INTERVAL) + ORM deleteMany", () => {
+  it("PG ::text ISO+offset 문자열을 정확한 UTC Date 로 변환", async () => {
     mockQueryRaw.mockResolvedValueOnce([
-      { id: "sess-1", userId: "user-a", expiresAt: "2026-04-01 00:00:00.000" },
-      { id: "sess-2", userId: "user-b", expiresAt: "2026-04-02 00:00:00.000" },
+      { id: "sess-1", userId: "user-a", expiresAt: "2026-04-01 00:00:00.000+00" },
+      { id: "sess-2", userId: "user-b", expiresAt: "2026-04-02 00:00:00.000+00" },
     ]);
-    mockExecuteRaw.mockResolvedValueOnce(2);
+    mockDeleteMany.mockResolvedValueOnce({ count: 2 });
 
     const result = await cleanupExpiredSessions();
     expect(result.deleted).toBe(2);
     expect(result.expiredEntries).toHaveLength(2);
     expect(result.expiredEntries[0].id).toBe("sess-1");
-    expect(result.expiredEntries[0].userId).toBe("user-a");
     expect(result.expiredEntries[0].expiresAt).toBeInstanceOf(Date);
     expect(result.expiredEntries[0].expiresAt.toISOString()).toBe(
       "2026-04-01T00:00:00.000Z",
     );
   });
 
-  it("만료 세션 0건 시 $executeRaw 호출 없이 빈 배열 반환", async () => {
+  it("PG ::text +09 KST offset 문자열도 정확한 UTC Date 로 변환", async () => {
+    mockQueryRaw.mockResolvedValueOnce([
+      { id: "s1", userId: "u1", expiresAt: "2026-04-18 14:14:19.232+09" },
+    ]);
+    mockDeleteMany.mockResolvedValueOnce({ count: 1 });
+
+    const result = await cleanupExpiredSessions();
+    expect(result.expiredEntries[0].expiresAt.toISOString()).toBe(
+      "2026-04-18T05:14:19.232Z",
+    );
+  });
+
+  it("만료 세션 0건 시 deleteMany 호출 없이 빈 배열 반환", async () => {
     mockQueryRaw.mockResolvedValueOnce([]);
 
     const result = await cleanupExpiredSessions();
     expect(result.deleted).toBe(0);
     expect(result.expiredEntries).toEqual([]);
-    expect(mockExecuteRaw).not.toHaveBeenCalled();
+    expect(mockDeleteMany).not.toHaveBeenCalled();
   });
 
-  it("PG 서버측 NOW()-INTERVAL filter 위임 — SELECT raw SQL 에 NOW()-INTERVAL 포함", async () => {
+  it("SELECT raw SQL 에 PG 측 NOW()-INTERVAL '1 day' + ::text 캐스팅 포함", async () => {
     mockQueryRaw.mockResolvedValueOnce([]);
-
     await cleanupExpiredSessions();
-    // $queryRaw 는 tagged template 으로 호출됨. 첫 인자는 strings 배열.
     const strings = mockQueryRaw.mock.calls[0][0];
     const combined = Array.isArray(strings) ? strings.join("?") : String(strings);
     expect(combined).toMatch(/FROM sessions/i);
     expect(combined).toMatch(/expires_at\s*<\s*NOW\(\)\s*-\s*INTERVAL/i);
     expect(combined).toMatch(/'1 day'/i);
-  });
-
-  it("expires_at::text 캐스팅으로 원본 문자열 보존 (TZ 오프셋 회피)", async () => {
-    mockQueryRaw.mockResolvedValueOnce([]);
-
-    await cleanupExpiredSessions();
-    const strings = mockQueryRaw.mock.calls[0][0];
-    const combined = Array.isArray(strings) ? strings.join("?") : String(strings);
     expect(combined).toMatch(/expires_at::text/i);
   });
 
-  it("PG 반환 공백 구분 timestamp 문자열을 UTC Date 로 변환", async () => {
+  it("DELETE 는 eligible id 만 대상 (deleteMany id IN ids)", async () => {
     mockQueryRaw.mockResolvedValueOnce([
-      { id: "s1", userId: "u1", expiresAt: "2026-04-18 02:32:50.001" },
+      { id: "a", userId: "u1", expiresAt: "2026-04-18 00:00:00.000+00" },
+      { id: "b", userId: "u2", expiresAt: "2026-04-18 00:00:00.000+00" },
     ]);
-    mockExecuteRaw.mockResolvedValueOnce(1);
-
-    const result = await cleanupExpiredSessions();
-    expect(result.expiredEntries[0].expiresAt.toISOString()).toBe(
-      "2026-04-18T02:32:50.001Z",
-    );
-  });
-
-  it("DELETE 는 eligible id 만 대상 (id = ANY(ids))", async () => {
-    mockQueryRaw.mockResolvedValueOnce([
-      { id: "a", userId: "u1", expiresAt: "2026-04-18 00:00:00.000" },
-      { id: "b", userId: "u2", expiresAt: "2026-04-18 00:00:00.000" },
-    ]);
-    mockExecuteRaw.mockResolvedValueOnce(2);
+    mockDeleteMany.mockResolvedValueOnce({ count: 2 });
 
     await cleanupExpiredSessions();
-    // $executeRaw 는 tagged template — 두 번째 값이 바인딩됨. 첫 인자는 strings.
-    const strings = mockExecuteRaw.mock.calls[0][0];
-    const combined = Array.isArray(strings) ? strings.join("?") : String(strings);
-    expect(combined).toMatch(/DELETE FROM sessions/i);
-    expect(combined).toMatch(/id\s*=\s*ANY/i);
-    // 바인딩 인자(2번째부터): ids 배열
-    const boundIds = mockExecuteRaw.mock.calls[0][1];
-    expect(boundIds).toEqual(["a", "b"]);
+    expect(mockDeleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["a", "b"] } },
+    });
   });
 
   it("Prisma 에러 전파 (scheduler 가 상위에서 catch)", async () => {
@@ -142,11 +128,11 @@ describe("cleanupExpiredSessions — 만료 1일 경과 세션 정리 (raw SQL)"
     await expect(cleanupExpiredSessions()).rejects.toThrow("DB 연결 끊김");
   });
 
-  it("$executeRaw 반환값이 BigInt 여도 Number 로 안전 변환", async () => {
+  it("deleteMany count 를 deleted 로 반환", async () => {
     mockQueryRaw.mockResolvedValueOnce([
-      { id: "x", userId: "u", expiresAt: "2026-04-18 00:00:00.000" },
+      { id: "x", userId: "u", expiresAt: "2026-04-18 00:00:00.000+00" },
     ]);
-    mockExecuteRaw.mockResolvedValueOnce(BigInt(1));
+    mockDeleteMany.mockResolvedValueOnce({ count: 1 });
 
     const result = await cleanupExpiredSessions();
     expect(result.deleted).toBe(1);

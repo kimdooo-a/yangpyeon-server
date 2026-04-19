@@ -49,9 +49,9 @@ export async function checkRateLimitDb(
   }
 
   // PG가 직접 reset 잔여 시간을 계산해서 반환.
-  // window_start 컬럼이 timezone-naive (TIMESTAMP(3)) 이라 Prisma 가 JS Date 로 변환하는 과정에서
-  // 시스템 timezone 오프셋(예: KST UTC+9)이 누적되어 elapsedMs 가 어긋나는 버그를 회피.
-  // EXTRACT(EPOCH FROM ...) * 1000 으로 ms 단위 잔여시간을 server-side 에서 계산.
+  // 세션 40에서 컬럼이 TIMESTAMPTZ(3) 으로 마이그레이션되어 9h 시프트는 해소되었으나,
+  // PG 측 EXTRACT(EPOCH FROM (windowStart + windowMs - NOW())) 패턴은 race-safe (UPSERT 한 번에
+  // 카운터 + 잔여시간 동시 결정) 이라 유지. 클라이언트 측 Date.now() 분리 호출은 race window 발생.
   const rows = await prisma.$queryRaw<
     { hits: number; reset_ms: string }[]
   >`
