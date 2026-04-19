@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 37 종료 시점 — Phase 15-D 보강 + revoke 의도-혼동 버그 수정
+## 필수 참조 파일 ⭐ 세션 38 종료 시점 — Phase 15-D 보강 2/5 완결 (touch throttle + activity fingerprint)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session37-revoked-reason-intent-fix.md       ⭐ 최신 (Session.revokedReason intent 태깅 + 자기파괴 버그 수정 + CK 3건 + E2E before/after)
+docs/handover/260419-session38-phase-15d-touch-throttle-ua-label.md  ⭐ 최신 (touch throttle + activity fingerprint + Playwright MCP 브라우저 검증)
+docs/handover/260419-session37-revoked-reason-intent-fix.md       (Session.revokedReason intent 태깅 + 자기파괴 버그 수정 + CK 3건)
 docs/handover/260419-session36-phase-15d-refresh-rotation.md      (Phase 15-D Refresh Rotation + Cleanup 수동 실행 UI + E2E 9 시나리오 PASS)
 docs/handover/260419-session35-cleanup-scheduler-ck-batch.md      (Cleanup Scheduler + CK 4건 + MFA QA 가이드)
 docs/handover/260419-session34-phase15-ui-and-mfa-status.md      (세션 34 UI 통합 + 라이브 디버깅 2건)
@@ -60,7 +61,9 @@ docs/solutions/2026-04-19-*.md (15건)                             ⭐ Compound 
 docs/security/skill-audit-2026-04-19.md                          /ypserver safeguard 감사 PASS
 docs/MASTER-DEV-PLAN.md
 src/lib/cleanup-scheduler.ts                                      세션 35 신설 + 세션 36 CleanupActor 확장
-src/lib/sessions/tokens.ts                                        ⭐ 세션 36 신설 (opaque 토큰 + DB Session rotation)
+src/lib/sessions/activity.ts                                      ⭐ 세션 38 신설 (shouldTouch 60s 디바운스 + parseUserAgent UA label)
+src/lib/sessions/activity.test.ts                                 ⭐ 세션 38 신설 (25 pure function 테스트)
+src/lib/sessions/tokens.ts                                        ⭐ 세션 36 신설 (opaque 토큰 + DB Session rotation), 세션 38 userAgentLabel/lastUsedAt 필드
 src/lib/sessions/login-finalizer.ts                               ⭐ 세션 36 신설 (3 로그인 경로 공통 helper)
 src/app/api/v1/auth/refresh/route.ts                              ⭐ 세션 36 신설 (rotate + reuse 탐지)
 src/app/api/v1/auth/sessions/route.ts                             ⭐ 세션 36 신설 (GET 활성 세션)
@@ -72,7 +75,7 @@ src/instrumentation.ts                                            세션 35 ensu
 prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 (Session.revokedReason TEXT)
 ```
 
-## 현재 상태 (세션 37 종료 시점)
+## 현재 상태 (세션 38 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -83,6 +86,13 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
 - **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
 - **세션 35**: Cleanup Scheduler + CK 4건 + MFA QA 가이드 (commit `a29ac1b`)
+- **세션 38** ⭐ — Phase 15-D 보강 2/5 완결 (touch throttle + activity fingerprint)
+  - `/kdyguide` 자율 실행 위임 → 5 보강 항목 중 가장 작고 독립적·낮은 리스크인 2개 선정
+  - 신규 `src/lib/sessions/activity.ts` — pure function 2개(shouldTouch 60초 디바운스 + parseUserAgent Chrome/Firefox/Safari/Edge × Windows/macOS/Linux/iOS/Android + curl regex)
+  - 신규 `activity.test.ts` +25 tests (TDD, iOS Safari UA regex 1회 fail → 수정: "Safari 토큰 존재 + Chrome/Edge 부재" 조건)
+  - `tokens.ts` SessionLookup lastUsedAt + ActiveSessionSummary userAgentLabel / `sessions/route.ts` shouldTouch 분기 / `security/page.tsx` 라벨+툴팁
+  - **검증**: tsc 0 / vitest 206→**231 PASS**(+25, 회귀 0) / `/ypserver prod --skip-win-build` PM2 ↺=4 / **프로덕션 E2E curl 3 PASS**(throttle·label·touch) / **Playwright MCP 브라우저 자동화 완결** — 로그인→/account/security→"Chrome 147 · Windows" 라벨+raw UA title 툴팁 보존 확인 + 스크린샷 증적
+  - 커밋 `b454e3c`
 - **세션 36** — Phase 15-D Refresh Token Rotation + Cleanup 수동 실행 UI
   - **P4 cleanup UI**: `/api/admin/cleanup/run` POST + `(admin)/settings/cleanup` 페이지. `cleanup-scheduler.ts` CleanupActor 확장(하위 호환). 사이드바 엔트리.
   - **P2 조기 검증**: 수동 트리거로 webauthn-challenges 1건 삭제 실측 + audit actor 정보 확인. 자동 스케줄 KST 03:00 병행.
@@ -130,14 +140,15 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 
 - SQLite `auditLogs` `action='CLEANUP_EXECUTED'` 엔트리 확인 (수동 `_MANUAL` 과 다른 action)
 - 실패 시 원인 조사 — prisma timeout / PG 연결 고갈 / instrumentation 등록 실패
 
-### 우선순위 3: Phase 15-D 추가 보강 (~2-3h)
+### 우선순위 3: Phase 15-D 추가 보강 남은 3건 (~2-3h)
 
-세션 36·37 으로 핵심 경로 + revoke-all + intent 태깅 완결. 남은 관측성·편의성:
+세션 36·37·38 으로 핵심 경로 + revoke-all + intent 태깅 + **touch throttle + activity fingerprint** 완결. 남은 3건:
 - **`SESSION_EXPIRE` audit** — cleanup 시 각 expired row 별 건수 기록 (지금은 통합 CLEANUP_EXECUTED 로만)
-- **activity fingerprint** — UA 파싱해 "Chrome 130 on macOS" 사람 읽기 쉬운 문자열 표시
-- **touch throttle** — GET /sessions 마다 touch 1회 / 요청 현재. 1분 단위 디바운스 가능
 - **관리자 forced revoke** — `/api/admin/users/[id]/sessions DELETE` + `revokedReason="admin"` 활용
-- **HS256 legacy 쿠키 제거** — 세션 33 JWKS ES256 전환 후 24h 만료 초과. `AUTH_SECRET` 제거 + HS256 fallback 코드 정리 가능
+- **HS256 legacy 쿠키 제거** — 세션 33 JWKS ES256 전환 후 24h 만료 초과. `AUTH_SECRET` 제거 + HS256 fallback 코드 정리 가능 (기존 쿠키 무효화 리스크로 단독 세션 권장)
+
+~~touch throttle~~ ✓ 세션 38 완결
+~~activity fingerprint~~ ✓ 세션 38 완결
 
 ### 우선순위 4: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
@@ -165,6 +176,14 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 
 ```
 
 ## 알려진 이슈 및 주의사항
+
+### 세션 38 신규
+
+- **`activity.ts` 는 순수 모듈** — DB·외부 상태·Date.now() 의존 없음(now 주입). route handler 에만 적용, 다른 경로에서 touch 하려면 직접 `shouldTouch` 호출 후 `touchSessionLastUsed` 수동 호출 필요.
+- **UA 라벨은 read-only 변환** — DB 에 raw `userAgent` 만 저장, 응답 시점 `parseUserAgent` 호출. 파싱 로직 변경 시 저장 데이터 마이그레이션 불필요.
+- **`ua-parser-js` 의도적 배제** — 본 프로젝트 UA 탐지 범위는 주류 브라우저 + curl 뿐이라 ~20KB 라이브러리 과투자. 미탐지는 "기타 브라우저 · 기타 OS" fallback. 봇 탐지는 범위 밖.
+- **iOS Safari regex 함정 교훈** — `Version/N ... Safari/N` 사이에 `Mobile/...` 토큰 끼는 패턴에서 `Version\/(\d+)[^\s]*\s+Safari` 실패. "Safari 토큰 존재 + Chrome/Edge 부재" exclusion 조건이 더 견고.
+- **touch throttle 임계치 60초 고정** — `TOUCH_THROTTLE_MS` 상수로 export. 향후 환경변수/설정으로 빼고 싶다면 `shouldTouch(last, now, threshold)` 3번째 인자 활용.
 
 ### 세션 37 신규
 
