@@ -137,14 +137,37 @@ describe("revokeAllExceptCurrent — 세션 37 사용자 자발적 종료", () =
   });
 });
 
-describe("revokeAllUserSessions — defense-in-depth", () => {
-  it("revokedReason='reuse_detected' 로 태깅 (reuse 탐지 출처 식별용)", async () => {
+describe("revokeAllUserSessions — defense-in-depth + admin 강제 revoke (세션 39)", () => {
+  it("reason 미지정 시 default 'reuse_detected' 로 태깅 (기존 refresh route 호환)", async () => {
     mockUpdateMany.mockResolvedValueOnce({ count: 3 });
     const count = await revokeAllUserSessions("user-7");
     expect(count).toBe(3);
     const args = mockUpdateMany.mock.calls[0][0];
     expect(args.where).toEqual({ userId: "user-7", revokedAt: null });
     expect(args.data.revokedReason).toBe("reuse_detected");
+  });
+
+  it("reason='admin' 명시 전달 시 태깅 변경 (관리자 강제 revoke)", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 2 });
+    const count = await revokeAllUserSessions("user-8", "admin");
+    expect(count).toBe(2);
+    const args = mockUpdateMany.mock.calls[0][0];
+    expect(args.where).toEqual({ userId: "user-8", revokedAt: null });
+    expect(args.data.revokedReason).toBe("admin");
+    expect(args.data.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("reason='logout' 명시 전달도 통과 (범용성 확인)", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 1 });
+    await revokeAllUserSessions("user-9", "logout");
+    const args = mockUpdateMany.mock.calls[0][0];
+    expect(args.data.revokedReason).toBe("logout");
+  });
+
+  it("활성 세션 없음 시 count=0 — where 조건은 그대로", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 0 });
+    const count = await revokeAllUserSessions("user-10", "admin");
+    expect(count).toBe(0);
   });
 });
 

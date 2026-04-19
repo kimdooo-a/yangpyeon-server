@@ -1,5 +1,8 @@
 import { writeAuditLogDb } from "@/lib/audit-log-db";
-import { cleanupExpiredSessions } from "@/lib/sessions/cleanup";
+import {
+  cleanupExpiredSessions,
+  buildSessionExpireAuditDetail,
+} from "@/lib/sessions/cleanup";
 import { cleanupExpiredRateLimitBuckets } from "@/lib/rate-limit-db";
 import { cleanupRetiredKeys } from "@/lib/jwks/store";
 import { cleanupExpiredChallenges } from "@/lib/mfa/webauthn";
@@ -68,11 +71,36 @@ export function computeCleanupWindow(
 }
 
 /**
+ * sessions cleanup 실행 + 각 expired row 별 SESSION_EXPIRE 감사 기록 (세션 39).
+ * audit 기록 실패가 삭제 집계에 영향 주지 않도록 try/catch 로 격리.
+ */
+async function runSessionsCleanupWithAudit(): Promise<number> {
+  const result = await cleanupExpiredSessions();
+  for (const entry of result.expiredEntries) {
+    try {
+      writeAuditLogDb({
+        timestamp: new Date().toISOString(),
+        method: "SYSTEM",
+        path: "/internal/cleanup-scheduler/session-expire",
+        ip: "127.0.0.1",
+        action: "SESSION_EXPIRE",
+        detail: buildSessionExpireAuditDetail(entry),
+      });
+    } catch {
+      // eslint-disable-next-line no-console
+      console.warn("[cleanup-scheduler] SESSION_EXPIRE audit write failed", entry.id);
+    }
+  }
+  return result.deleted;
+}
+
+/**
  * 기본 cleanup task 세트 — 4종. 각 함수의 반환값을 "삭제 행 수"로 정규화.
+ * sessions task 는 세션 39 부터 per-row SESSION_EXPIRE 감사 로그를 함께 기록.
  */
 export function defaultCleanupTasks(): CleanupTask[] {
   return [
-    { name: "sessions", run: async () => (await cleanupExpiredSessions()).deleted },
+    { name: "sessions", run: runSessionsCleanupWithAudit },
     { name: "rate-limit", run: () => cleanupExpiredRateLimitBuckets() },
     { name: "jwks", run: async () => (await cleanupRetiredKeys()).removed },
     { name: "webauthn-challenges", run: async () => (await cleanupExpiredChallenges()).removed },
