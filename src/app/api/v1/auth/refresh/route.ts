@@ -43,20 +43,42 @@ export async function POST(request: NextRequest) {
   const lookup = await findSessionByToken(token);
 
   if (lookup.status === "revoked" && lookup.session) {
-    // Reuse 탐지 — 이 계정의 모든 활성 세션 revoke
-    const revoked = await revokeAllUserSessions(lookup.session.userId);
-    writeAuditLogDb({
-      timestamp: new Date().toISOString(),
-      method: "POST",
-      path: request.nextUrl.pathname,
-      ip,
-      action: "SESSION_REUSE_DETECTED",
-      userAgent: userAgent ?? undefined,
-      detail: JSON.stringify({
-        userId: lookup.session.userId,
-        revokedSessionsCount: revoked,
-      }),
-    });
+    // 세션 37 — revokedReason 분기:
+    //   - "rotation": 진짜 reuse 의심 → 모든 세션 revoke + SESSION_REUSE_DETECTED
+    //   - 나머지(self/self_except_current/logout/reuse_detected/admin): 사용자가 이미
+    //     종료한 세션의 stale 호출 → 조용히 401, defense-in-depth 미발동
+    const isRotationReuse = lookup.session.revokedReason === "rotation";
+
+    if (isRotationReuse) {
+      const revoked = await revokeAllUserSessions(lookup.session.userId);
+      writeAuditLogDb({
+        timestamp: new Date().toISOString(),
+        method: "POST",
+        path: request.nextUrl.pathname,
+        ip,
+        action: "SESSION_REUSE_DETECTED",
+        userAgent: userAgent ?? undefined,
+        detail: JSON.stringify({
+          userId: lookup.session.userId,
+          revokedSessionsCount: revoked,
+          trigger: "rotation_token_reuse",
+        }),
+      });
+    } else {
+      writeAuditLogDb({
+        timestamp: new Date().toISOString(),
+        method: "POST",
+        path: request.nextUrl.pathname,
+        ip,
+        action: "SESSION_REFRESH_REJECTED",
+        userAgent: userAgent ?? undefined,
+        detail: JSON.stringify({
+          userId: lookup.session.userId,
+          revokedReason: lookup.session.revokedReason,
+        }),
+      });
+    }
+
     const response = errorResponse(
       "SESSION_REVOKED",
       "세션이 만료되었습니다. 다시 로그인하세요",

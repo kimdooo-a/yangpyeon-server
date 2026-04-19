@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const lookup = await findSessionByToken(token);
     if (lookup.session && lookup.status !== "not_found") {
       try {
-        await revokeSession(lookup.session.id);
+        await revokeSession(lookup.session.id, "logout");
       } catch {
         // 동시성 race — 이미 revoke 된 경우 무시
       }

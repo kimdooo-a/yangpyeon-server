@@ -63,12 +63,30 @@ export type SessionLookupStatus =
   | "user_invalid"
   | "not_found";
 
+/**
+ * 세션 37 — revoke 사유 분류.
+ *   - "rotation": rotate 시점에 구 세션을 revoke (이 토큰 재사용 = 진짜 reuse 공격 의심)
+ *   - "self": 사용자가 세션 1건 개별 종료 (/api/v1/auth/sessions/[id] DELETE)
+ *   - "self_except_current": 사용자 "다른 세션 모두 종료" (revoke-all)
+ *   - "logout": 로그아웃 시점
+ *   - "reuse_detected": defense-in-depth 로 연쇄 revoke
+ *   - "admin": 관리자 강제 revoke (향후)
+ */
+export type SessionRevokeReason =
+  | "rotation"
+  | "self"
+  | "self_except_current"
+  | "logout"
+  | "reuse_detected"
+  | "admin";
+
 export interface SessionLookup {
   status: SessionLookupStatus;
   session: {
     id: string;
     userId: string;
     revokedAt: Date | null;
+    revokedReason: string | null;
     expiresAt: Date;
     ip: string | null;
     userAgent: string | null;
@@ -84,6 +102,7 @@ export async function findSessionByToken(token: string): Promise<SessionLookup> 
       id: true,
       userId: true,
       revokedAt: true,
+      revokedReason: true,
       expiresAt: true,
       ip: true,
       userAgent: true,
@@ -100,6 +119,7 @@ export async function findSessionByToken(token: string): Promise<SessionLookup> 
 /**
  * 세션 회전 — 단일 트랜잭션으로 구 세션 revoke + 신 세션 insert.
  * 클라이언트 race 시에도 양쪽 UPDATE/INSERT 원자성 보장.
+ * 구 세션은 `revokedReason="rotation"` 으로 표시 — 이 토큰 재사용 시 reuse 탐지 발동 신호.
  */
 export async function rotateSession(params: {
   oldSessionId: string;
@@ -110,7 +130,7 @@ export async function rotateSession(params: {
   return prisma.$transaction(async (tx) => {
     await tx.session.update({
       where: { id: params.oldSessionId },
-      data: { revokedAt: new Date() },
+      data: { revokedAt: new Date(), revokedReason: "rotation" },
     });
     const token = generateOpaqueToken();
     const tokenHash = hashToken(token);
@@ -129,21 +149,25 @@ export async function rotateSession(params: {
   });
 }
 
-export async function revokeSession(sessionId: string): Promise<void> {
+export async function revokeSession(
+  sessionId: string,
+  reason: SessionRevokeReason = "self",
+): Promise<void> {
   await prisma.session.update({
     where: { id: sessionId },
-    data: { revokedAt: new Date() },
+    data: { revokedAt: new Date(), revokedReason: reason },
   });
 }
 
 /**
  * 사용자의 모든 활성 세션 revoke — reuse 탐지 시 defense-in-depth.
+ * 세션 37: revokedReason="reuse_detected" 로 기록.
  * @returns revoke 된 세션 수
  */
 export async function revokeAllUserSessions(userId: string): Promise<number> {
   const result = await prisma.session.updateMany({
     where: { userId, revokedAt: null },
-    data: { revokedAt: new Date() },
+    data: { revokedAt: new Date(), revokedReason: "reuse_detected" },
   });
   return result.count;
 }
@@ -153,9 +177,8 @@ export async function revokeAllUserSessions(userId: string): Promise<number> {
  * currentSessionId 가 있으면 해당 세션 1건만 보존, 나머지 revoke.
  * currentSessionId 가 없으면 revokeAllUserSessions 와 동치.
  *
- * reuse 탐지(`revokeAllUserSessions`) 와 분리한 이유:
- *   - 감사 로그 액션 구분 (SESSION_REVOKE_ALL vs SESSION_REUSE_DETECTED)
- *   - 사용자 의도 vs 시스템 방어 의도 분리
+ * revokedReason="self_except_current" — 이 세션의 구 토큰 재사용은 reuse 탐지 미발동
+ * (사용자가 의도적으로 종료한 세션이므로 "자기파괴" 방지).
  *
  * @returns revoke 된 세션 수 (current 제외)
  */
@@ -169,7 +192,7 @@ export async function revokeAllExceptCurrent(
       revokedAt: null,
       ...(currentSessionId ? { NOT: { id: currentSessionId } } : {}),
     },
-    data: { revokedAt: new Date() },
+    data: { revokedAt: new Date(), revokedReason: "self_except_current" },
   });
   return result.count;
 }

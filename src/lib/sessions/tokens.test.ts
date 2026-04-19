@@ -5,14 +5,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * rate-limit-db.test.ts 패턴을 따라 `@/lib/prisma` 만 모킹하고 where 절 구성만 검증.
  * 실제 PG 동작은 E2E curl 로 확인.
  */
-const { mockUpdateMany } = vi.hoisted(() => ({
+const { mockUpdateMany, mockUpdate } = vi.hoisted(() => ({
   mockUpdateMany: vi.fn(),
+  mockUpdate: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     session: {
       updateMany: mockUpdateMany,
+      update: mockUpdate,
     },
   },
 }));
@@ -23,6 +25,8 @@ import {
   REFRESH_TOKEN_MAX_AGE_MS,
   REFRESH_TOKEN_MAX_AGE_SEC,
   revokeAllExceptCurrent,
+  revokeAllUserSessions,
+  revokeSession,
 } from "./tokens";
 
 beforeEach(() => {
@@ -122,5 +126,49 @@ describe("revokeAllExceptCurrent — 세션 37 사용자 자발적 종료", () =
     await expect(
       revokeAllExceptCurrent("user-5", "sess-x"),
     ).rejects.toThrow("DB connection lost");
+  });
+
+  it("revokedReason='self_except_current' 로 태깅 — 구 토큰 재사용 시 reuse 탐지 미발동", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 2 });
+    await revokeAllExceptCurrent("user-6", "sess-keep");
+    const args = mockUpdateMany.mock.calls[0][0];
+    expect(args.data.revokedReason).toBe("self_except_current");
+    expect(args.data.revokedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe("revokeAllUserSessions — defense-in-depth", () => {
+  it("revokedReason='reuse_detected' 로 태깅 (reuse 탐지 출처 식별용)", async () => {
+    mockUpdateMany.mockResolvedValueOnce({ count: 3 });
+    const count = await revokeAllUserSessions("user-7");
+    expect(count).toBe(3);
+    const args = mockUpdateMany.mock.calls[0][0];
+    expect(args.where).toEqual({ userId: "user-7", revokedAt: null });
+    expect(args.data.revokedReason).toBe("reuse_detected");
+  });
+});
+
+describe("revokeSession — reason 파라미터", () => {
+  it("reason 미지정 시 default 'self'", async () => {
+    mockUpdate.mockResolvedValueOnce({});
+    await revokeSession("sess-A");
+    const args = mockUpdate.mock.calls[0][0];
+    expect(args.where).toEqual({ id: "sess-A" });
+    expect(args.data.revokedReason).toBe("self");
+    expect(args.data.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("reason='logout' 명시 전달", async () => {
+    mockUpdate.mockResolvedValueOnce({});
+    await revokeSession("sess-B", "logout");
+    const args = mockUpdate.mock.calls[0][0];
+    expect(args.data.revokedReason).toBe("logout");
+  });
+
+  it("reason='admin' (관리자 강제 revoke 향후 대비)", async () => {
+    mockUpdate.mockResolvedValueOnce({});
+    await revokeSession("sess-C", "admin");
+    const args = mockUpdate.mock.calls[0][0];
+    expect(args.data.revokedReason).toBe("admin");
   });
 });
