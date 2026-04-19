@@ -26,31 +26,38 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 34 종료 시점 — Phase 15 Step 1~6 + UI 통합 완료
+## 필수 참조 파일 ⭐ 세션 35 종료 시점 — Cleanup Scheduler + CK 4건 + MFA QA 가이드
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session34-phase15-ui-and-mfa-status.md      ⭐ 최신 (UI 통합 + 라이브 디버깅 2건)
+docs/handover/260419-session35-cleanup-scheduler-ck-batch.md      ⭐ 최신 (Cleanup Scheduler + CK 4건 + MFA QA 가이드)
+docs/handover/260419-session34-phase15-ui-and-mfa-status.md      (세션 34 UI 통합 + 라이브 디버깅 2건)
 docs/handover/260419-session33-phase15-step3-4-5.md              (JWKS + TOTP + WebAuthn + Step 6 백엔드)
-docs/handover/260419-session32-phase15-step1-2.md                (세션 32 Prisma Session + argon2id)
-docs/handover/260419-session31-cleanup-safeguard-adr-reflect.md  (세션 31 safeguard + ADR/DQ 반영)
-docs/handover/260419-session30-spike-priority-set.md             (세션 30 스파이크 7건 완결)
-docs/research/_SPIKE_CLEARANCE.md                                ⭐ 15 엔트리 (9 기존 + 7 세션30 신규)
-docs/research/spikes/spike-014-jwks-cache-result.md              ⭐ 세션 33 구현 반영
-docs/research/spikes/spike-015-session-index-result.md           ⭐ 세션 32 구현 반영
-docs/research/spikes/spike-011-argon2-result.md                  ⭐ 세션 32 구현 반영
-docs/research/spikes/spike-013-wal2json-slot-result.md           ⭐ Pending (물리 측정)
-docs/research/spikes/spike-016-seaweedfs-50gb-result.md          ⭐ Pending (물리 측정)
-docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md    ⭐ ADR-001~019
-docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md  ⭐ §7.2.1~7.2.3
-docs/research/2026-04-supabase-parity/00-vision/07-dq-matrix.md       ⭐ DQ-AC-1/AC-2/4.1/12.4 Resolved
-docs/solutions/2026-04-19-*.md (5건)                             ⭐ Compound Knowledge 5건
-docs/security/skill-audit-2026-04-19.md                          ⭐ /ypserver safeguard 감사 PASS
+docs/handover/260419-session32-phase15-step1-2.md                (Prisma Session + argon2id)
+docs/handover/260419-session31-cleanup-safeguard-adr-reflect.md  (safeguard + ADR/DQ 반영)
+docs/handover/260419-session30-spike-priority-set.md             (스파이크 7건 완결)
+docs/guides/mfa-browser-manual-qa.md                             ⭐ 세션 35 — 8 시나리오 SOP (우선순위 1 실행 대상)
+docs/research/_SPIKE_CLEARANCE.md                                15 엔트리 (SP-013/016 Pending 유지)
+docs/research/spikes/spike-013-wal2json-slot-result.md           Pending (물리 측정)
+docs/research/spikes/spike-016-seaweedfs-50gb-result.md          Pending (물리 측정)
+docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md    ADR-001~019
+docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md  §7.2.1~7.2.3
+docs/research/2026-04-supabase-parity/00-vision/07-dq-matrix.md       DQ-AC-1/AC-2/4.1/12.4 Resolved
+docs/solutions/2026-04-19-*.md (11건)                             ⭐ Compound Knowledge 세션 33·34·35 추가
+  - otplib-v13-breaking-noble-plugin.md                          세션 33 외부 라이브러리
+  - simplewebauthn-v10-api-shape.md                              세션 33 외부 라이브러리
+  - mfa-challenge-token-2fa-pattern.md                           세션 33 설계 패턴
+  - bcrypt-argon2-progressive-rehash-merged-update.md            세션 32 설계 패턴
+  - pg-timestamp-naive-js-date-tz-offset.md                      세션 34 디버깅
+  - rate-limit-defense-in-depth-conflict.md                      세션 34 디버깅
+docs/security/skill-audit-2026-04-19.md                          /ypserver safeguard 감사 PASS
 docs/MASTER-DEV-PLAN.md
+src/lib/cleanup-scheduler.ts                                      ⭐ 세션 35 신설 (4종 매일 KST 03:00)
+src/instrumentation.ts                                            세션 35 ensureCleanupScheduler 통합
 ```
 
-## 현재 상태 (세션 34 종료 시점)
+## 현재 상태 (세션 35 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -59,68 +66,58 @@ docs/MASTER-DEV-PLAN.md
 - **세션 31**: safeguard + ADR/DQ 반영 + CK 5건 (타 터미널)
 - **세션 32**: Phase 15 Step 1-2 — Prisma Session + argon2id 자동 재해시
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
-- **세션 34** ⭐ — Phase 15 **UI 통합** + 라이브 디버깅 2건
-  - 신규 통합 페이지 `(protected)/account/security` — TOTP 3-stage stepper + Passkey list/enroll/delete + Disable
-  - 신규 API 2건: `GET /mfa/status` + `DELETE /mfa/webauthn/authenticators/[id]`
-  - 로그인 페이지 MFA Challenge UI — `MfaState` discriminated union + Method Tabs + Passkey `startAuthentication()`
-  - 사이드바 "내 계정" 그룹 신설 + `@simplewebauthn/browser@^10` 설치
-  - **Step 6 라이브 디버깅 2건** (다음 세션 CK 후보):
-    - proxy 인메모리 vs handler DB rate limit 충돌 → `HANDLER_OWNED_RATE_LIMIT_PATHS` 양도
-    - PG TIMESTAMP(3) timezone-naive + JS Date 9시간 오프셋 → `EXTRACT(EPOCH...)` PG 직접 계산
-  - **검증**: tsc 0 / vitest 175 PASS / `/ypserver` 4회 / curl smoke 307·401·200
+- **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
+- **세션 35** ⭐ — 세션 34 위임 4건 순차 처리
+  - **우선순위 1**: `docs/guides/mfa-browser-manual-qa.md` 신규 8 시나리오 SOP (WebAuthn 브라우저 인터랙션 필수라 자동화 불가 → 다음 세션 직접 실행용)
+  - **우선순위 2**: `src/lib/cleanup-scheduler.ts` 신설 — 4종 cleanup(sessions/rate-limit-buckets/jwks-retired/webauthn-challenges) 매일 KST 03:00 실행. 1분 tick + `lastRunKey` dedupe + 각 task 독립 try/catch + audit `CLEANUP_EXECUTED` 기록. `cron/registry.ts` 와 분리(UI CRUD vs 시스템 내부). `computeCleanupWindow` 순수 함수로 timezone-safe. `instrumentation.ts` 통합. **vitest 175→188 PASS** (+13 회귀 0). `/ypserver prod --skip-win-build` 통과(HTTP 307, Next Ready 79ms, PM2 로그 예외 0).
+  - **우선순위 3**: SP-013/016 물리 측정 환경 미확보 → Pending 유지 확인만.
+  - **우선순위 4**: Compound Knowledge 6건 중 세션 34 unstaged 2건 확인(pg-timestamp-naive / rate-limit-defense-in-depth) + 신규 4건 Agent 2대 병렬 작성(otplib-v13 / simplewebauthn-v10 / mfa-challenge-token / bcrypt-argon2-rehash, 총 703줄). **CK 누적 23건**.
 
 ## 추천 다음 작업
 
-### 우선순위 1: MFA UI 브라우저 검증 ⭐ 즉시 착수 가능 (1-2h)
+### 우선순위 1: MFA UI 브라우저 round-trip 직접 실행 ⭐ 즉시 착수 가능 (1-2h)
 
-서버측·UI 모두 완결. 실제 브라우저 + 사용자 인터랙션으로 round-trip 검증만 남음:
+`docs/guides/mfa-browser-manual-qa.md` 의 8 시나리오 SOP 를 순차 수행. 각 시나리오에 단계·DOD·실패 진단 순서·관련 CK 교차 참조 포함. Passkey enroll/assert 는 본 환경에서 유일하게 자동화 불가 구간.
 
-1. https://stylelucky4u.com/login (admin 로그인)
-2. `/account/security` 진입
-3. **TOTP enroll**: "MFA 등록 시작" → Authenticator 앱(Google Auth/1Password 등)으로 QR 스캔 → 6자리 입력 → 복구 코드 10개 텍스트 다운로드
-4. 로그아웃 → 다시 로그인 → MFA challenge UI 확인 → TOTP 코드로 인증 → 메인 진입
-5. **Passkey enroll**: `/account/security` → "새 Passkey 등록" → 기기 이름 → Touch ID/Windows Hello/Passkey manager
-6. 로그아웃 → 다시 로그인 → Passkey 탭 → 인증 → 메인 진입
-7. (선택) 복구 코드로 로그인 → 사용한 코드 재사용 거부 확인
+1. TOTP Enroll (idle → qr+secret+6자리 → recovery 10 코드)
+2. Login MFA Challenge (TOTP)
+3. Passkey Enroll (WebAuthn Register + biometric)
+4. Login via Passkey (WebAuthn Assert)
+5. Passkey Delete (자기 자격증명 — userId 매칭 강제)
+6. Recovery Code 사용 + 재사용 거부
+7. (선택) Rate Limit 차단 + `Retry-After: 60` 회귀 가드 (세션 34 §3 버그 재발 방지)
+8. TOTP Disable (비밀번호 + 현재 TOTP 모두 요구)
 
-**DOD**: 6 시나리오 모두 PASS. 발견된 이슈는 새 세션 권장사항 1순위로 즉시 수정.
+**DOD**: 1~6·8 필수 PASS, 7은 회귀 가드. 발견 이슈는 즉시 수정 + 가이드 업데이트.
 
-### 우선순위 2: Cleanup cron 일괄 등록 (1h)
+### 우선순위 2: Cleanup scheduler 첫 실행 결과 검증 (0.5h, KST 03:00 +1일 후)
 
-다음 4종 cleanup 함수가 정의만 되고 스케줄 미등록 — `instrumentation.ts` cron bootstrap 또는 신설 `src/lib/cleanup-scheduler.ts`로 통합:
-- `cleanupExpiredSessions` (세션 32, `src/lib/sessions/cleanup.ts`)
-- `cleanupExpiredRateLimitBuckets` (세션 34, `src/lib/rate-limit-db.ts`)
-- `cleanupExpiredJwksKeys` (세션 33, `src/lib/jwks/store.ts`)
-- `cleanupExpiredChallenges` (세션 33, `src/lib/mfa/webauthn.ts`)
+세션 35 구축한 스케줄러 검증:
+- PM2 dashboard 로그 예외 0
+- SQLite auditLogs 테이블 `action = "CLEANUP_EXECUTED"` 최신 1행
+- `sessions` / `rate_limit_buckets` / `jwks_keys`(RETIRED 만료) / `webauthn_challenges` 만료 행 감소
+- summary JSON 각 task 숫자 (실패 시 "ERROR: ..." 문자열)
 
-권장: 일 1회 03:00 KST 일괄 실행. 실패는 audit log + Sentry 후속.
+실패 시 원인 조사 — 가장 흔한 원인: prisma timeout / PG 연결 고갈.
 
-### 우선순위 3: Compound Knowledge 5건 작성 (1h)
+### 우선순위 3: Phase 15-D Refresh Token Rotation (~8h)
 
-세션 33 산출 3건:
-```
-docs/solutions/2026-04-19-otplib-v13-breaking-noble-plugin.md
-docs/solutions/2026-04-19-simplewebauthn-v10-api-shape.md
-docs/solutions/2026-04-19-mfa-challenge-token-2fa-pattern.md
-```
+세션 32 `Sessions` 테이블 인프라(미사용 중) 활성화. Blueprint §7.2.2 구현:
+- opaque refresh token 발급/회전/revoke
+- UI "활성 세션" 카드 (`/account/security` 에 추가)
+- device fingerprint 기록 (ip/userAgent — 이미 컬럼 있음)
+- 세션 lifecycle audit 로그 (LOGIN / ROTATE / REVOKE / EXPIRE)
 
-세션 32 미작성:
-```
-docs/solutions/2026-04-19-bcrypt-argon2-progressive-rehash-merged-update.md
-```
+### 우선순위 4: `/api/admin/cleanup/run` 엔드포인트 + UI (~2h)
 
-세션 34 신규 (라이브 디버깅 2건 — 본 세션 §3 핵심 자산):
-```
-docs/solutions/2026-04-19-pg-timestamp-naive-js-date-tz-offset.md
-docs/solutions/2026-04-19-rate-limit-defense-in-depth-conflict.md
-```
+`src/lib/cleanup-scheduler.ts` 의 `runCleanupsNow()` export 를 ADMIN role + csrf guard 로 래핑:
+- `POST /api/admin/cleanup/run` — summary JSON 반환
+- Settings 페이지 "지금 정리 실행" 버튼 + 실행 결과 토스트
+- audit log 분기 이미 준비 (`CLEANUP_EXECUTED_MANUAL`)
 
-### 우선순위 4: SP-013/016 물리 측정 (13h, 환경 확보 시)
+### 우선순위 5: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
 - **SP-016 SeaweedFS 50GB** (8h): weed 설치 + 50GB 디스크 + B2 오프로드
-
-### 우선순위 5: Phase 15-D Refresh Rotation
-세션 32 Sessions 테이블 인프라(미사용) 활성화. opaque refresh token 회전 + revoke + UI "활성 세션" 카드.
 
 ### 우선순위 6: `/kdygenesis --from-wave` 연계
 입력: `07-appendix/03-genesis-handoff.md` _PROJECT_GENESIS.md 초안 (85+ 태스크)
@@ -128,18 +125,26 @@ docs/solutions/2026-04-19-rate-limit-defense-in-depth-conflict.md
 
 ### 진입점 예시
 ```
-# 우선순위 1 — MFA UI 브라우저 검증
+# 우선순위 1 — MFA UI 브라우저 직접 실행
+# docs/guides/mfa-browser-manual-qa.md 를 열어 순차 수행
 # 1. https://stylelucky4u.com/login 로 admin 로그인
-# 2. 사이드바 "내 계정 > MFA & 보안" 클릭
-# 3. TOTP 등록 흐름 6단계 + Passkey 등록 흐름 (등록 → 로그아웃 → 재로그인)
-# 4. 발견된 UI 이슈 수정 → /ypserver prod --skip-win-build 재배포
+# 2. 사이드바 "내 계정 > MFA & 보안"
+# 3. 체크리스트 8 시나리오 각 DOD 확인
+# 4. 발견 이슈 즉시 수정 → /ypserver prod --skip-win-build 재배포
 
-# 또는 우선순위 2 — Cleanup cron
-# instrumentation.ts 의 기존 cron 부트스트랩에 4종 cleanup 추가
-# /api/cron/cleanup 엔드포인트 신설 + audit log
+# 또는 우선순위 2 — Cleanup scheduler 첫 실행 검증
+# wsl -e bash -c "source ~/.nvm/nvm.sh && pm2 logs dashboard --lines 200 | grep -i cleanup"
+# wsl -e bash -c "cd ~/dashboard && sqlite3 data/dashboard.db \"SELECT timestamp, action, detail FROM audit_logs WHERE action LIKE 'CLEANUP%' ORDER BY id DESC LIMIT 5;\""
 ```
 
 ## 알려진 이슈 및 주의사항
+
+### 세션 35 신규
+- **Cleanup scheduler 첫 실행 관찰 필요** — KST 03:00 익일에 첫 실행 예정. PM2 로그 + audit log `CLEANUP_EXECUTED` + 각 테이블 만료 행 감소 모두 확인.
+- **`globalThis.__cleanupScheduler` 는 단일 프로세스 전제** — PM2 cluster(SP-010) 도입 시 워커마다 별도 scheduler → 중복 실행. advisory_lock/Redis 리더 선출로 보강 필요. 현재 fork 모드 무관.
+- **`runCleanupsNow()` 는 함수 export 만** — `/api/admin/cleanup/run` 엔드포인트 + UI 미구현 (세션 35 우선순위 4 위임).
+- **audit log `action` 2종 추가** (`CLEANUP_EXECUTED`, `CLEANUP_EXECUTED_MANUAL`) — 감사 로그 UI 필터 drizzle like 로 자동 노출.
+- **MFA UI 브라우저 검증은 여전히 본인 직접 실행 필수** — `docs/guides/mfa-browser-manual-qa.md` 8 시나리오.
 
 ### 세션 34 신규
 - **MFA UI는 코드만 완결, 브라우저 round-trip 미실행** — 실제 WebAuthn `navigator.credentials.create/get()` 호출은 사용자 인터랙션 필요. 다음 세션 우선순위 1
