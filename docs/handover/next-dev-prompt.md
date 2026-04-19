@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 세션 36 종료 시점 — Phase 15-D Refresh Rotation + Cleanup 수동 실행 UI
+## 필수 참조 파일 ⭐ 세션 37 종료 시점 — Phase 15-D 보강 + revoke 의도-혼동 버그 수정
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session36-phase-15d-refresh-rotation.md      ⭐ 최신 (Phase 15-D Refresh Rotation + Cleanup 수동 실행 UI + E2E 9 시나리오 PASS)
+docs/handover/260419-session37-revoked-reason-intent-fix.md       ⭐ 최신 (Session.revokedReason intent 태깅 + 자기파괴 버그 수정 + CK 3건 + E2E before/after)
+docs/handover/260419-session36-phase-15d-refresh-rotation.md      (Phase 15-D Refresh Rotation + Cleanup 수동 실행 UI + E2E 9 시나리오 PASS)
 docs/handover/260419-session35-cleanup-scheduler-ck-batch.md      (Cleanup Scheduler + CK 4건 + MFA QA 가이드)
 docs/handover/260419-session34-phase15-ui-and-mfa-status.md      (세션 34 UI 통합 + 라이브 디버깅 2건)
 docs/handover/260419-session33-phase15-step3-4-5.md              (JWKS + TOTP + WebAuthn + Step 6 백엔드)
@@ -45,13 +46,17 @@ docs/research/spikes/spike-016-seaweedfs-50gb-result.md          Pending (물리
 docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md    ADR-001~019
 docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md  §7.2.1~7.2.3
 docs/research/2026-04-supabase-parity/00-vision/07-dq-matrix.md       DQ-AC-1/AC-2/4.1/12.4 Resolved
-docs/solutions/2026-04-19-*.md (11건)                             ⭐ Compound Knowledge 세션 33·34·35 추가
+docs/solutions/2026-04-19-*.md (15건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37 추가 (누적 27건)
   - otplib-v13-breaking-noble-plugin.md                          세션 33 외부 라이브러리
   - simplewebauthn-v10-api-shape.md                              세션 33 외부 라이브러리
   - mfa-challenge-token-2fa-pattern.md                           세션 33 설계 패턴
   - bcrypt-argon2-progressive-rehash-merged-update.md            세션 32 설계 패턴
   - pg-timestamp-naive-js-date-tz-offset.md                      세션 34 디버깅
   - rate-limit-defense-in-depth-conflict.md                      세션 34 디버깅
+  - opaque-refresh-rotation-reuse-detection.md                   세션 36 아키텍처
+  - login-finalize-helper-centralization.md                      ⭐ 세션 37 DRY 패턴
+  - session-revoke-user-intent-vs-defense.md                     ⭐ 세션 37 함수 분리
+  - revoked-reason-intent-tagging.md                             ⭐ 세션 37 버그픽스 (severity: functional)
 docs/security/skill-audit-2026-04-19.md                          /ypserver safeguard 감사 PASS
 docs/MASTER-DEV-PLAN.md
 src/lib/cleanup-scheduler.ts                                      세션 35 신설 + 세션 36 CleanupActor 확장
@@ -62,10 +67,12 @@ src/app/api/v1/auth/sessions/route.ts                             ⭐ 세션 36 
 src/app/api/v1/auth/sessions/[id]/route.ts                        ⭐ 세션 36 신설 (DELETE self-revoke)
 src/app/api/admin/cleanup/run/route.ts                            ⭐ 세션 36 신설 (수동 트리거)
 src/app/(protected)/(admin)/settings/cleanup/page.tsx             ⭐ 세션 36 신설 (UI)
+src/app/api/v1/auth/sessions/revoke-all/route.ts                  ⭐ ffb3e0f 커밋 + 세션 37 reason 태깅 (POST /revoke-all)
 src/instrumentation.ts                                            세션 35 ensureCleanupScheduler 통합
+prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 (Session.revokedReason TEXT)
 ```
 
-## 현재 상태 (세션 36 종료 시점)
+## 현재 상태 (세션 37 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -76,11 +83,17 @@ src/instrumentation.ts                                            세션 35 ensu
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
 - **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
 - **세션 35**: Cleanup Scheduler + CK 4건 + MFA QA 가이드 (commit `a29ac1b`)
-- **세션 36** ⭐ — Phase 15-D Refresh Token Rotation + Cleanup 수동 실행 UI
+- **세션 36** — Phase 15-D Refresh Token Rotation + Cleanup 수동 실행 UI
   - **P4 cleanup UI**: `/api/admin/cleanup/run` POST + `(admin)/settings/cleanup` 페이지. `cleanup-scheduler.ts` CleanupActor 확장(하위 호환). 사이드바 엔트리.
   - **P2 조기 검증**: 수동 트리거로 webauthn-challenges 1건 삭제 실측 + audit actor 정보 확인. 자동 스케줄 KST 03:00 병행.
   - **P3 Phase 15-D**: opaque 32 bytes hex + SHA-256 hash + Prisma Session DB-backed rotation. 신규 `src/lib/sessions/{tokens,login-finalizer}.ts` + `tokens.test.ts`(+8). API 3건(`POST /refresh` reuse 탐지 / `GET /sessions` / `DELETE /sessions/[id]`). logout 서버측 revoke. 로그인 3경로 finalizeLoginResponse. `/account/security` 활성 세션 카드. 사이드바 v1+dashboard logout 병행. jwt-v1 미사용 export 정리. 감사 4종 신규(SESSION_LOGIN/ROTATE/REVOKE/REUSE_DETECTED).
   - **검증**: tsc 0 / vitest 188→**201 PASS**(+13, 회귀 0) / `/ypserver prod --skip-win-build` 통과 / **프로덕션 E2E curl 9 시나리오 전 PASS**
+- **세션 37** ⭐ — Phase 15-D 보강 + revoke 의도-혼동 버그 수정 (ffb3e0f 병렬 기초 + 세션 37 버그 수정)
+  - **ffb3e0f (병렬 터미널)**: `revokeAllExceptCurrent` / POST `/revoke-all` / `touchSessionLastUsed` (GET /sessions) / UI "다른 세션 모두 종료" 버튼 / +13 tests (188→201)
+  - **세션 37 본류 (버그 수정)**: E2E 중 자기파괴 시나리오 발견 — revoke-all 후 B 세션의 stale /refresh 가 defense-in-depth 를 발동시켜 A 도 revoke. 사용자 의도 파괴.
+  - **수정**: schema `Session.revokedReason` String? + migration `20260419170000_add_session_revoked_reason` + tokens.ts `SessionRevokeReason` type (6값) + 4경로(rotation/revokeSession/revokeAllUserSessions/revokeAllExceptCurrent) reason 태깅 + refresh route `isRotationReuse` 분기 (`rotation` 만 reuse 탐지, 나머지는 `SESSION_REFRESH_REJECTED`)
+  - **검증**: tsc 0 / vitest 201→**206 PASS**(+5 회귀 0) / `/ypserver prod` 2차 배포 migrate deploy 적용 / **프로덕션 E2E before/after**: `SESSION_REUSE_DETECTED revokedCount=1` → `SESSION_REFRESH_REJECTED revokedReason="self_except_current"` + A 생존
+  - **CK +3**: login-finalize-helper-centralization (pattern) / session-revoke-user-intent-vs-defense (pattern) / revoked-reason-intent-tagging (bug-fix-pattern, functional-bug). **누적 24 → 27**
 - **세션 34b (세션 35 요약)** — 세션 34 위임 4건 순차 처리
   - **우선순위 1**: `docs/guides/mfa-browser-manual-qa.md` 신규 8 시나리오 SOP (WebAuthn 브라우저 인터랙션 필수라 자동화 불가 → 다음 세션 직접 실행용)
   - **우선순위 2**: `src/lib/cleanup-scheduler.ts` 신설 — 4종 cleanup(sessions/rate-limit-buckets/jwks-retired/webauthn-challenges) 매일 KST 03:00 실행. 1분 tick + `lastRunKey` dedupe + 각 task 독립 try/catch + audit `CLEANUP_EXECUTED` 기록. `cron/registry.ts` 와 분리(UI CRUD vs 시스템 내부). `computeCleanupWindow` 순수 함수로 timezone-safe. `instrumentation.ts` 통합. **vitest 175→188 PASS** (+13 회귀 0). `/ypserver prod --skip-win-build` 통과(HTTP 307, Next Ready 79ms, PM2 로그 예외 0).
@@ -117,25 +130,20 @@ src/instrumentation.ts                                            세션 35 ensu
 - SQLite `auditLogs` `action='CLEANUP_EXECUTED'` 엔트리 확인 (수동 `_MANUAL` 과 다른 action)
 - 실패 시 원인 조사 — prisma timeout / PG 연결 고갈 / instrumentation 등록 실패
 
-### 우선순위 3: Phase 15-D 보강 (~2-3h)
+### 우선순위 3: Phase 15-D 추가 보강 (~2-3h)
 
-세션 36 에서 핵심 구현 완료. 운영 편의성·관측성 보강:
-- **`POST /api/v1/auth/sessions/revoke-all`** — 사용자가 "현재 세션 외 모두 종료" 요청. `revokeAllUserSessions(userId)` + 현재 세션은 예외로 남김.
-- **`lastUsedAt` 실시간 갱신** — `touchSessionLastUsed` 를 refresh 시 또는 일정 주기로 호출해 UI 활성 세션 카드에 정확한 마지막 사용 시간 표시 (현재는 rotate 시점 의존).
-- **`SESSION_EXPIRE` audit** — cleanup 시 각 expired row 별 개별 audit (또는 aggregate 건수만 기록).
-- **activity fingerprint** — UA 파싱해 "Chrome 130 on macOS" 같은 사람 읽기 쉬운 문자열 표시.
+세션 36·37 으로 핵심 경로 + revoke-all + intent 태깅 완결. 남은 관측성·편의성:
+- **`SESSION_EXPIRE` audit** — cleanup 시 각 expired row 별 건수 기록 (지금은 통합 CLEANUP_EXECUTED 로만)
+- **activity fingerprint** — UA 파싱해 "Chrome 130 on macOS" 사람 읽기 쉬운 문자열 표시
+- **touch throttle** — GET /sessions 마다 touch 1회 / 요청 현재. 1분 단위 디바운스 가능
+- **관리자 forced revoke** — `/api/admin/users/[id]/sessions DELETE` + `revokedReason="admin"` 활용
+- **HS256 legacy 쿠키 제거** — 세션 33 JWKS ES256 전환 후 24h 만료 초과. `AUTH_SECRET` 제거 + HS256 fallback 코드 정리 가능
 
 ### 우선순위 4: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
 - **SP-016 SeaweedFS 50GB** (8h): weed 설치 + 50GB 디스크 + B2 오프로드
 
-### 우선순위 5: Compound Knowledge 후속 (2건, ~1h)
-
-세션 36 설계에서 도출된 재사용 가치 높은 패턴:
-- **opaque token + DB session + SHA-256 hash vs stateless JWT refresh** — tradeoff 표 + reuse 탐지 defense-in-depth 패턴
-- **공통 로그인 종료 helper (finalizeLoginResponse)** — 3+ 경로의 access/refresh/audit/cookie 묶음 중복 제거 패턴
-
-### 우선순위 6: `/kdygenesis --from-wave` 연계
+### 우선순위 5: `/kdygenesis --from-wave` 연계
 입력: `07-appendix/03-genesis-handoff.md` _PROJECT_GENESIS.md 초안 (85+ 태스크)
 산출: 주간 실행 플로우
 
@@ -157,6 +165,15 @@ src/instrumentation.ts                                            세션 35 ensu
 ```
 
 ## 알려진 이슈 및 주의사항
+
+### 세션 37 신규
+
+- **Session.revokedReason 는 TEXT nullable** — 세션 36 이전에 revoke 된 기존 행은 NULL, refresh route 에서 자동으로 non-rotation → stale 취급. 하위 호환.
+- **`revokedReason` 값은 `SessionRevokeReason` string literal union (6값)** — DB 에는 TEXT 지만 TS 레벨 강제. 값 추가 시 schema + type 두 곳 동기화 필요.
+- **reuse 탐지는 이제 "진짜 rotation reuse" 만** — 사용자 의도 경로(self/self_except_current/logout) 에서 `SESSION_REFRESH_REJECTED` 조용히 401. rotation 경로(실제 공격 벡터) 는 여전히 defense-in-depth 발동.
+- **병렬 터미널 커밋 `ffb3e0f`** — 세션 37 진행 중 다른 터미널이 기초 구현(revoke-all + lastUsedAt + UI) 커밋. 본 세션은 그 위에 버그 수정 + CK 3건 쌓음. 동시 작업이지만 파일 충돌 0건 (다른 영역 편집).
+- **E2E script `/tmp/session37-e2e.sh`** — WSL 측 /tmp 에 작성. 재실행 시 `source ~/.nvm/nvm.sh && /tmp/session37-e2e.sh` (node 필요).
+- **테스트 mock 패턴 확장** — `tokens.test.ts` 에 `mockUpdate` (update) + `mockUpdateMany` 2종. 향후 Session DB 로직 추가 시 동일 패턴.
 
 ### 세션 36 신규
 - **기 발급 v1_refresh_token (stateless JWT) 은 더 이상 refresh 불가** — 본 세션 배포 시점 기준. 해당 쿠키 소지자는 `/api/v1/auth/refresh` 시 401 INVALID_REFRESH_TOKEN → 재로그인 유도. 프로덕션은 admin 1계정만이라 실사용 영향 없음.
