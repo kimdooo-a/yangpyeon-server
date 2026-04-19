@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 세션 39 종료 시점 — Phase 15-D 보강 4/5 완결 (touch throttle + UA label + SESSION_EXPIRE audit + admin forced revoke, HS256 legacy 제거만 이월)
+## 필수 참조 파일 ⭐ 세션 40 종료 시점 — TIMESTAMPTZ 마이그레이션 완결 (17 모델 / 47 컬럼) + cleanup 정공법 정착 (Prisma binding-side 시프트 잔존 발견)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session39-session-expire-admin-revoke.md     ⭐ 최신 (SESSION_EXPIRE per-row audit + 관리자 forced revoke + PG TZ 버그 국소 회피)
+docs/handover/260419-session40-timestamptz-migration.md           ⭐ 최신 (TIMESTAMPTZ 마이그레이션 + cleanup 정공법 + binding-side 시프트 잔존 발견)
+docs/handover/260419-session39-session-expire-admin-revoke.md     (SESSION_EXPIRE per-row audit + 관리자 forced revoke + PG TZ 버그 국소 회피)
 docs/handover/260419-session38-phase-15d-touch-throttle-ua-label.md  (touch throttle + activity fingerprint + Playwright MCP)
 docs/handover/260419-session37-revoked-reason-intent-fix.md       (Session.revokedReason intent 태깅 + 자기파괴 버그 수정 + CK 3건)
 docs/handover/260419-session36-phase-15d-refresh-rotation.md      (Phase 15-D Refresh Rotation + Cleanup 수동 실행 UI + E2E 9 시나리오 PASS)
@@ -48,7 +49,7 @@ docs/research/spikes/spike-016-seaweedfs-50gb-result.md          Pending (물리
 docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md    ADR-001~019
 docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md  §7.2.1~7.2.3
 docs/research/2026-04-supabase-parity/00-vision/07-dq-matrix.md       DQ-AC-1/AC-2/4.1/12.4 Resolved
-docs/solutions/2026-04-19-*.md (18건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37·38·39 (누적 30건)
+docs/solutions/2026-04-19-*.md (19건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37·38·39·40 (누적 31건)
   - otplib-v13-breaking-noble-plugin.md                          세션 33 외부 라이브러리
   - simplewebauthn-v10-api-shape.md                              세션 33 외부 라이브러리
   - mfa-challenge-token-2fa-pattern.md                           세션 33 설계 패턴
@@ -60,8 +61,9 @@ docs/solutions/2026-04-19-*.md (18건)                             ⭐ Compound 
   - session-revoke-user-intent-vs-defense.md                     세션 37 함수 분리
   - revoked-reason-intent-tagging.md                             세션 37 버그픽스 (severity: functional)
   - ios-safari-ua-regex-trap.md                                  세션 38 bug-fix (Version/N ... Safari/N 중간 Mobile/ 토큰 끼임)
-  - prisma-orm-tz-naive-filter-gotcha.md                         ⭐ 세션 39 bug-fix-pattern (Prisma 7 adapter-pg + PG TIMESTAMP(3) 9h KST 조용한 filter 실패 → raw SQL NOW()-INTERVAL 위임)
+  - prisma-orm-tz-naive-filter-gotcha.md                         ⭐ 세션 39 bug-fix + 세션 40 정정 (TIMESTAMPTZ 마이그레이션 후에도 binding-side 9h 시프트 잔존, 정공법 = raw SELECT + ::text)
   - per-row-audit-on-batch-delete.md                             ⭐ 세션 39 pattern (DB ops 는 entries 반환, audit 정책은 호출자 scheduler 에서 → 집계 + per-row 병행)
+  - timestamp-to-timestamptz-migration-using-clause.md           ⭐ 세션 40 pattern (USING AT TIME ZONE '<server_tz>' 결정 + dry-run BEGIN/ROLLBACK + 한계 명시)
 docs/security/skill-audit-2026-04-19.md                          /ypserver safeguard 감사 PASS
 docs/MASTER-DEV-PLAN.md
 src/lib/cleanup-scheduler.ts                                      세션 35 신설 + 세션 36 CleanupActor 확장
@@ -83,7 +85,7 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      세션 37 (Ses
 scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 E2E (admin revoke + SESSION_EXPIRE audit 12 step 검증)
 ```
 
-## 현재 상태 (세션 39 종료 시점)
+## 현재 상태 (세션 40 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -94,7 +96,16 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
 - **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
 - **세션 35**: Cleanup Scheduler + CK 4건 + MFA QA 가이드 (commit `a29ac1b`)
-- **세션 39** ⭐ — Phase 15-D 보강 2건 완결 + PG TZ 버그 국소 회피 (SESSION_EXPIRE per-row audit + 관리자 forced revoke)
+- **세션 40** ⭐ — TIMESTAMPTZ 마이그레이션 완결 (17 모델 / 47 DateTime 컬럼) + cleanup 정공법 정착
+  - 6 권장 중 2·3b·5 자율 채택, HS256(잠금)·MFA biometric·SP-013/016 측정·kdygenesis 제외
+  - schema.prisma 모든 DateTime 에 `@db.Timestamptz(3)` + migration `20260419180000_use_timestamptz` (17 ALTER TABLE, USING AT TIME ZONE 'Asia/Seoul')
+  - pg_dump 5.3MB 백업 + BEGIN/ROLLBACK dry-run 17 ALTER OK + migrate deploy 적용
+  - **cleanup.ts ORM 복원 1차 시도 → 실패** (Prisma 7 adapter-pg binding-side 9h 시프트가 timestamptz 컬럼에서도 별도 존재함이 E2E 재현으로 발견)
+  - **정공법**: raw SELECT (PG NOW()-INTERVAL '1 day' 위임) + `expires_at::text` 캐스팅 + ORM `deleteMany({where:{id:{in:ids}}})` 하이브리드
+  - cleanup.test.ts 10 PASS / vitest 245 → **244 PASS** / tsc 0 / `/ypserver prod --skip-win-build` 2회 통과 (PM2 ↺=10, 11)
+  - E2E 12 step 전수 PASS — `summary.sessions=2` 정확, SESSION_EXPIRE per-row audit 정확 기록
+  - **CK +1 신규 1건 갱신** (30→31): `timestamp-to-timestamptz-migration-using-clause` 신규 + `prisma-orm-tz-naive-filter-gotcha` 정정 섹션 추가
+- **세션 39** — Phase 15-D 보강 2건 완결 + PG TZ 버그 국소 회피 (SESSION_EXPIRE per-row audit + 관리자 forced revoke)
   - 5 이월 항목 중 HS256(단독 세션 잠금) · MFA biometric · SP013/016 · /kdygenesis 제외, 2·3a·3b 3건 자율 채택
   - TDD: `cleanup.test.ts` 11 신규 + `tokens.test.ts` admin/logout 3 신규 → **vitest 231→245 PASS**
   - `cleanup.ts`: `$executeRaw` 1-step → `$queryRaw + $executeRaw` 2-step 재설계 + `{deleted, expiredEntries}` 반환 + `buildSessionExpireAuditDetail` 순수 함수 신규
@@ -130,7 +141,39 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### 우선순위 1: MFA UI + Phase 15-D 활성 세션 카드 브라우저 직접 실행 ⭐ 즉시 착수 가능 (1-2h)
+### 우선순위 1: 다른 모듈 ORM 시간 비교 전수 검토 ⭐ 즉시 착수 가능 (1-2h, 세션 40 후속)
+
+세션 40 에서 cleanup.ts 만 정정. 다른 모듈에서 동일 패턴(`where: {field: {lt|gt|lte|gte: jsDate}}`)이 사용되면 binding-side 9h 시프트로 데이터 누락 발생 가능.
+
+**검색 명령**:
+```bash
+grep -rE "where:\\s*\\{[^}]*\\b(expiresAt|lastUsedAt|revokedAt|windowStart|retireAt|lockedUntil|usedAt|createdAt|updatedAt)\\b\\s*:\\s*\\{\\s*(lt|gt|lte|gte)\\s*:" src/
+```
+
+**대상 후보**:
+- `src/lib/sessions/tokens.ts` — listActiveSessions / findSessionByToken 의 expiresAt > NOW
+- `src/lib/mfa/webauthn.ts` — challenge expiresAt 비교
+- `src/lib/jwks/store.ts` — retireAt < NOW grace
+- `src/lib/mfa/service.ts` — locked_until 비교
+- `src/lib/rate-limit-db.ts` — 이미 PG 측 EXTRACT EPOCH 사용 (안전)
+
+**정공법 적용**: raw SELECT (PG NOW()-INTERVAL 위임 + `::text` 캐스팅) + ORM CRUD (id 기반).
+
+### 우선순위 2: prisma INSERT timestamptz 시프트 검증 (~30분)
+
+실제 사용자 로그인 후 PG 직접 SELECT 로 expires_at 정확성 확인. 만약 INSERT 시도 시프트하면 새 session 만료가 9h 빨리 됨 (보안 측면 over-conservative 이지만 UX 영향).
+
+```bash
+# 로그인 후
+PGPASSWORD='<DB_PASSWORD>' psql -h localhost -p 5432 -U postgres -d luckystyle4u -c \
+  "SELECT id, expires_at, expires_at AT TIME ZONE 'UTC' AS utc FROM sessions ORDER BY created_at DESC LIMIT 3;"
+```
+
+### 우선순위 3: KST 03:00 자동 cleanup tick 관찰 (익일)
+
+세션 40 종료 시점 KST 15시. 익일 KST 03:00 첫 자동 tick 발생. `audit_logs WHERE action='CLEANUP_EXECUTED'` 신규 엔트리 확인.
+
+### 우선순위 4: MFA UI + Phase 15-D 활성 세션 카드 브라우저 직접 실행 (1-2h)
 
 `docs/guides/mfa-browser-manual-qa.md` 의 8 시나리오 SOP + **세션 36 추가**: Phase 15-D 활성 세션 카드 3 시나리오.
 
@@ -158,7 +201,7 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 - SQLite `auditLogs` `action='CLEANUP_EXECUTED'` 엔트리 확인 (수동 `_MANUAL` 과 다른 action)
 - 실패 시 원인 조사 — prisma timeout / PG 연결 고갈 / instrumentation 등록 실패
 
-### 우선순위 3: Phase 15-D 추가 보강 — 남은 1건 (~1.5h, 단독 세션 권장)
+### 우선순위 5: Phase 15-D 추가 보강 — HS256 legacy 제거 (~1.5h, 단독 세션 권장)
 
 세션 36·37·38·39 로 핵심 경로 + revoke-all + intent 태깅 + touch throttle + activity fingerprint + **SESSION_EXPIRE audit + 관리자 forced revoke** 완결. 남은 1건:
 - **HS256 legacy 쿠키 제거** ⭐ 단독 세션 — 세션 33 JWKS ES256 전환 후 24h 만료 초과. `AUTH_SECRET` 제거 + `src/lib/auth.ts` HS256 fallback 코드 정리. 기존 쿠키 무효화 리스크 존재 → 작업 직전 활성 사용자 세션 전수 확인 필요.
@@ -168,20 +211,13 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 ~~SESSION_EXPIRE audit~~ ✓ 세션 39 완결
 ~~관리자 forced revoke~~ ✓ 세션 39 완결
 
-### 우선순위 3b (신규): PG TIMESTAMPTZ 컬럼 마이그레이션 — 기술부채 최상위 승격 (2~3h)
+~~우선순위 3b: PG TIMESTAMPTZ 컬럼 마이그레이션~~ ✅ **세션 40 완결** (17 모델 / 47 컬럼). 단, Prisma binding-side 시프트 잔존 발견 → 우선순위 1 (다른 모듈 전수 검토) 신규.
 
-세션 34 + 세션 39 연 2회 재현. 대상:
-- `sessions.{created_at,last_used_at,expires_at,revoked_at}` — 세션 39 에서 국소 raw SQL 회피 적용
-- `rate_limit_buckets.{window_start,updated_at}` — 세션 34 에서 `EXTRACT(EPOCH FROM ...)` 회피
-- `mfa_*` / `webauthn_*` 등 타임스탬프 컬럼 전수
-
-마이그레이션 SQL: `ALTER COLUMN ... TYPE TIMESTAMPTZ(3) USING ... AT TIME ZONE 'UTC'`. 런타임 Prisma ORM filter 의 시간 기반 쿼리 모두 정상화.
-
-### 우선순위 4: SP-013/016 물리 측정 (13h, 환경 확보 시)
+### 우선순위 6: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
 - **SP-016 SeaweedFS 50GB** (8h): weed 설치 + 50GB 디스크 + B2 오프로드
 
-### 우선순위 5: `/kdygenesis --from-wave` 연계
+### 우선순위 7: `/kdygenesis --from-wave` 연계
 입력: `07-appendix/03-genesis-handoff.md` _PROJECT_GENESIS.md 초안 (85+ 태스크)
 산출: 주간 실행 플로우
 
@@ -203,6 +239,14 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 ```
 
 ## 알려진 이슈 및 주의사항
+
+### 세션 40 신규
+
+- **Prisma 7 adapter-pg 의 timestamptz 컬럼 binding-side TZ 시프트** — TIMESTAMPTZ 마이그레이션 적용 후에도 ORM `findMany({where:{ts:{lt: jsDate}}})` 가 9h 시프트로 0 rows 반환. 컬럼 측 변경만으로 해소 안 됨. 정공법 = raw SELECT (PG NOW()-INTERVAL 위임 + `::text` 캐스팅) + ORM CRUD (id 기반). cleanup.ts 적용 완료, **다른 모듈 전수 검토 필요** (우선순위 1).
+- **prisma INSERT 시도 시프트하는지 검증 미완** — 실제 사용자 로그인 시 만들어지는 session row 의 expires_at 정확성 확인 필요. helper 측 raw pg INSERT 는 9h 시프트 확인됨. prisma 측 INSERT 동작은 별도 검증 (우선순위 2).
+- **audit_logs.timestamp 단위 sec/ms 불일치** — Drizzle INTEGER 컬럼에 `Math.floor(Date.now()/1000)` (sec) 저장하는데 UI 코드가 ms 가정으로 표시 시 1970년 표기 (`1970-01-21T13:29:30Z` 형태). 본 세션 범위 밖.
+- **마이그레이션 USING 절 결정 원칙**: PG 서버 timezone (`SHOW TIMEZONE` = 'Asia/Seoul') 의 wall-clock 의미를 보존하려면 `USING ts AT TIME ZONE 'Asia/Seoul'` 명시. 잘못된 USING 은 데이터 영구 시프트 — CK `2026-04-19-timestamp-to-timestamptz-migration-using-clause.md` 참조.
+- **pg_dump 백업 보존**: `/tmp/luckystyle4u-pre-tz-migration-20260419-150722.dump` (5.3MB). 마이그레이션 rollback 필요 시 `pg_restore` 사용.
 
 ### 세션 39 신규
 
