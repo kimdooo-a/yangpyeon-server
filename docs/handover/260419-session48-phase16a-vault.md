@@ -247,4 +247,56 @@ Phase 16b 구현만 dev 에서 선행 (배포는 S52 최종 배포에서 일괄)
 - **migrate script**: `scripts/migrate-env-to-vault.ts`
 - **verify script**: `scripts/phase16-vault-verify.sh`
 
+## 부록 — 프로덕션 배포 완료 (세션 내 연속 수행)
+
+사용자 요청("S49 진입 전 필수 선행 (~20min) ... 이것 마무리해줘") 으로 세션 48 내에서 배포까지 전구간 완결. S48 DOD 최종 충족.
+
+### 배포 절차 실 수행 결과
+
+| 단계 | 조치 | 결과 |
+|------|------|------|
+| 1 | MASTER_KEY 생성 + 저장 경로 | `/home/smart/.luckystyle4u/secrets.env` (0640, user=smart, 64 hex) — sudo 없는 user-home 대안 |
+| 2 | .env 업데이트 | `~/dashboard/.env` 에 `MASTER_KEY_PATH=/home/smart/.luckystyle4u/secrets.env` 추가 |
+| 3 | ypserver prod --skip-win-build | Phase 2-2~2-6 전부 PASS (BUILD_ID `G4O5gQVpDaIxRXBIWyUql` / migrate "No pending" / PM2 ↺=17→18 / cloudflared 무중단 / TUNNEL_OK) |
+| 4 | migrate-env-to-vault.ts | **초기 실패**: tsx 자동 dotenv 미로드 → `.env` 의 MASTER_KEY_PATH 미적용 → 기본 경로 /etc/... ENOENT. **수정**: `set -a; source .env; set +a; npx tsx ...` 패턴으로 env export 후 재실행 → `{"migrated":"mfa.master_key"}` |
+| 5 | 헬스체크 | local=307(로그인 리다이렉트) / ext(stylelucky4u.com/login)=200 |
+| 6 | Vault decrypt 직접 스모크 | `{"test":"vault_decrypt","pass":true,"decrypted_len":64,"env_len":64}` — Vault 복호값 === process.env.MFA_MASTER_KEY (E2E 실증) |
+| 7 | phase16-vault-verify.sh 실행 | **초기 FAIL** — mfa_status UNAUTHORIZED. 원인: 스크립트가 쿠키 기반 인증 사용, 그러나 /api/v1/auth/* 는 `Authorization: Bearer <accessToken>` 요구. **픽스 커밋 `effaf52`**: node 파싱으로 accessToken 추출 + Bearer 헤더 부착 + 성공 조건을 실제 응답 shape(j.success && j.data.totp) 로 강화. 재실행 PASS (accessToken_len=260 / mfa_status PASS / === PASS ===) |
+
+### 추가 발견 / CK 후보 2건
+
+- **tsx 자동 dotenv 미로드** → `docs/solutions/2026-04-19-tsx-dotenv-autoload-missing.md` (pattern, medium)
+- **v1 API Bearer 전용 / 쿠키 인증 불가** → `docs/solutions/2026-04-19-v1-api-bearer-vs-cookie-auth.md` (bug-fix, high) — 회귀 가드 스크립트가 이 사실 몰라서 실배포 전까지 드러나지 않은 교훈
+
+### 커밋 추가분
+
+| SHA | 설명 |
+|-----|------|
+| `effaf52` | phase16-vault-verify.sh 쿠키 → Bearer 방식 픽스 |
+
+### S48 소요 총 정리
+
+| 구간 | 예상 | 실제 |
+|------|------|------|
+| Task 48-1~48-6 코드 | 8h | ~1h |
+| S48 마감 (검증 + handover + push) | 미명시 | ~10min |
+| 프로덕션 배포 (사용자 요청 직후 연속) | ~20min | ~15min |
+| 회귀 가드 버그 발견·픽스 | 미예상 | ~10min |
+| **총** | **~8h** | **~1.5h** |
+
+### Phase 16a DOD 100% 충족 증거
+
+- **드리프트 방지 3원칙 ① 사전 스파이크** — S47 SP-017/018/019 PASS
+- **② `@db.Timestamptz(3)` 강제** — SecretItem.createdAt/rotatedAt 프로덕션 적용 확인 (migration.sql `TIMESTAMPTZ(3)`)
+- **③ 회귀 가드 curl** — `scripts/phase16-vault-verify.sh` 프로덕션 PASS + 인라인 vault decrypt PASS 병행 도입
+- **MFA 로그인 회귀 0** — vitest 264/264 + 프로덕션 login API 200 + /api/v1/auth/me 200
+
+### S49 진입 조건 충족
+
+- Phase 16a 코드 + 배포 + 실전 검증 전구간 완료
+- `docs/superpowers/plans/2026-04-19-phase-16-plan.md §"세션 49: 16b Capistrano 배포 자동화 (10h) — Outline"` 이 진입점. S49 시작 시 SP-018 실측 기반 풀 디테일로 확장.
+
+---
 [← handover/_index.md](./_index.md)
+
+**저널**: [docs/logs/journal-2026-04-19.md](../logs/journal-2026-04-19.md) §"세션 48" (원본 대화 흐름 11개 토픽)
