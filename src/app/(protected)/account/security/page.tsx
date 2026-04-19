@@ -85,6 +85,33 @@ export default function MfaSecurityPage() {
     }
   }
 
+  async function revokeAllOtherSessions() {
+    if (
+      !confirm(
+        "현재 세션을 제외한 모든 세션을 종료합니다. 다른 기기는 즉시 로그아웃됩니다. 계속하시겠습니까?",
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/v1/auth/sessions/revoke-all", {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data.error?.message || "다른 세션 종료 실패");
+      const count: number = data.data?.revokedCount ?? 0;
+      await loadSessions();
+      toast.success(
+        count > 0 ? `${count}개 세션이 종료되었습니다` : "종료할 세션이 없습니다",
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "오류");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     loadStatus();
     loadSessions();
@@ -444,10 +471,23 @@ export default function MfaSecurityPage() {
       {/* 활성 세션 카드 (Phase 15-D) */}
       <Card>
         <CardHeader>
-          <CardTitle>활성 세션</CardTitle>
-          <CardDescription>
-            모든 로그인된 기기 목록. 의심스러운 세션은 즉시 종료하세요.
-          </CardDescription>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle>활성 세션</CardTitle>
+              <CardDescription>
+                모든 로그인된 기기 목록. 의심스러운 세션은 즉시 종료하세요.
+              </CardDescription>
+            </div>
+            {sessions && sessions.length > 1 && (
+              <button
+                onClick={revokeAllOtherSessions}
+                disabled={busy}
+                className="px-3 py-1.5 text-sm text-red-700 border border-red-200 rounded hover:bg-red-50 disabled:opacity-50 shrink-0"
+              >
+                현재 세션 외 모두 종료
+              </button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {sessions === null ? (
