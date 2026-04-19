@@ -8,7 +8,9 @@
 
 | 파일 | 내용 | 최종 갱신 |
 |------|------|-----------|
-| <!-- 프로젝트에 따라 추가 --> | | |
+| [mfa-browser-manual-qa.md](./mfa-browser-manual-qa.md) | Phase 15 MFA UI 브라우저 수동 QA 체크리스트 (TOTP 3종 + WebAuthn 3종 + Disable + Rate Limit) | 2026-04-19 (세션 35) |
+| [server-boot-manual.md](./server-boot-manual.md) | 서버 기동 수동 절차 | — |
+| [tables-e2e-manual.md](./tables-e2e-manual.md) | Table Editor E2E 수동 검증 | — |
 
 ## 일반적인 가이드 유형
 
