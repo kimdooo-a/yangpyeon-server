@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 세션 48 종료 시점 — Phase 16a Vault 구현 완료 (envelope 암호화 + MFA 통합)
+## 필수 참조 파일 ⭐ 세션 49 종료 시점 — S49 플랜 풀 디테일 확장 + Phase 16a 프로덕션 배포 완결 (16b 구현은 미실행)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session48-phase16a-vault.md                  ⭐ 최신 (Phase 16a 구현 완료 +528/-33 12파일, tsc 0 / vitest 264 / build 0, 커밋 6건, 배포만 남음)
+docs/handover/260419-session49-s49b-plan-expansion-phase16a-deploy.md  ⭐⭐ 최신 (S49 outline→848줄 풀 디테일 + Phase 16a prod 4 Step 완결, Task 49-1 디스패치 직전 사용자 /cs interrupt, 실구현 0건)
+docs/handover/260419-session48-phase16a-vault.md                  (Phase 16a 구현 +528/-33 12파일, tsc 0 / vitest 264 / build 0, 커밋 6건)
 docs/handover/260419-session47-phase16-spikes.md                  (3 스파이크 PASS, Clearance +3, S48 진입 Clearance 확보)
 docs/handover/260419-session46-phase-16-design-plan.md            (Phase 16 설계 425줄 + 플랜 997줄 = 1,422줄, 코드 0)
 docs/superpowers/specs/2026-04-19-phase-16-design.md              ⭐⭐ Phase 16 설계 (ADR-020 초안, 5 sub-phase 35h)
@@ -212,9 +213,11 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### ~~우선순위 0: Phase 16a 프로덕션 배포 + 회귀 가드 실행~~ ✅ **세션 48 마감 시 완결**
+### ~~우선순위 0: Phase 16a 프로덕션 배포 + 회귀 가드 실행~~ ✅ **세션 48/49 2단계 완결**
 
-세션 48 내에서 이미 수행 완료 — `/home/smart/.luckystyle4u/secrets.env` 생성 + `/ypserver prod --skip-win-build` + migrate-env-to-vault + `phase16-vault-verify.sh` PASS + Vault decrypt E2E 실측 (`{"pass":true,"decrypted_len":64,"env_len":64}`). 부수 픽스: 스크립트 쿠키→Bearer 인증 방식 (`effaf52`).
+- **세션 48**: user-home 경로 `/home/smart/.luckystyle4u/secrets.env` 로 1차 설치 + migrate + verify PASS (Vault decrypt E2E `decrypted_len:64` 일치).
+- **세션 49**: plan 기본 경로 `/etc/luckystyle4u/secrets.env` 로 재설치 (사용자 sudo) + `~/dashboard/.env.production` 에 `MASTER_KEY_PATH` append + Phase 2 전구간 재배포 (PM2 ↺=19 pid=52616 HTTP 307) + migrate-env-to-vault `already migrated` (dev/prod 동일 인스턴스) + `phase16-vault-verify.sh` `=== PASS ===`.
+- **⚠ S50 진입 전 선행 필요**: (1) KEK 일치 퍼즐 (새 ded2… KEK 로 S48 SecretItem decrypt 성공 — 수학적 특이, `mfa/crypto.ts` fallback 경로 여부 조사) (2) MASTER_KEY_PATH 이중 상태 정리 (S48 `/home/smart/.luckystyle4u/` vs S49 `/etc/luckystyle4u/` 공존 가능성).
 
 **참고용 절차 (재배포 또는 타 환경 반복 시)**:
 
@@ -239,24 +242,37 @@ wsl -e bash -c "source ~/.nvm/nvm.sh && /mnt/e/00_develop/260406_luckystyle4u_se
 
 **주의**: MASTER_KEY_PATH 미설정 시 MFA 로그인 100% 차단. 배포 전 WSL 에서 `require('./src/lib/vault').getVault().then(v => v.decrypt('mfa.master_key'))` 로 스모크 권장.
 
-### 우선순위 1: S49 Phase 16b Capistrano 배포 자동화 (10h)
+### 우선순위 1: S49 Phase 16b Capistrano 배포 자동화 — **풀 디테일 플랜 준비 완료** (10h)
 
-`docs/superpowers/plans/2026-04-19-phase-16-plan.md §"세션 49: 16b Capistrano 배포 자동화 (10h) — Outline"` 은 작업 목록 + 인터페이스만 명시 — **진입 시점에 SP-018 실측 결과 기반 풀 디테일로 확장** (점진적 플래닝 원칙, CK #33).
+**상태**: 세션 49 에서 outline(58줄)→**풀 디테일 848줄** 확장 완료 (`docs/superpowers/plans/2026-04-19-phase-16-plan.md §세션 49`). 실구현 0건, 다음 세션에서 서브에이전트 기반 순차 실행.
 
-**S49 핵심 과제** (outline 기반):
-1. **Task 49-1** (2h) — `releases/` 디렉토리 구조 초기화 (`~/dashboard/releases/<timestamp>/`, `~/dashboard/current → releases/<ts>` symlink)
-2. **Task 49-2** — `ln -sfn` atomic swap 스크립트 (SP-018 OS 수준 원자성 검증 완료)
-3. **Task 49-3** — `/ypserver` 스킬 Capistrano 패턴 교체 (현재 rsync 덮어쓰기 → release 디렉토리 push + symlink swap)
-4. **Task 49-4** — 5 release 유지 + 구 release GC
-5. **Task 49-5** — 롤백 스크립트 (symlink revert + PM2 restart, SP-018 실측 600ms fork reload 기반)
+**선행 조치 (S50 진입 즉시, ~30분)**:
+1. **KEK 퍼즐 해소**: `psql -c "SELECT name, kek_version, length(encrypted_value) AS ct_len, created_at FROM secret_items;"` + `grep -n 'MFA_MASTER_KEY\|getMfaMasterKey\|process\.env' src/lib/mfa/crypto.ts` (fallback 경로 여부)
+2. **MASTER_KEY_PATH 단일 출처 정리**: `grep -n MASTER_KEY_PATH ~/dashboard/.env*` → `.env.production` 만 유지, `.env` 중복 제거
+3. **git status** 정리 — 병렬 흔적 unstaged 3건(.gitignore/next.config.ts/pack-standalone.sh) 소속 확인
 
-**S49 DOD**:
-- 10회 배포 → `ls releases/` 가 **5 정확**
-- 롤백 시간 <30s (SP-018 fork reload 600ms 기준 넉넉한 여유)
+**실행 순서 (서브에이전트 기반, main 직접)**:
+1. **Task 49-1** (2h) `scripts/capistrano-bootstrap.sh` + `phase16-bootstrap-verify.sh` — flat→Capistrano 1회성 cut-over. **~10s 다운타임** 동반 — 사용자 확인 필수. 본 세션 대화 히스토리에 서브에이전트 프롬프트 전문 준비됨 (재사용 가능)
+2. **Task 49-2** (3h) `scripts/deploy.sh` — rsync + `npm ci` + prisma/drizzle migrate + build + shared symlink + atomic swap (`ln -sfn`) + `pm2 reload --update-env` + 5-retry exponential health + auto-rollback
+3. **Task 49-3** (2h) `scripts/rollback.sh` + <30s 측정 (SP-018 fork 600ms + npm start cold + health retry 합산)
+4. **Task 49-4** (1h) `scripts/cleanup-releases.sh` + dummy 환경 단위 테스트 + (옵션) 10 real deploys GC 검증 (15-25분 소요)
+5. **Task 49-5** (1h) `/ypserver` 스킬 Phase 2 본문 치환 (§1·§3·§4 safeguard 보존) + `docs/references/_ypserver-skill-snapshot-s49{-before,}.md` 스냅샷
+6. **Task 49-6** (1h) `phase16-deploy-verify.sh failbuild` 케이스 + `all` 모드 통합 (single/rollback/ten/failbuild 4/4 PASS = S49 DOD)
 
-실행 방식:
-- `superpowers:subagent-driven-development` — Task 단위 fresh subagent + 리뷰 포인트
-- `superpowers:executing-plans` — 현 세션 inline 실행
+**S49 DOD** (plan §세션 49 마감):
+- `~/dashboard/{releases,shared,current}` 구조 완성 (Task 49-1)
+- 10회 배포 후 `ls ~/dashboard/releases/ \| wc -l` == 5 (Task 49-4)
+- 롤백 <30s 실측 (Task 49-3)
+- `/ypserver prod` 내부적으로 `deploy.sh` 사용 (Task 49-5)
+- 실패 빌드 → current symlink 불변 (Task 49-6)
+- `phase16-deploy-verify.sh all` 4/4 PASS
+- `phase16-vault-verify.sh` 여전히 PASS (S48 회귀 0)
+
+**실행 방식**:
+- 권장: `superpowers:subagent-driven-development` — Task 단위 fresh subagent + spec/code quality 리뷰 2단계
+- 대안: `superpowers:executing-plans` — inline 배치 실행
+
+**본 세션 서브에이전트 준비 상태**: Task 49-1 프롬프트 전문 (구체적 scope 제약: 스크립트 작성 + syntax 검증 + 개별 `git add` + 한국어 커밋 메시지, **live 실행 금지**) 본 세션 transcript 에 완성 — 재진입 시 재사용.
 
 ~~우선순위 1: 다른 모듈 ORM 시간 비교 전수 검토~~ ✅ **세션 41 완결** (4파일 8곳 raw SQL 전환, 3 전환 패턴 A/B/C 정립, CK `orm-date-filter-audit-sweep.md` 신규)
 ~~우선순위 (A) INSERT-side binding 시프트 검증~~ ✅ **세션 42 완결** — DB TTL 604800 정확, 가설 기각, §1 해소. 부수적으로 `issueSession`/`rotateSession` 선제적 방어 적용 (read-back 제거).
