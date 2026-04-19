@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 47 종료 시점 — Phase 16 사전 스파이크 3건 PASS (SP-017/018/019)
+## 필수 참조 파일 ⭐ 세션 48 종료 시점 — Phase 16a Vault 구현 완료 (envelope 암호화 + MFA 통합)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session47-phase16-spikes.md                  ⭐ 최신 (3 스파이크 PASS, Clearance +3, S48 진입 Clearance 확보)
+docs/handover/260419-session48-phase16a-vault.md                  ⭐ 최신 (Phase 16a 구현 완료 +528/-33 12파일, tsc 0 / vitest 264 / build 0, 커밋 6건, 배포만 남음)
+docs/handover/260419-session47-phase16-spikes.md                  (3 스파이크 PASS, Clearance +3, S48 진입 Clearance 확보)
 docs/handover/260419-session46-phase-16-design-plan.md            (Phase 16 설계 425줄 + 플랜 997줄 = 1,422줄, 코드 0)
 docs/superpowers/specs/2026-04-19-phase-16-design.md              ⭐⭐ Phase 16 설계 (ADR-020 초안, 5 sub-phase 35h)
 docs/superpowers/plans/2026-04-19-phase-16-plan.md                ⭐⭐ Phase 16 플랜 (S47/S48 풀 디테일 + S49~S52 outline)
@@ -211,28 +212,45 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### 우선순위 1: S48 Phase 16a Vault 구현 (8h, TDD 20+ tests)
+### 우선순위 0: Phase 16a 프로덕션 배포 + 회귀 가드 실행 (~20min, 필수 선행)
 
-`docs/superpowers/plans/2026-04-19-phase-16-plan.md §"세션 48: 16a Vault 구현 (8h)"` 풀 디테일 참조.
+세션 48 에서 Phase 16a 코드는 완결되었으나 **프로덕션 미배포**. S49 진입 전에 배포 1회 + 회귀 가드 실행 필수.
 
-**6 Task 순차 실행**:
-1. **Task 48-1** (1h) — Prisma `SecretItem` 모델 + migration (**첫 `@db.Timestamptz(3)` 적용 포인트** — 드리프트 방지 원칙 #2 검증)
-2. **Task 48-2** (2h) — `MasterKeyLoader.ts` TDD 4 tests (파일 미존재/권한 0640/정상 파싱/hex length)
-3. **Task 48-3** (3h) — `VaultService.ts` TDD 6 tests (encrypt row 생성 / encrypt→decrypt round-trip / tag 변조 throw / 미존재 키 throw / IV 매회 다름 / masterKey 32 bytes 검증)
-4. **Task 48-4** (1h) — `getVault()` 싱글톤 + `scripts/migrate-env-to-vault.ts` (MFA_MASTER_KEY → mfa.master_key)
-5. **Task 48-5** (1h) — `src/lib/mfa/crypto.ts` VaultService 통합 (**기존 MFA 테스트 회귀 0 필수**)
-6. **Task 48-6** (1h) — `scripts/phase16-vault-verify.sh` 회귀 가드 (**첫 회귀 가드 스크립트 도입** — 드리프트 방지 원칙 #3 검증)
+```bash
+# 1) WSL — /etc/luckystyle4u/secrets.env 생성 (1회, 0640 권한 필수)
+sudo mkdir -p /etc/luckystyle4u
+sudo nano /etc/luckystyle4u/secrets.env
+# 파일 내용: MASTER_KEY=<64 hex>  (node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+sudo chown root:smart /etc/luckystyle4u/secrets.env
+sudo chmod 0640 /etc/luckystyle4u/secrets.env
 
-**SP-017 결과로 확정된 구현 사항** (`spikes/sp-017-vault-crypto/README.md` 참조):
-- `createCipheriv('aes-256-gcm', masterKey, randomBytes(12))` — IV 매회 랜덤, 저장/캐싱 금지
-- `rotateKek` 는 `prisma.$transaction` + 단일 for-loop (100 DEK 기준 1.18ms, async chunking 불필요)
-- Tag length 기본 16 byte, IV 12 byte (GCM 표준)
+# 2) /ypserver prod --skip-win-build  (migration + PM2 restart)
 
-**S48 DOD**:
-- `npx vitest run src/lib/vault/` 20+ tests PASS
-- MFA 로그인 회귀 0 (`npx vitest run src/lib/mfa/`)
-- `./scripts/phase16-vault-verify.sh` → `{"test":"mfa_status","pass":true}`
-- 프로덕션 `/ypserver prod --skip-win-build` + MFA 로그인 E2E PASS
+# 3) WSL — migrate-env-to-vault.ts 1회
+wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && MASTER_KEY_PATH=/etc/luckystyle4u/secrets.env npx tsx scripts/migrate-env-to-vault.ts"
+# Expected: {"migrated":"mfa.master_key"}
+
+# 4) 회귀 가드
+wsl -e bash -c "source ~/.nvm/nvm.sh && /mnt/e/00_develop/260406_luckystyle4u_server/scripts/phase16-vault-verify.sh"
+# Expected: {"test":"login","pass":true} + {"test":"mfa_status","pass":true}
+```
+
+**주의**: MASTER_KEY_PATH 미설정 시 MFA 로그인 100% 차단. 배포 전 WSL 에서 `require('./src/lib/vault').getVault().then(v => v.decrypt('mfa.master_key'))` 로 스모크 권장.
+
+### 우선순위 1: S49 Phase 16b Capistrano 배포 자동화 (10h)
+
+`docs/superpowers/plans/2026-04-19-phase-16-plan.md §"세션 49: 16b Capistrano 배포 자동화 (10h) — Outline"` 은 작업 목록 + 인터페이스만 명시 — **진입 시점에 SP-018 실측 결과 기반 풀 디테일로 확장** (점진적 플래닝 원칙, CK #33).
+
+**S49 핵심 과제** (outline 기반):
+1. **Task 49-1** (2h) — `releases/` 디렉토리 구조 초기화 (`~/dashboard/releases/<timestamp>/`, `~/dashboard/current → releases/<ts>` symlink)
+2. **Task 49-2** — `ln -sfn` atomic swap 스크립트 (SP-018 OS 수준 원자성 검증 완료)
+3. **Task 49-3** — `/ypserver` 스킬 Capistrano 패턴 교체 (현재 rsync 덮어쓰기 → release 디렉토리 push + symlink swap)
+4. **Task 49-4** — 5 release 유지 + 구 release GC
+5. **Task 49-5** — 롤백 스크립트 (symlink revert + PM2 restart, SP-018 실측 600ms fork reload 기반)
+
+**S49 DOD**:
+- 10회 배포 → `ls releases/` 가 **5 정확**
+- 롤백 시간 <30s (SP-018 fork reload 600ms 기준 넉넉한 여유)
 
 실행 방식:
 - `superpowers:subagent-driven-development` — Task 단위 fresh subagent + 리뷰 포인트
