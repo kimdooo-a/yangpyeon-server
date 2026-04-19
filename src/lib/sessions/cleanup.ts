@@ -6,8 +6,15 @@ import { prisma } from "@/lib/prisma";
  * 세션 32: `$executeRaw DELETE ... NOW() - INTERVAL '1 day'` 단일 쿼리.
  * 세션 39: 각 만료 row 별 SESSION_EXPIRE 감사 로그 기록을 위해
  *          `$queryRaw` SELECT → `$executeRaw` DELETE 2-step 으로 재설계.
- *          Prisma ORM filter (session.findMany) 는 PG TIMESTAMP(3) timezone-naive +
- *          adapter-pg 의 KST 9시간 오프셋 문제로 회피 (자세한 설명은 함수 위 주석).
+ *          Prisma ORM filter 가 PG TIMESTAMP(3) timezone-naive + adapter-pg 의
+ *          9시간 KST 오프셋 문제로 회피 (raw SQL + `expires_at::text` 캐스팅).
+ * 세션 40: 컬럼을 TIMESTAMPTZ(3) 로 마이그레이션. 컬럼 자체는 정확한 timestamptz 가
+ *          되었으나 E2E 재현 결과 Prisma 7 adapter-pg 가 timestamptz 컬럼 SELECT 시도
+ *          server timezone wall-clock 을 UTC ms 로 직접 해석하는 9h 시프트가 양방향
+ *          (binding + parsing) 으로 존재. 정공법: SELECT 의 cutoff 를 PG 측
+ *          `NOW() - INTERVAL '1 day'` 로 위임 + `expires_at::text` 캐스팅으로
+ *          PG 가 직접 ISO+offset 문자열 (예: "2026-04-18 05:14:19.232+00") 반환 →
+ *          JS `new Date(text)` 가 정확한 UTC ms 로 파싱. DELETE 는 ORM `deleteMany`.
  *
  * partial index `WHERE expires_at > NOW()` 가 PG 제약(NOW() STABLE)으로 불가하므로,
  * 일반 복합 인덱스 `(user_id, revoked_at, expires_at)` + 본 cleanup job 조합을 유지.
@@ -38,17 +45,9 @@ export function buildSessionExpireAuditDetail(entry: ExpiredSessionEntry): strin
   });
 }
 
-/**
- * 세션 39 — PG TIMESTAMP(3) timezone-naive + Prisma 7 adapter-pg 에서
- * JS Date 바인딩 시 KST 9시간 오프셋이 발생하는 문제(CK `pg-timestamp-naive-js-date-tz-offset`)
- * 를 E2E 에서 재확인함. filter cutoff 는 반드시 PG 서버측 `NOW() - INTERVAL '1 day'` 로
- * 위임하여 클라이언트 TZ 변환을 우회.
- *
- * - SELECT: `$queryRaw` 로 eligible row 스냅샷 확보 (id/userId/expiresAt).
- *   `expires_at::text` 캐스팅으로 Prisma 가 재해석하지 않는 원본 문자열 보존.
- * - DELETE: `$executeRaw DELETE ... WHERE id = ANY($ids)` 로 해당 id 만 제거 (race 방지).
- */
 export async function cleanupExpiredSessions(): Promise<CleanupResult> {
+  // SELECT: cutoff 는 PG 측 NOW()-INTERVAL 위임 (binding-side TZ 시프트 회피).
+  // expires_at::text 캐스팅으로 PG 가 정확한 ISO+offset 문자열 반환 → JS new Date() 정확 파싱.
   const rows = await prisma.$queryRaw<
     Array<{ id: string; userId: string; expiresAt: string }>
   >`
@@ -60,15 +59,16 @@ export async function cleanupExpiredSessions(): Promise<CleanupResult> {
     return { deleted: 0, expiredEntries: [] };
   }
   const ids = rows.map((r) => r.id);
-  const deletedCount = await prisma.$executeRaw`
-    DELETE FROM sessions WHERE id = ANY(${ids}::text[])
-  `;
-  const expiredEntries: ExpiredSessionEntry[] = rows.map((r) => ({
-    id: r.id,
-    userId: r.userId,
-    // PG 측 text 값은 타임존 없음 문자열 — UTC 간주로 Date 생성.
-    // audit 상세에는 이 Date 의 toISOString() 가 기록됨. 9h 오프셋 리스크 회피.
-    expiresAt: new Date(r.expiresAt.replace(" ", "T") + "Z"),
-  }));
-  return { deleted: Number(deletedCount), expiredEntries };
+  const result = await prisma.session.deleteMany({
+    where: { id: { in: ids } },
+  });
+  return {
+    deleted: result.count,
+    expiredEntries: rows.map((r) => ({
+      id: r.id,
+      userId: r.userId,
+      // PG ::text 결과 예: "2026-04-18 05:14:19.232+00" — new Date() 가 ISO 해석.
+      expiresAt: new Date(r.expiresAt),
+    })),
+  };
 }
