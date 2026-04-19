@@ -50,7 +50,7 @@ export async function verifyMfaSecondFactor(
   }
 
   if (input.code) {
-    const secret = decryptSecret(enrollment.secretCiphertext);
+    const secret = await decryptSecret(enrollment.secretCiphertext);
     const valid = verifyTotpCode(input.code, secret);
     if (!valid) {
       const lockedUntil = await registerFailure(userId, now);

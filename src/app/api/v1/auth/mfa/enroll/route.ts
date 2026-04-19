@@ -23,7 +23,7 @@ export const POST = withAuth(async (_request: NextRequest, user) => {
   }
 
   const secret = generateTotpSecret();
-  const secretCiphertext = encryptSecret(secret);
+  const secretCiphertext = await encryptSecret(secret);
 
   await prisma.mfaEnrollment.upsert({
     where: { userId: user.sub },
