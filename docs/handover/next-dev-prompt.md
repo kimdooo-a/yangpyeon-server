@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 세션 35 종료 시점 — Cleanup Scheduler + CK 4건 + MFA QA 가이드
+## 필수 참조 파일 ⭐ 세션 36 종료 시점 — Phase 15-D Refresh Rotation + Cleanup 수동 실행 UI
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session35-cleanup-scheduler-ck-batch.md      ⭐ 최신 (Cleanup Scheduler + CK 4건 + MFA QA 가이드)
+docs/handover/260419-session36-phase-15d-refresh-rotation.md      ⭐ 최신 (Phase 15-D Refresh Rotation + Cleanup 수동 실행 UI + E2E 9 시나리오 PASS)
+docs/handover/260419-session35-cleanup-scheduler-ck-batch.md      (Cleanup Scheduler + CK 4건 + MFA QA 가이드)
 docs/handover/260419-session34-phase15-ui-and-mfa-status.md      (세션 34 UI 통합 + 라이브 디버깅 2건)
 docs/handover/260419-session33-phase15-step3-4-5.md              (JWKS + TOTP + WebAuthn + Step 6 백엔드)
 docs/handover/260419-session32-phase15-step1-2.md                (Prisma Session + argon2id)
@@ -53,11 +54,18 @@ docs/solutions/2026-04-19-*.md (11건)                             ⭐ Compound 
   - rate-limit-defense-in-depth-conflict.md                      세션 34 디버깅
 docs/security/skill-audit-2026-04-19.md                          /ypserver safeguard 감사 PASS
 docs/MASTER-DEV-PLAN.md
-src/lib/cleanup-scheduler.ts                                      ⭐ 세션 35 신설 (4종 매일 KST 03:00)
+src/lib/cleanup-scheduler.ts                                      세션 35 신설 + 세션 36 CleanupActor 확장
+src/lib/sessions/tokens.ts                                        ⭐ 세션 36 신설 (opaque 토큰 + DB Session rotation)
+src/lib/sessions/login-finalizer.ts                               ⭐ 세션 36 신설 (3 로그인 경로 공통 helper)
+src/app/api/v1/auth/refresh/route.ts                              ⭐ 세션 36 신설 (rotate + reuse 탐지)
+src/app/api/v1/auth/sessions/route.ts                             ⭐ 세션 36 신설 (GET 활성 세션)
+src/app/api/v1/auth/sessions/[id]/route.ts                        ⭐ 세션 36 신설 (DELETE self-revoke)
+src/app/api/admin/cleanup/run/route.ts                            ⭐ 세션 36 신설 (수동 트리거)
+src/app/(protected)/(admin)/settings/cleanup/page.tsx             ⭐ 세션 36 신설 (UI)
 src/instrumentation.ts                                            세션 35 ensureCleanupScheduler 통합
 ```
 
-## 현재 상태 (세션 35 종료 시점)
+## 현재 상태 (세션 36 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -67,7 +75,13 @@ src/instrumentation.ts                                            세션 35 ensu
 - **세션 32**: Phase 15 Step 1-2 — Prisma Session + argon2id 자동 재해시
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
 - **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
-- **세션 35** ⭐ — 세션 34 위임 4건 순차 처리
+- **세션 35**: Cleanup Scheduler + CK 4건 + MFA QA 가이드 (commit `a29ac1b`)
+- **세션 36** ⭐ — Phase 15-D Refresh Token Rotation + Cleanup 수동 실행 UI
+  - **P4 cleanup UI**: `/api/admin/cleanup/run` POST + `(admin)/settings/cleanup` 페이지. `cleanup-scheduler.ts` CleanupActor 확장(하위 호환). 사이드바 엔트리.
+  - **P2 조기 검증**: 수동 트리거로 webauthn-challenges 1건 삭제 실측 + audit actor 정보 확인. 자동 스케줄 KST 03:00 병행.
+  - **P3 Phase 15-D**: opaque 32 bytes hex + SHA-256 hash + Prisma Session DB-backed rotation. 신규 `src/lib/sessions/{tokens,login-finalizer}.ts` + `tokens.test.ts`(+8). API 3건(`POST /refresh` reuse 탐지 / `GET /sessions` / `DELETE /sessions/[id]`). logout 서버측 revoke. 로그인 3경로 finalizeLoginResponse. `/account/security` 활성 세션 카드. 사이드바 v1+dashboard logout 병행. jwt-v1 미사용 export 정리. 감사 4종 신규(SESSION_LOGIN/ROTATE/REVOKE/REUSE_DETECTED).
+  - **검증**: tsc 0 / vitest 188→**196 PASS**(+8, 회귀 0) / `/ypserver prod --skip-win-build` 통과 / **프로덕션 E2E curl 9 시나리오 전 PASS**
+- **세션 34b (세션 35 요약)** — 세션 34 위임 4건 순차 처리
   - **우선순위 1**: `docs/guides/mfa-browser-manual-qa.md` 신규 8 시나리오 SOP (WebAuthn 브라우저 인터랙션 필수라 자동화 불가 → 다음 세션 직접 실행용)
   - **우선순위 2**: `src/lib/cleanup-scheduler.ts` 신설 — 4종 cleanup(sessions/rate-limit-buckets/jwks-retired/webauthn-challenges) 매일 KST 03:00 실행. 1분 tick + `lastRunKey` dedupe + 각 task 독립 try/catch + audit `CLEANUP_EXECUTED` 기록. `cron/registry.ts` 와 분리(UI CRUD vs 시스템 내부). `computeCleanupWindow` 순수 함수로 timezone-safe. `instrumentation.ts` 통합. **vitest 175→188 PASS** (+13 회귀 0). `/ypserver prod --skip-win-build` 통과(HTTP 307, Next Ready 79ms, PM2 로그 예외 0).
   - **우선순위 3**: SP-013/016 물리 측정 환경 미확보 → Pending 유지 확인만.
@@ -75,49 +89,51 @@ src/instrumentation.ts                                            세션 35 ensu
 
 ## 추천 다음 작업
 
-### 우선순위 1: MFA UI 브라우저 round-trip 직접 실행 ⭐ 즉시 착수 가능 (1-2h)
+### 우선순위 1: MFA UI + Phase 15-D 활성 세션 카드 브라우저 직접 실행 ⭐ 즉시 착수 가능 (1-2h)
 
-`docs/guides/mfa-browser-manual-qa.md` 의 8 시나리오 SOP 를 순차 수행. 각 시나리오에 단계·DOD·실패 진단 순서·관련 CK 교차 참조 포함. Passkey enroll/assert 는 본 환경에서 유일하게 자동화 불가 구간.
+`docs/guides/mfa-browser-manual-qa.md` 의 8 시나리오 SOP + **세션 36 추가**: Phase 15-D 활성 세션 카드 3 시나리오.
 
+**MFA 기존 8 시나리오**:
 1. TOTP Enroll (idle → qr+secret+6자리 → recovery 10 코드)
 2. Login MFA Challenge (TOTP)
 3. Passkey Enroll (WebAuthn Register + biometric)
 4. Login via Passkey (WebAuthn Assert)
 5. Passkey Delete (자기 자격증명 — userId 매칭 강제)
 6. Recovery Code 사용 + 재사용 거부
-7. (선택) Rate Limit 차단 + `Retry-After: 60` 회귀 가드 (세션 34 §3 버그 재발 방지)
+7. (선택) Rate Limit 차단 + `Retry-After: 60` 회귀 가드
 8. TOTP Disable (비밀번호 + 현재 TOTP 모두 요구)
 
-**DOD**: 1~6·8 필수 PASS, 7은 회귀 가드. 발견 이슈는 즉시 수정 + 가이드 업데이트.
+**Phase 15-D 활성 세션 카드 신규 3 시나리오**:
+9. `/account/security` 하단 "활성 세션" 카드 노출 + 현재 세션 배지 (세션 36 E2E curl 검증 완료, 브라우저 UI 만 남음)
+10. 다른 브라우저(또는 시크릿 창)에서 재로그인 → 활성 세션 2건 → 하나 "종료" 클릭 → 해당 창 401 리다이렉트
+11. 사이드바 "로그아웃" → `/api/v1/auth/logout` + `/api/auth/logout` 병행 호출 확인(DevTools Network) → /login 리다이렉트
 
-### 우선순위 2: Cleanup scheduler 첫 실행 결과 검증 (0.5h, KST 03:00 +1일 후)
+**DOD**: 1~6·8 필수 + 9~11 Phase 15-D UI 확인.
 
-세션 35 구축한 스케줄러 검증:
-- PM2 dashboard 로그 예외 0
-- SQLite auditLogs 테이블 `action = "CLEANUP_EXECUTED"` 최신 1행
-- `sessions` / `rate_limit_buckets` / `jwks_keys`(RETIRED 만료) / `webauthn_challenges` 만료 행 감소
-- summary JSON 각 task 숫자 (실패 시 "ERROR: ..." 문자열)
+### 우선순위 2: Cleanup scheduler 자동 실행 (KST 03:00 관찰) — 수동 검증은 세션 36에 완결
 
-실패 시 원인 조사 — 가장 흔한 원인: prisma timeout / PG 연결 고갈.
+세션 36 P4 UI 로 수동 트리거 1회 실행 완결(webauthn-challenges 1건 삭제 실증). KST 03:00 +1일 자동 tick 동작 검증만 남음:
+- `wsl -e bash -c "source ~/.nvm/nvm.sh && pm2 logs dashboard --lines 200 | grep -i cleanup"`
+- SQLite `auditLogs` `action='CLEANUP_EXECUTED'` 엔트리 확인 (수동 `_MANUAL` 과 다른 action)
+- 실패 시 원인 조사 — prisma timeout / PG 연결 고갈 / instrumentation 등록 실패
 
-### 우선순위 3: Phase 15-D Refresh Token Rotation (~8h)
+### 우선순위 3: Phase 15-D 보강 (~2-3h)
 
-세션 32 `Sessions` 테이블 인프라(미사용 중) 활성화. Blueprint §7.2.2 구현:
-- opaque refresh token 발급/회전/revoke
-- UI "활성 세션" 카드 (`/account/security` 에 추가)
-- device fingerprint 기록 (ip/userAgent — 이미 컬럼 있음)
-- 세션 lifecycle audit 로그 (LOGIN / ROTATE / REVOKE / EXPIRE)
+세션 36 에서 핵심 구현 완료. 운영 편의성·관측성 보강:
+- **`POST /api/v1/auth/sessions/revoke-all`** — 사용자가 "현재 세션 외 모두 종료" 요청. `revokeAllUserSessions(userId)` + 현재 세션은 예외로 남김.
+- **`lastUsedAt` 실시간 갱신** — `touchSessionLastUsed` 를 refresh 시 또는 일정 주기로 호출해 UI 활성 세션 카드에 정확한 마지막 사용 시간 표시 (현재는 rotate 시점 의존).
+- **`SESSION_EXPIRE` audit** — cleanup 시 각 expired row 별 개별 audit (또는 aggregate 건수만 기록).
+- **activity fingerprint** — UA 파싱해 "Chrome 130 on macOS" 같은 사람 읽기 쉬운 문자열 표시.
 
-### 우선순위 4: `/api/admin/cleanup/run` 엔드포인트 + UI (~2h)
-
-`src/lib/cleanup-scheduler.ts` 의 `runCleanupsNow()` export 를 ADMIN role + csrf guard 로 래핑:
-- `POST /api/admin/cleanup/run` — summary JSON 반환
-- Settings 페이지 "지금 정리 실행" 버튼 + 실행 결과 토스트
-- audit log 분기 이미 준비 (`CLEANUP_EXECUTED_MANUAL`)
-
-### 우선순위 5: SP-013/016 물리 측정 (13h, 환경 확보 시)
+### 우선순위 4: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
 - **SP-016 SeaweedFS 50GB** (8h): weed 설치 + 50GB 디스크 + B2 오프로드
+
+### 우선순위 5: Compound Knowledge 후속 (2건, ~1h)
+
+세션 36 설계에서 도출된 재사용 가치 높은 패턴:
+- **opaque token + DB session + SHA-256 hash vs stateless JWT refresh** — tradeoff 표 + reuse 탐지 defense-in-depth 패턴
+- **공통 로그인 종료 helper (finalizeLoginResponse)** — 3+ 경로의 access/refresh/audit/cookie 묶음 중복 제거 패턴
 
 ### 우선순위 6: `/kdygenesis --from-wave` 연계
 입력: `07-appendix/03-genesis-handoff.md` _PROJECT_GENESIS.md 초안 (85+ 태스크)
@@ -125,22 +141,33 @@ src/instrumentation.ts                                            세션 35 ensu
 
 ### 진입점 예시
 ```
-# 우선순위 1 — MFA UI 브라우저 직접 실행
-# docs/guides/mfa-browser-manual-qa.md 를 열어 순차 수행
-# 1. https://stylelucky4u.com/login 로 admin 로그인
-# 2. 사이드바 "내 계정 > MFA & 보안"
-# 3. 체크리스트 8 시나리오 각 DOD 확인
-# 4. 발견 이슈 즉시 수정 → /ypserver prod --skip-win-build 재배포
+# 우선순위 1 — MFA UI + Phase 15-D 활성 세션 카드 브라우저 직접 실행
+# 1. https://stylelucky4u.com/login → admin 로그인
+# 2. 사이드바 "내 계정 > MFA & 보안" → TOTP/Passkey/Recovery 기존 1~8
+# 3. 동일 페이지 하단 "활성 세션" 카드 (세션 36 신규):
+#    - 현재 세션 배지 표시
+#    - 다른 브라우저/시크릿 창 재로그인 → 2건 → 하나 "종료" → 즉시 401
+# 4. 로그아웃 → /login 리다이렉트 + DevTools Network 에서 v1 logout + dashboard logout 둘 다 200 확인
 
-# 또는 우선순위 2 — Cleanup scheduler 첫 실행 검증
-# wsl -e bash -c "source ~/.nvm/nvm.sh && pm2 logs dashboard --lines 200 | grep -i cleanup"
-# wsl -e bash -c "cd ~/dashboard && sqlite3 data/dashboard.db \"SELECT timestamp, action, detail FROM audit_logs WHERE action LIKE 'CLEANUP%' ORDER BY id DESC LIMIT 5;\""
+# 또는 우선순위 2 — KST 03:00 자동 cleanup 관찰 (익일)
+# wsl -e bash -c "source ~/.nvm/nvm.sh && cd ~/dashboard && node -e \"const Database=require('better-sqlite3');const db=new Database('data/dashboard.db',{readonly:true});console.log(JSON.stringify(db.prepare(\\\"SELECT action,substr(detail,1,100) AS detail FROM audit_logs WHERE action LIKE 'CLEANUP%' ORDER BY id DESC LIMIT 5\\\").all(),null,2));\""
+
+# 또는 우선순위 3 — Phase 15-D revoke-all 보강
+# POST /api/v1/auth/sessions/revoke-all (신규) → 현재 세션만 유지, 나머지 revoke
 ```
 
 ## 알려진 이슈 및 주의사항
 
+### 세션 36 신규
+- **기 발급 v1_refresh_token (stateless JWT) 은 더 이상 refresh 불가** — 본 세션 배포 시점 기준. 해당 쿠키 소지자는 `/api/v1/auth/refresh` 시 401 INVALID_REFRESH_TOKEN → 재로그인 유도. 프로덕션은 admin 1계정만이라 실사용 영향 없음.
+- **dashboard_session 쿠키 (24h ES256) 는 별개 유지** — v1 refresh rotation 과 무관. 로그아웃 시 `Promise.allSettled` 로 v1 + dashboard 양쪽 모두 revoke.
+- **`touchSessionLastUsed` 는 미사용 export** — 현재 rotate 시점 의존. 향후 access 검증 또는 일정 주기 갱신으로 `lastUsedAt` 정확도 높이면 UI 활성 세션 카드 개선됨.
+- **`revokeAllUserSessions` 는 reuse 탐지 전용** — 사용자 "모든 세션 종료" 버튼은 별도 endpoint 필요 (다음 세션 우선순위 3).
+- **`/api/v1/auth/sessions` GET Bearer 단독 사용 시 `current: false`** — v1_refresh_token 쿠키로 current 판별. Bearer 만으로 호출하면 현재 세션 배지 표시 안 됨 (올바른 동작).
+- **Session DB reuse 탐지는 단일 프로세스 보장** — `findSessionByToken` 는 Prisma unique index 에서 확인하므로 PM2 cluster 에서도 안전. 단 `revokeAllUserSessions` 내 update 는 트랜잭션 없이 `updateMany` → race 발생해도 최종 revoke 상태 보장됨.
+
 ### 세션 35 신규
-- **Cleanup scheduler 첫 실행 관찰 필요** — KST 03:00 익일에 첫 실행 예정. PM2 로그 + audit log `CLEANUP_EXECUTED` + 각 테이블 만료 행 감소 모두 확인.
+- **Cleanup scheduler 자동 실행 (KST 03:00) 관찰 필요** — 세션 36 수동 트리거로 로직 검증 완결. 자동 tick 동작 확인은 익일 남음.
 - **`globalThis.__cleanupScheduler` 는 단일 프로세스 전제** — PM2 cluster(SP-010) 도입 시 워커마다 별도 scheduler → 중복 실행. advisory_lock/Redis 리더 선출로 보강 필요. 현재 fork 모드 무관.
 - **`runCleanupsNow()` 는 함수 export 만** — `/api/admin/cleanup/run` 엔드포인트 + UI 미구현 (세션 35 우선순위 4 위임).
 - **audit log `action` 2종 추가** (`CLEANUP_EXECUTED`, `CLEANUP_EXECUTED_MANUAL`) — 감사 로그 UI 필터 drizzle like 로 자동 노출.

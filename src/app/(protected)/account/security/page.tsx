@@ -30,6 +30,16 @@ interface MfaStatus {
   recoveryCodesRemaining: number;
 }
 
+interface SessionInfo {
+  id: string;
+  ip: string | null;
+  userAgent: string | null;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+  current: boolean;
+}
+
 type TotpFlow =
   | { stage: "idle" }
   | { stage: "qr"; otpauthUrl: string; qrDataUrl: string }
@@ -37,6 +47,7 @@ type TotpFlow =
 
 export default function MfaSecurityPage() {
   const [status, setStatus] = useState<MfaStatus | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[] | null>(null);
   const [totpFlow, setTotpFlow] = useState<TotpFlow>({ stage: "idle" });
   const [confirmCode, setConfirmCode] = useState("");
   const [disablePassword, setDisablePassword] = useState("");
@@ -50,8 +61,33 @@ export default function MfaSecurityPage() {
     if (res.ok && data.success) setStatus(data.data);
   }
 
+  async function loadSessions() {
+    const res = await fetch("/api/v1/auth/sessions");
+    const data = await res.json();
+    if (res.ok && data.success) setSessions(data.data.sessions);
+  }
+
+  async function revokeSessionById(id: string) {
+    if (!confirm("이 세션을 강제 종료하시겠습니까?")) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/v1/auth/sessions/${id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || "세션 종료 실패");
+      await loadSessions();
+      toast.success("세션 종료됨");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "오류");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     loadStatus();
+    loadSessions();
   }, []);
 
   async function startTotpEnroll() {
@@ -402,6 +438,60 @@ export default function MfaSecurityPage() {
               새 Passkey 등록
             </button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* 활성 세션 카드 (Phase 15-D) */}
+      <Card>
+        <CardHeader>
+          <CardTitle>활성 세션</CardTitle>
+          <CardDescription>
+            모든 로그인된 기기 목록. 의심스러운 세션은 즉시 종료하세요.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {sessions === null ? (
+            <p className="text-sm text-gray-500">로딩 중...</p>
+          ) : sessions.length === 0 ? (
+            <p className="text-sm text-gray-500">활성 세션이 없습니다.</p>
+          ) : (
+            <ul className="space-y-2">
+              {sessions.map((s) => (
+                <li
+                  key={s.id}
+                  className="flex items-start justify-between p-3 border border-gray-200 rounded-md text-sm gap-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium flex items-center gap-2">
+                      <span className="truncate">
+                        {s.ip ?? "(IP 알 수 없음)"}
+                      </span>
+                      {s.current && (
+                        <span className="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-700 rounded border border-green-200 shrink-0">
+                          현재 세션
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate mt-0.5">
+                      {s.userAgent ?? "(User-Agent 없음)"}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      시작: {new Date(s.createdAt).toLocaleString("ko-KR")} · 마지막 사용:{" "}
+                      {new Date(s.lastUsedAt).toLocaleString("ko-KR")} · 만료:{" "}
+                      {new Date(s.expiresAt).toLocaleString("ko-KR")}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => revokeSessionById(s.id)}
+                    disabled={busy}
+                    className="px-3 py-1 text-sm text-red-700 border border-red-200 rounded hover:bg-red-50 disabled:opacity-50 shrink-0"
+                  >
+                    종료
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
     </div>

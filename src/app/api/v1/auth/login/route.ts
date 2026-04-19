@@ -2,15 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyPasswordHash, needsRehash, hashPassword } from "@/lib/password";
 import { loginSchema } from "@/lib/schemas/auth";
-import {
-  createAccessToken,
-  createRefreshToken,
-  V1_REFRESH_COOKIE,
-  REFRESH_MAX_AGE,
-} from "@/lib/jwt-v1";
 import { errorResponse } from "@/lib/api-response";
 import { issueMfaChallenge, CHALLENGE_MAX_AGE } from "@/lib/mfa/challenge";
 import { applyRateLimit } from "@/lib/rate-limit-guard";
+import { finalizeLoginResponse } from "@/lib/sessions/login-finalizer";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -92,36 +87,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const accessToken = await createAccessToken({
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-  });
-  const refreshToken = await createRefreshToken(user.id);
-
-  const response = NextResponse.json(
-    {
-      success: true,
-      data: {
-        accessToken,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
-      },
+  return finalizeLoginResponse({
+    request,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     },
-    { status: 200 }
-  );
-
-  response.cookies.set(V1_REFRESH_COOKIE, refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: REFRESH_MAX_AGE,
-    path: "/api/v1/",
+    method: "password",
   });
-
-  return response;
 }
