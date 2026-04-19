@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 46 종료 시점 — Phase 16 설계 + 구현 플랜 완결 (브레인스토밍 + 플랜 체인)
+## 필수 참조 파일 ⭐ 세션 47 종료 시점 — Phase 16 사전 스파이크 3건 PASS (SP-017/018/019)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session46-phase-16-design-plan.md            ⭐ 최신 (Phase 16 설계 425줄 + 플랜 997줄 = 1,422줄, 코드 0)
+docs/handover/260419-session47-phase16-spikes.md                  ⭐ 최신 (3 스파이크 PASS, Clearance +3, S48 진입 Clearance 확보)
+docs/handover/260419-session46-phase-16-design-plan.md            (Phase 16 설계 425줄 + 플랜 997줄 = 1,422줄, 코드 0)
 docs/superpowers/specs/2026-04-19-phase-16-design.md              ⭐⭐ Phase 16 설계 (ADR-020 초안, 5 sub-phase 35h)
 docs/superpowers/plans/2026-04-19-phase-16-plan.md                ⭐⭐ Phase 16 플랜 (S47/S48 풀 디테일 + S49~S52 outline)
 docs/solutions/2026-04-19-progressive-large-scale-plan-just-in-time.md  ⭐ CK +1 (33) — 점진적 플래닝 원칙
@@ -52,7 +53,10 @@ docs/handover/260419-session32-phase15-step1-2.md                (Prisma Session
 docs/handover/260419-session31-cleanup-safeguard-adr-reflect.md  (safeguard + ADR/DQ 반영)
 docs/handover/260419-session30-spike-priority-set.md             (스파이크 7건 완결)
 docs/guides/mfa-browser-manual-qa.md                             ⭐ 세션 35 — 8 시나리오 SOP (우선순위 1 실행 대상)
-docs/research/_SPIKE_CLEARANCE.md                                15 엔트리 (SP-013/016 Pending 유지)
+docs/research/_SPIKE_CLEARANCE.md                                20 엔트리 (SP-017/018/019 세션 47 추가, SP-013/016 Pending 유지)
+spikes/sp-017-vault-crypto/                                       ⭐ 세션 47 (AES-GCM envelope 검증 PASS)
+spikes/sp-018-symlink-swap/                                       ⭐ 세션 47 (symlink atomic swap PASS + PM2 fork reload 600ms)
+spikes/sp-019-pm2-cluster/                                        ⭐ 세션 47 (PM2 cluster + SQLite WAL + v6 delete 검증)
 docs/research/spikes/spike-013-wal2json-slot-result.md           Pending (물리 측정)
 docs/research/spikes/spike-016-seaweedfs-50gb-result.md          Pending (물리 측정)
 docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md    ADR-001~019
@@ -95,13 +99,19 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      세션 37 (Ses
 scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 E2E (admin revoke + SESSION_EXPIRE audit 12 step 검증)
 ```
 
-## 현재 상태 (세션 46 종료 시점)
+## 현재 상태 (세션 47 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
 - **Phase 15 Auth Advanced A-D 완전 종결** (세션 32~45)
 - **kdywave Wave 1-5 완주**: 123 문서 / 106,588줄
-- **세션 46** ⭐ — Phase 16 설계 + 구현 플랜 완결 (브레인스토밍 + 플랜 체인, ~3h)
+- **세션 47** ⭐ — Phase 16 사전 스파이크 3건 전부 PASS (SP-017/018/019, ~1.5h)
+  - **SP-017 Vault crypto GO**: IV 1M 충돌 0 / GCM tamper throw / 100 DEK rotation **1.18ms** (목표의 1/400) → `VaultService.rotateKek` 단일 트랜잭션 for-loop 구현 확정
+  - **SP-018 symlink + PM2 fork reload**: `ln -sfn` 1000 reads × 100 swaps fails=0 (atomic 확증) / fork 모드 reload 관측 다운타임 ~600ms → cluster:4 전환 근거 강화
+  - **SP-019 PM2 cluster Conditional GO**: 19,465 insert SQLITE_BUSY 0 (WAL + busy_timeout 5s 완벽) / 4 worker 독립 scheduler init → **scheduler fork × 1 분리 필수** / `pm2 delete <name>` 이름 기반은 namespace 격리 준수
+  - 커밋 3건 (`408c782` / `3e2d225` / `959c487` 병렬 흡수), Clearance Registry 17→**20 엔트리**
+  - **S48 Phase 16a Vault 즉시 진입 가능** — 플랜 풀 디테일 + TDD 20+ tests 준비 완료
+- **세션 46** — Phase 16 설계 + 구현 플랜 완결 (브레인스토밍 + 플랜 체인, ~3h)
   - 세션 45 이월 6건 매트릭스 평가 → Phase 16 분해 최우선 선정
   - KST tick 조기 이월 (PM2 uptime 0.44h, 24h+ 미충족) / kdygenesis Phase 16 §9 흡수
   - Wave 5 Phase 16 40h → **35h 보정** (세션 33 JWKS core 5h 회수)
@@ -201,19 +211,32 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### 우선순위 1: S47 Phase 16 스파이크 3건 즉시 진입 (6h, 최우선)
+### 우선순위 1: S48 Phase 16a Vault 구현 (8h, TDD 20+ tests)
 
-`docs/superpowers/plans/2026-04-19-phase-16-plan.md §"세션 47"` 풀 디테일 참조.
-- **SP-017 AES-GCM envelope** (2h) — pure node:crypto 실험, 리스크 최저. IV 충돌 (1M 샘플) + tamper 탐지 + rotation <500ms 검증
-- **SP-018 symlink atomic swap** (1h) — WSL 실행, 1000 reads × 100 swaps 실패율 <0.1% 검증
-- **SP-019 PM2 cluster+SQLite** (3h) — **최고 위험**. WAL 4 worker 경합 / instrumentation 중복 / v6 delete 버그. `pm2 delete all --namespace` safeguard 준수 필수 (세션 30 사고 재발 방지)
+`docs/superpowers/plans/2026-04-19-phase-16-plan.md §"세션 48: 16a Vault 구현 (8h)"` 풀 디테일 참조.
+
+**6 Task 순차 실행**:
+1. **Task 48-1** (1h) — Prisma `SecretItem` 모델 + migration (**첫 `@db.Timestamptz(3)` 적용 포인트** — 드리프트 방지 원칙 #2 검증)
+2. **Task 48-2** (2h) — `MasterKeyLoader.ts` TDD 4 tests (파일 미존재/권한 0640/정상 파싱/hex length)
+3. **Task 48-3** (3h) — `VaultService.ts` TDD 6 tests (encrypt row 생성 / encrypt→decrypt round-trip / tag 변조 throw / 미존재 키 throw / IV 매회 다름 / masterKey 32 bytes 검증)
+4. **Task 48-4** (1h) — `getVault()` 싱글톤 + `scripts/migrate-env-to-vault.ts` (MFA_MASTER_KEY → mfa.master_key)
+5. **Task 48-5** (1h) — `src/lib/mfa/crypto.ts` VaultService 통합 (**기존 MFA 테스트 회귀 0 필수**)
+6. **Task 48-6** (1h) — `scripts/phase16-vault-verify.sh` 회귀 가드 (**첫 회귀 가드 스크립트 도입** — 드리프트 방지 원칙 #3 검증)
+
+**SP-017 결과로 확정된 구현 사항** (`spikes/sp-017-vault-crypto/README.md` 참조):
+- `createCipheriv('aes-256-gcm', masterKey, randomBytes(12))` — IV 매회 랜덤, 저장/캐싱 금지
+- `rotateKek` 는 `prisma.$transaction` + 단일 for-loop (100 DEK 기준 1.18ms, async chunking 불필요)
+- Tag length 기본 16 byte, IV 12 byte (GCM 표준)
+
+**S48 DOD**:
+- `npx vitest run src/lib/vault/` 20+ tests PASS
+- MFA 로그인 회귀 0 (`npx vitest run src/lib/mfa/`)
+- `./scripts/phase16-vault-verify.sh` → `{"test":"mfa_status","pass":true}`
+- 프로덕션 `/ypserver prod --skip-win-build` + MFA 로그인 E2E PASS
 
 실행 방식:
-- `superpowers:subagent-driven-development` — 태스크별 fresh subagent + 리뷰 포인트
+- `superpowers:subagent-driven-development` — Task 단위 fresh subagent + 리뷰 포인트
 - `superpowers:executing-plans` — 현 세션 inline 실행
-
-3 PASS 시 → **S48 16a Vault 즉시 진입 가능** (플랜 풀 디테일 준비 완료, 8h TDD 20+ tests).
-FAIL 시 → Phase 16 설계 §3 해당 sub-phase 재검토.
 
 ~~우선순위 1: 다른 모듈 ORM 시간 비교 전수 검토~~ ✅ **세션 41 완결** (4파일 8곳 raw SQL 전환, 3 전환 패턴 A/B/C 정립, CK `orm-date-filter-audit-sweep.md` 신규)
 ~~우선순위 (A) INSERT-side binding 시프트 검증~~ ✅ **세션 42 완결** — DB TTL 604800 정확, 가설 기각, §1 해소. 부수적으로 `issueSession`/`rotateSession` 선제적 방어 적용 (read-back 제거).
