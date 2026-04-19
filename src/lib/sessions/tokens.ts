@@ -148,6 +148,32 @@ export async function revokeAllUserSessions(userId: string): Promise<number> {
   return result.count;
 }
 
+/**
+ * 사용자가 "다른 모든 세션 종료" 요청 시 (세션 37).
+ * currentSessionId 가 있으면 해당 세션 1건만 보존, 나머지 revoke.
+ * currentSessionId 가 없으면 revokeAllUserSessions 와 동치.
+ *
+ * reuse 탐지(`revokeAllUserSessions`) 와 분리한 이유:
+ *   - 감사 로그 액션 구분 (SESSION_REVOKE_ALL vs SESSION_REUSE_DETECTED)
+ *   - 사용자 의도 vs 시스템 방어 의도 분리
+ *
+ * @returns revoke 된 세션 수 (current 제외)
+ */
+export async function revokeAllExceptCurrent(
+  userId: string,
+  currentSessionId?: string | null,
+): Promise<number> {
+  const result = await prisma.session.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+      ...(currentSessionId ? { NOT: { id: currentSessionId } } : {}),
+    },
+    data: { revokedAt: new Date() },
+  });
+  return result.count;
+}
+
 export interface ActiveSessionSummary {
   id: string;
   ip: string | null;

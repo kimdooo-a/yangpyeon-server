@@ -2,7 +2,8 @@
 
 > 일자: 2026-04-19
 > 선행 세션: [세션 35](./260419-session35-cleanup-scheduler-ck-batch.md) — Cleanup Scheduler + CK 4건 + MFA QA 가이드
-> 이 세션 위치: 세션 35 위임 우선순위 4·2·3 순차 처리. P1(MFA UI brouser)과 P5(SP-013/016 물리 측정)는 환경/생체 인증 제약으로 실행 불가 → 사용자 위임
+> 이 세션 위치: 세션 35 위임 우선순위 4·2·3 순차 처리. P1(MFA UI browser)과 P5(SP-013/016 물리 측정)는 환경/생체 인증 제약으로 실행 불가 → 사용자 위임
+> 대화 저널: [journal-2026-04-19.md §세션 36](../logs/journal-2026-04-19.md) — 대화 흐름 전수 기록
 
 ---
 
@@ -243,17 +244,19 @@ CLEANUP_EXECUTED_MANUAL | {"actor":{"userId":"c0c0b305...","email":"kimdooo@styl
 
 ## 3. 변경 파일 요약
 
-### 신규 (10)
+### 신규 (12)
 ```
-src/lib/sessions/tokens.ts                                  (196줄)
-src/lib/sessions/login-finalizer.ts                          (77줄)
-src/lib/sessions/tokens.test.ts                              (+8 tests, 196→204 PASS)
-src/app/api/admin/cleanup/run/route.ts                       (관리자 수동 cleanup)
-src/app/api/v1/auth/refresh/route.ts                         (rotate + reuse 탐지)
-src/app/api/v1/auth/sessions/route.ts                        (GET 활성 세션 목록)
-src/app/api/v1/auth/sessions/[id]/route.ts                   (DELETE 자기 세션 revoke)
-src/app/(protected)/(admin)/settings/cleanup/page.tsx        (수동 cleanup UI)
-docs/handover/260419-session36-phase-15d-refresh-rotation.md (이 파일)
+src/lib/sessions/tokens.ts                                   (227줄, revokeAllExceptCurrent 포함)
+src/lib/sessions/login-finalizer.ts                           (77줄)
+src/lib/sessions/tokens.test.ts                               (+13 tests, 188→201 PASS)
+src/app/api/admin/cleanup/run/route.ts                        (관리자 수동 cleanup)
+src/app/api/v1/auth/refresh/route.ts                          (rotate + reuse 탐지)
+src/app/api/v1/auth/sessions/route.ts                         (GET 활성 세션 + touchSessionLastUsed)
+src/app/api/v1/auth/sessions/[id]/route.ts                    (DELETE 자기 세션 revoke)
+src/app/api/v1/auth/sessions/revoke-all/route.ts              (POST 현재 세션 외 모두 revoke)
+src/app/(protected)/(admin)/settings/cleanup/page.tsx         (수동 cleanup UI)
+docs/handover/260419-session36-phase-15d-refresh-rotation.md  (이 파일)
+docs/solutions/2026-04-19-opaque-refresh-rotation-reuse-detection.md  (CK, /cs 단계 작성)
 ```
 
 ### 수정 (8)
@@ -277,8 +280,8 @@ src/components/layout/sidebar.tsx                — v1 logout 병행 + /setting
 | 항목 | 결과 |
 |------|------|
 | `npx tsc --noEmit` | 0 에러 |
-| `npx vitest run` | **188 → 196 PASS** (+8, 회귀 0) |
-| 신규 테스트 | tokens.test.ts 8 케이스 (generateOpaqueToken 2 / hashToken 4 / 상수 2) |
+| `npx vitest run` | **188 → 201 PASS** (+13, 회귀 0) |
+| 신규 테스트 | tokens.test.ts 13 케이스 (generateOpaqueToken 2 / hashToken 4 / 상수 2 / revokeAllExceptCurrent 5 with Prisma mock) |
 
 ### 4-2. 배포
 
@@ -338,11 +341,12 @@ KST 03:00 +1일 후에 `sudo -u postgres psql -d dashboard -c "SELECT * FROM aud
 
 **본 세션 P2 는 수동 트리거로 완결** — 자동 tick 동작 자체는 관찰만 남음.
 
-### 우선순위 3: Phase 15-D 보강 (~2-3h)
+### 우선순위 3: Phase 15-D 잔여 보강 (~1h)
 
-- `POST /api/v1/auth/sessions/revoke-all` — 사용자가 "현재 세션 외 모두 종료" 요청. `revokeAllUserSessions(userId)` + 현재 세션은 예외로 남김.
-- `lastUsedAt` 갱신 — access 검증 또는 refresh 시 `touchSessionLastUsed` 를 실제 호출하여 UI 활성 세션 표시 현실화. 현재는 rotate 만 새 row 초기값 제공.
-- `SESSION_EXPIRE` audit — cleanup 시 expired 개별 row 를 삭제하면서 기록. `cleanupExpiredSessions` 를 BATCHED audit 형태로 확장.
+✅ `POST /api/v1/auth/sessions/revoke-all` — 현재 세션 보존 + 나머지 revoke. `/cs` 단계에서 추가 구현. UI 에 "다른 기기 모두 로그아웃" 버튼 연동 완료.
+✅ `lastUsedAt` 갱신 — GET `/api/v1/auth/sessions` 진입 시 현재 세션 touch. `/cs` 단계에서 추가 구현. refresh 시점에 국한되지 않음.
+⏳ `SESSION_EXPIRE` audit — cleanup 시 expired 개별 row 를 삭제하면서 건수 또는 개별 기록. `cleanupExpiredSessions` 를 BATCHED audit 형태로 확장.
+⏳ `touchSessionLastUsed` 스로틀 — 매 GET 마다 DB write 는 과함. 5분 throttle 도입 (Redis 또는 in-memory Map).
 
 ### 우선순위 4: SP-013 wal2json / SP-016 SeaweedFS 물리 측정 (환경 확보 시, 13h)
 
@@ -377,9 +381,9 @@ KST 03:00 +1일 후에 `sudo -u postgres psql -d dashboard -c "SELECT * FROM aud
 ## 8. Compound Knowledge 누적
 
 - **세션 35 이전**: 23건
-- **세션 36**: 0건 신규 작성 (시간 예산을 P3/P4 구현 + 배포 + E2E 9 시나리오에 투입). CK 후보 2건은 §6 우선순위 5에 위임.
+- **세션 36**: +1 — `2026-04-19-opaque-refresh-rotation-reuse-detection.md` (architecture / high confidence). Stateless JWT vs Opaque+DB 트레이드오프 표 + rotate 트랜잭션 + reuse 탐지 defense-in-depth 패턴 정리. 잔여 CK 후보 1건(공통 로그인 종료 helper 패턴)은 다음 세션 우선순위 5 위임.
 
-**누적 23건 유지**.
+**누적 24건**.
 
 ---
 
