@@ -59,3 +59,13 @@ nul
 # Playwright test output (세션 27~)
 /test-results/
 /playwright-report/
+
+# Next.js standalone 배포 패키지 (scripts/pack-standalone.sh 재생성 가능)
+# /standalone/ 대신 /standalone/* 사용 — 디렉토리 자체는 추적하되 내부만 ignore + 아래 화이트리스트만 재포함
+/standalone/*
+# 기동 헬퍼는 커밋 대상
+!/standalone/start.sh
+!/standalone/ecosystem.config.cjs
+!/standalone/install-native-linux.sh
+!/standalone/.env.production.example
+!/standalone/README.md
