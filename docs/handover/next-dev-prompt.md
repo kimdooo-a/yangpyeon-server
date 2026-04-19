@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 세션 38 종료 시점 — Phase 15-D 보강 2/5 완결 (touch throttle + activity fingerprint)
+## 필수 참조 파일 ⭐ 세션 39 종료 시점 — Phase 15-D 보강 4/5 완결 (touch throttle + UA label + SESSION_EXPIRE audit + admin forced revoke, HS256 legacy 제거만 이월)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session38-phase-15d-touch-throttle-ua-label.md  ⭐ 최신 (touch throttle + activity fingerprint + Playwright MCP 브라우저 검증)
+docs/handover/260419-session39-session-expire-admin-revoke.md     ⭐ 최신 (SESSION_EXPIRE per-row audit + 관리자 forced revoke + PG TZ 버그 국소 회피)
+docs/handover/260419-session38-phase-15d-touch-throttle-ua-label.md  (touch throttle + activity fingerprint + Playwright MCP)
 docs/handover/260419-session37-revoked-reason-intent-fix.md       (Session.revokedReason intent 태깅 + 자기파괴 버그 수정 + CK 3건)
 docs/handover/260419-session36-phase-15d-refresh-rotation.md      (Phase 15-D Refresh Rotation + Cleanup 수동 실행 UI + E2E 9 시나리오 PASS)
 docs/handover/260419-session35-cleanup-scheduler-ck-batch.md      (Cleanup Scheduler + CK 4건 + MFA QA 가이드)
@@ -47,7 +48,7 @@ docs/research/spikes/spike-016-seaweedfs-50gb-result.md          Pending (물리
 docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md    ADR-001~019
 docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md  §7.2.1~7.2.3
 docs/research/2026-04-supabase-parity/00-vision/07-dq-matrix.md       DQ-AC-1/AC-2/4.1/12.4 Resolved
-docs/solutions/2026-04-19-*.md (16건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37·38 (누적 28건)
+docs/solutions/2026-04-19-*.md (18건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37·38·39 (누적 30건)
   - otplib-v13-breaking-noble-plugin.md                          세션 33 외부 라이브러리
   - simplewebauthn-v10-api-shape.md                              세션 33 외부 라이브러리
   - mfa-challenge-token-2fa-pattern.md                           세션 33 설계 패턴
@@ -58,7 +59,9 @@ docs/solutions/2026-04-19-*.md (16건)                             ⭐ Compound 
   - login-finalize-helper-centralization.md                      세션 37 DRY 패턴
   - session-revoke-user-intent-vs-defense.md                     세션 37 함수 분리
   - revoked-reason-intent-tagging.md                             세션 37 버그픽스 (severity: functional)
-  - ios-safari-ua-regex-trap.md                                  ⭐ 세션 38 bug-fix (Version/N ... Safari/N 중간 Mobile/ 토큰 끼임)
+  - ios-safari-ua-regex-trap.md                                  세션 38 bug-fix (Version/N ... Safari/N 중간 Mobile/ 토큰 끼임)
+  - prisma-orm-tz-naive-filter-gotcha.md                         ⭐ 세션 39 bug-fix-pattern (Prisma 7 adapter-pg + PG TIMESTAMP(3) 9h KST 조용한 filter 실패 → raw SQL NOW()-INTERVAL 위임)
+  - per-row-audit-on-batch-delete.md                             ⭐ 세션 39 pattern (DB ops 는 entries 반환, audit 정책은 호출자 scheduler 에서 → 집계 + per-row 병행)
 docs/security/skill-audit-2026-04-19.md                          /ypserver safeguard 감사 PASS
 docs/MASTER-DEV-PLAN.md
 src/lib/cleanup-scheduler.ts                                      세션 35 신설 + 세션 36 CleanupActor 확장
@@ -71,12 +74,16 @@ src/app/api/v1/auth/sessions/route.ts                             ⭐ 세션 36 
 src/app/api/v1/auth/sessions/[id]/route.ts                        ⭐ 세션 36 신설 (DELETE self-revoke)
 src/app/api/admin/cleanup/run/route.ts                            ⭐ 세션 36 신설 (수동 트리거)
 src/app/(protected)/(admin)/settings/cleanup/page.tsx             ⭐ 세션 36 신설 (UI)
-src/app/api/v1/auth/sessions/revoke-all/route.ts                  ⭐ ffb3e0f 커밋 + 세션 37 reason 태깅 (POST /revoke-all)
+src/app/api/v1/auth/sessions/revoke-all/route.ts                  ffb3e0f 커밋 + 세션 37 reason 태깅 (POST /revoke-all)
+src/app/api/admin/users/[id]/sessions/route.ts                    ⭐ 세션 39 신설 (DELETE admin forced revoke + reason="admin" + SESSION_ADMIN_REVOKE_ALL audit)
+src/lib/sessions/cleanup.ts                                       ⭐ 세션 39 재설계 (raw SQL 2-step + expiredEntries 반환 + buildSessionExpireAuditDetail 순수 함수)
+src/lib/sessions/cleanup.test.ts                                  ⭐ 세션 39 신설 (11 tests)
 src/instrumentation.ts                                            세션 35 ensureCleanupScheduler 통합
-prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 (Session.revokedReason TEXT)
+prisma/migrations/20260419170000_add_session_revoked_reason/      세션 37 (Session.revokedReason TEXT)
+scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 E2E (admin revoke + SESSION_EXPIRE audit 12 step 검증)
 ```
 
-## 현재 상태 (세션 38 종료 시점)
+## 현재 상태 (세션 39 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -87,7 +94,17 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
 - **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
 - **세션 35**: Cleanup Scheduler + CK 4건 + MFA QA 가이드 (commit `a29ac1b`)
-- **세션 38** ⭐ — Phase 15-D 보강 2/5 완결 (touch throttle + activity fingerprint)
+- **세션 39** ⭐ — Phase 15-D 보강 2건 완결 + PG TZ 버그 국소 회피 (SESSION_EXPIRE per-row audit + 관리자 forced revoke)
+  - 5 이월 항목 중 HS256(단독 세션 잠금) · MFA biometric · SP013/016 · /kdygenesis 제외, 2·3a·3b 3건 자율 채택
+  - TDD: `cleanup.test.ts` 11 신규 + `tokens.test.ts` admin/logout 3 신규 → **vitest 231→245 PASS**
+  - `cleanup.ts`: `$executeRaw` 1-step → `$queryRaw + $executeRaw` 2-step 재설계 + `{deleted, expiredEntries}` 반환 + `buildSessionExpireAuditDetail` 순수 함수 신규
+  - `cleanup-scheduler.ts`: `runSessionsCleanupWithAudit` 래퍼 — 각 entry 별 `SESSION_EXPIRE` audit 기록 (try/catch 격리), 집계 `CLEANUP_EXECUTED` 와 병행
+  - `tokens.ts`: `revokeAllUserSessions(userId, reason?)` optional 파라미터 — default `"reuse_detected"` (refresh route 호환 유지)
+  - 신규 `src/app/api/admin/users/[id]/sessions/route.ts` — withRole(ADMIN) + revokeAll("admin") + `SESSION_ADMIN_REVOKE_ALL` audit (writeAuditLogDb 즉시)
+  - **E2E 중 버그 재현**: Prisma 7 adapter-pg + PG `TIMESTAMP(3)` timezone-naive 조합에서 `session.findMany({where:{expiresAt:{lt:cutoff}}})` 가 조용히 0 rows. 9h KST 오프셋 (세션 34 CK `pg-timestamp-naive-js-date-tz-offset` 재현 케이스). 서버측 `NOW() - INTERVAL '1 day'` + `expires_at::text` 캐스팅으로 국소 회피
+  - **검증**: tsc 0 / `/ypserver prod --skip-win-build` 통과 (PM2 ↺ 누적 9, HTTP 307, Tunnel OK) / E2E curl 12 step 전수 PASS
+  - **CK +2** (누적 28 → 30): `prisma-orm-tz-naive-filter-gotcha` (bug-fix-pattern, high) / `per-row-audit-on-batch-delete` (pattern, high)
+- **세션 38** — Phase 15-D 보강 2/5 완결 (touch throttle + activity fingerprint)
   - `/kdyguide` 자율 실행 위임 → 5 보강 항목 중 가장 작고 독립적·낮은 리스크인 2개 선정
   - 신규 `src/lib/sessions/activity.ts` — pure function 2개(shouldTouch 60초 디바운스 + parseUserAgent Chrome/Firefox/Safari/Edge × Windows/macOS/Linux/iOS/Android + curl regex)
   - 신규 `activity.test.ts` +25 tests (TDD, iOS Safari UA regex 1회 fail → 수정: "Safari 토큰 존재 + Chrome/Edge 부재" 조건)
@@ -141,15 +158,24 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 
 - SQLite `auditLogs` `action='CLEANUP_EXECUTED'` 엔트리 확인 (수동 `_MANUAL` 과 다른 action)
 - 실패 시 원인 조사 — prisma timeout / PG 연결 고갈 / instrumentation 등록 실패
 
-### 우선순위 3: Phase 15-D 추가 보강 남은 3건 (~2-3h)
+### 우선순위 3: Phase 15-D 추가 보강 — 남은 1건 (~1.5h, 단독 세션 권장)
 
-세션 36·37·38 으로 핵심 경로 + revoke-all + intent 태깅 + **touch throttle + activity fingerprint** 완결. 남은 3건:
-- **`SESSION_EXPIRE` audit** — cleanup 시 각 expired row 별 건수 기록 (지금은 통합 CLEANUP_EXECUTED 로만)
-- **관리자 forced revoke** — `/api/admin/users/[id]/sessions DELETE` + `revokedReason="admin"` 활용
-- **HS256 legacy 쿠키 제거** — 세션 33 JWKS ES256 전환 후 24h 만료 초과. `AUTH_SECRET` 제거 + HS256 fallback 코드 정리 가능 (기존 쿠키 무효화 리스크로 단독 세션 권장)
+세션 36·37·38·39 로 핵심 경로 + revoke-all + intent 태깅 + touch throttle + activity fingerprint + **SESSION_EXPIRE audit + 관리자 forced revoke** 완결. 남은 1건:
+- **HS256 legacy 쿠키 제거** ⭐ 단독 세션 — 세션 33 JWKS ES256 전환 후 24h 만료 초과. `AUTH_SECRET` 제거 + `src/lib/auth.ts` HS256 fallback 코드 정리. 기존 쿠키 무효화 리스크 존재 → 작업 직전 활성 사용자 세션 전수 확인 필요.
 
 ~~touch throttle~~ ✓ 세션 38 완결
 ~~activity fingerprint~~ ✓ 세션 38 완결
+~~SESSION_EXPIRE audit~~ ✓ 세션 39 완결
+~~관리자 forced revoke~~ ✓ 세션 39 완결
+
+### 우선순위 3b (신규): PG TIMESTAMPTZ 컬럼 마이그레이션 — 기술부채 최상위 승격 (2~3h)
+
+세션 34 + 세션 39 연 2회 재현. 대상:
+- `sessions.{created_at,last_used_at,expires_at,revoked_at}` — 세션 39 에서 국소 raw SQL 회피 적용
+- `rate_limit_buckets.{window_start,updated_at}` — 세션 34 에서 `EXTRACT(EPOCH FROM ...)` 회피
+- `mfa_*` / `webauthn_*` 등 타임스탬프 컬럼 전수
+
+마이그레이션 SQL: `ALTER COLUMN ... TYPE TIMESTAMPTZ(3) USING ... AT TIME ZONE 'UTC'`. 런타임 Prisma ORM filter 의 시간 기반 쿼리 모두 정상화.
 
 ### 우선순위 4: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
@@ -177,6 +203,15 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      ⭐ 세션 37 
 ```
 
 ## 알려진 이슈 및 주의사항
+
+### 세션 39 신규
+
+- **PG `TIMESTAMP(3)` timezone-naive + Prisma 7 adapter-pg = 9h KST 시프트** — 세션 34(rate-limit 경로) 에 이어 세션 39(sessions 경로) 에서 재현. `session.findMany({where:{expiresAt:{lt: jsDate}}})` 가 조용히 0 rows 반환. 신규 filter 구현 시 **raw SQL `NOW() - INTERVAL` 서버측 위임** 우선 검토. 근본 해결은 TIMESTAMPTZ 마이그레이션(우선순위 3b).
+- **`cleanupExpiredSessions` 는 `$queryRaw + $executeRaw` 2-step** — interactive `$transaction` 미사용. race 는 `id = ANY($ids)` 필터로 완화. 세션 39 이전의 `$executeRaw DELETE FROM sessions` 단일 쿼리 시그니처는 **Breaking Change** (반환 타입 확장). caller 는 scheduler 1곳뿐이라 이미 반영.
+- **SESSION_EXPIRE audit detail 의 `expiresAt` 은 9h 시프트 상태 기록** — PG 저장 값 자체가 KST-local 해석으로 들어간 문제라 감사 상세도 의도 시각 대비 9h 뒤. "어떤 row 가 언제 배치 정리되었나" 추적은 가능. 완전 교정은 TIMESTAMPTZ 마이그레이션 종속.
+- **`revokeAllUserSessions(userId, reason?)` 기본값은 `"reuse_detected"`** — refresh route 호환 유지. 새 caller (admin forced revoke 등) 는 reason 명시 전달 의무. reason 값은 `SessionRevokeReason` 타입(6값)에서 선택.
+- **`DELETE /api/admin/users/[id]/sessions` 는 자기 revoke 허용** — admin 이 본인 id 로 호출해도 차단 없음. 본인 세션 전부 revoke 후 next request 가 401 → 재로그인. 의도적 동작.
+- **`/api/auth/login` (deprecated) 쿠키 설정 간헐 실패** — E2E 스크립트 일부 시나리오에서 cookieA 가 비어 옴. rate-limit 버킷 축적 영향 가능성. 실사용 영향 낮음. 장기적으로 `/api/v1/auth/login` 으로 전환.
 
 ### 세션 38 신규
 
