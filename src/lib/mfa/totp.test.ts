@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { authenticator } from "otplib";
 import {
   generateTotpSecret,
@@ -7,15 +7,36 @@ import {
   generateRecoveryCodes,
   normalizeAndHashRecoveryCode,
 } from "./totp";
-import { encryptSecret, decryptSecret, hashRecoveryCode, safeEqualHash } from "./crypto";
+import {
+  encryptSecret,
+  decryptSecret,
+  hashRecoveryCode,
+  safeEqualHash,
+  __resetMfaKeyCache,
+} from "./crypto";
 
 // Phase 15 Auth Advanced Step 4 — TOTP MFA (FR-6.1)
 // 참조: docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md
+//
+// Phase 16a: MASTER_KEY 로딩이 Vault 경유 async 로 전환됨.
+// 테스트 격리 위해 @/lib/vault 를 mock — process.env.MFA_MASTER_KEY 를 Vault decrypt 결과로 위장.
+
+vi.mock("@/lib/vault", () => ({
+  getVault: async () => ({
+    decrypt: async (name: string) => {
+      if (name === "mfa.master_key") {
+        return process.env.MFA_MASTER_KEY!;
+      }
+      throw new Error(`Secret not found: ${name}`);
+    },
+  }),
+}));
 
 beforeAll(() => {
   // 32 byte hex = AES-256 key
   process.env.MFA_MASTER_KEY =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  __resetMfaKeyCache();
 });
 
 describe("TOTP secret & URL", () => {
@@ -75,25 +96,25 @@ describe("Recovery codes", () => {
 });
 
 describe("AES-256-GCM encryption", () => {
-  it("암호화 → 복호화 round-trip", () => {
+  it("암호화 → 복호화 round-trip", async () => {
     const plain = generateTotpSecret();
-    const ct = encryptSecret(plain);
+    const ct = await encryptSecret(plain);
     expect(ct).not.toBe(plain);
-    expect(decryptSecret(ct)).toBe(plain);
+    expect(await decryptSecret(ct)).toBe(plain);
   });
 
-  it("같은 평문도 매번 다른 ciphertext 를 생성 (nonce)", () => {
+  it("같은 평문도 매번 다른 ciphertext 를 생성 (nonce)", async () => {
     const plain = "JBSWY3DPEHPK3PXP";
-    const a = encryptSecret(plain);
-    const b = encryptSecret(plain);
+    const a = await encryptSecret(plain);
+    const b = await encryptSecret(plain);
     expect(a).not.toBe(b);
   });
 
-  it("변조된 ciphertext 를 거부한다 (GCM auth tag)", () => {
-    const ct = encryptSecret("JBSWY3DPEHPK3PXP");
+  it("변조된 ciphertext 를 거부한다 (GCM auth tag)", async () => {
+    const ct = await encryptSecret("JBSWY3DPEHPK3PXP");
     // 마지막 문자 뒤집기
     const tampered = ct.slice(0, -1) + (ct.endsWith("A") ? "B" : "A");
-    expect(() => decryptSecret(tampered)).toThrow();
+    await expect(decryptSecret(tampered)).rejects.toThrow();
   });
 });
 

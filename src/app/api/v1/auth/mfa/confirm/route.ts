@@ -43,7 +43,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     return errorResponse("NO_ENROLLMENT", "먼저 MFA 설정을 시작하세요", 400);
   }
 
-  const secret = decryptSecret(enrollment.secretCiphertext);
+  const secret = await decryptSecret(enrollment.secretCiphertext);
   if (!verifyTotpCode(parsed.data.code, secret)) {
     return errorResponse("INVALID_CODE", "코드가 올바르지 않습니다", 401);
   }
