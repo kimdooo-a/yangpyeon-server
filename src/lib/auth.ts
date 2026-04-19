@@ -14,17 +14,6 @@ export interface DashboardSessionPayload {
 }
 
 /**
- * HS256 legacy secret (기 발급 쿠키 검증용).
- * SP-014 이후 신 토큰은 ES256로 서명하지만, 기 발급된 HS256 쿠키의 자연 만료(24h)까지 허용.
- * AUTH_SECRET 미설정 시 legacy 검증은 스킵 (신 배포 이후 재로그인 강제).
- */
-function getLegacySecret(): Uint8Array | null {
-  const secret = process.env.AUTH_SECRET;
-  if (!secret || secret.length < 16) return null;
-  return new TextEncoder().encode(secret);
-}
-
-/**
  * 대시보드 세션 JWT 생성 — ES256 비대칭 서명.
  * 참조: docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md §7.2.1
  * SP-014 Go 판정: kid 헤더 기반 JWKS 검증, 회전 시 endpoint-side grace 운용.
@@ -44,38 +33,23 @@ export async function createSession(payload: {
 }
 
 /**
- * 대시보드 세션 JWT 검증 — ES256 우선, HS256 legacy fallback.
+ * 대시보드 세션 JWT 검증 — ES256 only (JWKS 기반).
  *
- * 분기 규칙:
- *   - 토큰 헤더에 `kid` 존재 → ES256, DB에서 공개키 조회 후 검증.
- *   - `kid` 없음 → 레거시 HS256, AUTH_SECRET으로 검증 (설정된 경우만).
- *
- * 레거시 토큰(role 없음)은 role="ADMIN"으로 간주 (30일 전환 기간, 세션 14 규칙 유지).
+ * 세션 45 이전: kid 없는 토큰은 AUTH_SECRET 기반 HS256 legacy fallback 으로 검증했음.
+ * 세션 45 에서 HS256 fallback 제거 (세션 33 JWKS 도입 후 24h+ 경과 → 레거시 쿠키 자연 만료).
+ * 이제 kid 없는 토큰은 즉시 null 반환 → 재로그인 유도.
  */
 export async function verifySession(
   token: string,
 ): Promise<DashboardSessionPayload | null> {
   try {
     const header = decodeProtectedHeader(token);
+    if (!header.kid) return null;
 
-    if (header.kid) {
-      const publicKey = await getPublicKeyByKid(header.kid);
-      if (!publicKey) return null;
-      const { payload } = await jwtVerify(token, publicKey, {
-        algorithms: [JWKS_ALG],
-      });
-      return {
-        sub: (payload.sub as string) ?? "legacy",
-        email: (payload.email as string) ?? "admin",
-        role: (payload.role as string) ?? "ADMIN",
-        authenticated: true,
-      };
-    }
-
-    const legacy = getLegacySecret();
-    if (!legacy) return null;
-    const { payload } = await jwtVerify(token, legacy, {
-      algorithms: ["HS256"],
+    const publicKey = await getPublicKeyByKid(header.kid);
+    if (!publicKey) return null;
+    const { payload } = await jwtVerify(token, publicKey, {
+      algorithms: [JWKS_ALG],
     });
     return {
       sub: (payload.sub as string) ?? "legacy",
