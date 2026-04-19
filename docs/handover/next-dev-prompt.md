@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 43 종료 시점 — 세션 42 이월 3건 순차 처리 (P1 관찰 + P2 users 테이블 확산 + P3 기각)
+## 필수 참조 파일 ⭐ 세션 44 종료 시점 — 0-row 테이블 17 파일 Date 직렬화 선제 일괄 수정 + 공용 헬퍼 도입
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session43-users-date-fix.md                  ⭐ 최신 (users 4 API 파일 7 핸들러 패턴 B/C 수정 + §3 기각)
+docs/handover/260419-session44-zero-row-tables-date-fix.md        ⭐ 최신 (12 API 헬퍼 적용 + 5 미수정 판별 + E2E 5건 diff_ms=0)
+docs/handover/260419-session43-users-date-fix.md                  (users 4 API 파일 7 핸들러 패턴 B/C 수정 + §3 기각)
 docs/handover/260419-session42-insert-audit.md                    (INSERT 시프트 검증 + 선제적 방어 + §3 신규)
 docs/handover/260419-session41-orm-date-audit.md                  (ORM Date 비교 전수 감사 + 3 전환 패턴 A/B/C + Wave 충실이행도 평가)
 docs/handover/260419-session40-timestamptz-migration.md           (TIMESTAMPTZ 마이그레이션 + cleanup 정공법 + binding-side 시프트 잔존 발견)
@@ -89,7 +90,7 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      세션 37 (Ses
 scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 E2E (admin revoke + SESSION_EXPIRE audit 12 step 검증)
 ```
 
-## 현재 상태 (세션 43 종료 시점)
+## 현재 상태 (세션 44 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -100,7 +101,14 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
 - **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
 - **세션 35**: Cleanup Scheduler + CK 4건 + MFA QA 가이드 (commit `a29ac1b`)
-- **세션 43** ⭐ — 세션 42 이월 3건 순차 처리 (P1 관찰 + P2 users 4 파일 확산 + P3 기각)
+- **세션 44** ⭐ — 0-row 테이블 17 파일 Date 직렬화 선제 일괄 수정 + 공용 헬퍼 도입
+  - **P3** (잔존 `::uuid` grep): 0건 즉시 종결 (세션 43 5곳 제거 후 추가 도입 없음)
+  - **P2** (0-row 17 파일 선제): 공용 헬퍼 `src/lib/date-fields.ts` 신규 (ALLOWED_TABLES Set + COLUMN_RE 정규식 두 겹 화이트리스트 + `fetchDateFieldsText` + `toIsoOrNull`) + 단위 테스트 10건. 12 API 라우트 수정(cron×2/webhooks×2/api-keys×2/log-drains×2/functions×3/mfa-status). 수정 불필요 5 파일 판별(write-only 응답에 Date 없음). functions/route.ts nested runs 처리 (fnDateMap+runDateMap), mfa/status enrollment.id select 추가
+  - **P1** (KST 03:00 자동 tick): baseline 스냅샷 — 0 entries (uptime 67분, 정상). 익일 발동 예정
+  - 신규 E2E `scripts/session44-verify.sh` (지속 자산) — 5건 diff_ms=0 (webhook POST/GET-single/GET-list, cron POST, log-drain POST)
+  - 검증: tsc 0 / vitest 244 → **254 PASS** (+10 헬퍼, 회귀 0) / `/ypserver prod --skip-win-build` (PM2 ↺=15, Tunnel 9h online)
+  - CK 갱신 1건 (32 유지): `orm-date-filter-audit-sweep.md` 잔존 과제 §2 해소 + 세션 44 추가 섹션
+- **세션 43** — 세션 42 이월 3건 순차 처리 (P1 관찰 + P2 users 4 파일 확산 + P3 기각)
   - **P1** (KST 03:00 자동 cleanup tick): PM2 uptime 111분(↺=12 직후)로 자동 tick 미발동, 현 상태 관찰만 + 다음 세션(uptime 24h+) 이월
   - **P2** (세션 41 CK §2 기타 API route Date 직렬화): `scripts/session43-parsing-repro.ts` 로 Prisma 7 adapter-pg parsing-side +9h 시프트 실측 재현 성공 (diff=32,400,147ms 정확). DB 인벤토리상 users 만 데이터 있음 → users 4 API 파일 7 핸들러 수정 (패턴 B/C 확장)
   - **P3** (세션 42 CK §3 Next.js Set-Cookie Expires +9h): `@edge-runtime/cookies/index.js` 소스 추적 + 실측 완료 — 9h 시프트 **재현 불가**, 가설 기각
@@ -181,38 +189,13 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 wsl -e bash -c "source ~/.nvm/nvm.sh && pm2 logs dashboard --lines 200 | grep -i cleanup"
 # audit_logs WHERE action='CLEANUP_EXECUTED' (자동) vs 'CLEANUP_EXECUTED_MANUAL' (UI)
 ```
-PM2 restart 누적 ↺=14 (세션 43 P2 수정 재배포 2회) — uptime 24h+ 확보 위해 당분간 재배포 없이 대기 필요.
+PM2 restart 누적 ↺=15 (세션 44 재배포 1회) — uptime 24h+ 확보 위해 당분간 재배포 없이 대기 필요. 세션 44 baseline = 0 entries 정상.
 
-### 우선순위 2: 0-row 테이블 17 파일 Date 직렬화 선제적 일괄 수정 (1-2h, 세션 43 CK 잔존 과제)
+~~우선순위 2: 0-row 테이블 17 파일 Date 직렬화 선제적 일괄 수정~~ ✅ **세션 44 완결** — 12 API 헬퍼 적용 + 5 미수정 판별 + E2E 5건 diff_ms=0. 헬퍼 `src/lib/date-fields.ts` 도입.
 
-세션 43 에서 users 테이블 경로 4 파일만 커버. 다른 17 파일 (해당 테이블 현재 0 rows) 은 데이터 유입 시 즉시 9h 시프트 발생. **선제적 일괄 수정 권장**:
+~~우선순위 3: 잔존 `::uuid` 캐스트 grep~~ ✅ **세션 44 완결** — 0건 (세션 43 5곳 제거 후 추가 도입 없음).
 
-**확산 대상 파일** (세션 43 grep 기반):
-- `src/app/api/v1/cron/route.ts` + `[id]/route.ts` + `[id]/run/route.ts` — lastRunAt / nextRunAt / createdAt
-- `src/app/api/v1/webhooks/route.ts` + `[id]/route.ts` + `[id]/trigger/route.ts` — createdAt / updatedAt / lastTriggeredAt
-- `src/app/api/v1/api-keys/route.ts` + `[id]/route.ts` — expiresAt / createdAt / lastUsedAt
-- `src/app/api/v1/log-drains/route.ts` + `[id]/route.ts` + `[id]/test/route.ts`
-- `src/app/api/v1/functions/route.ts` + `[id]/route.ts` + `[id]/run/route.ts` + `[id]/runs/route.ts` — updatedAt / startedAt / finishedAt
-- `src/app/api/v1/auth/mfa/status/route.ts` — passkey createdAt / lastUsedAt + enrollment.lockedUntil
-
-**적용 패턴**: 세션 43 users 와 동일 (패턴 B = 전체 raw SELECT with `::text`, 또는 패턴 C 확장 = 보조 raw SELECT + Map 병합).
-
-**선제 체크리스트** (세션 43 파생 교훈):
-1. `information_schema.columns` 로 대상 테이블 id 컬럼 타입 확인 (PG `text` vs `uuid`)
-2. `::uuid` 캐스트는 users.id 동일 타입이라 제거. 다른 테이블은 별도 확인.
-3. 수정 후 배포 + curl E2E 1회 필수
-
-**공용 헬퍼 검토**: `src/lib/utils/fetch-date-fields-text.ts` (table, ids, fields[]) 도입 가능. 단, 스키마별 필드명 상이하여 제네릭 비용 vs 반복 코드 감축 저울질.
-
-### 우선순위 3: 잔존 `::uuid` 캐스트 grep (10분)
-
-세션 43 에서 추가한 `::uuid` 캐스트 5 곳을 제거했으나 기존 코드에 잔존 여부 확인 필요:
-```bash
-grep -rn "::uuid" src/
-```
-발견 시 컬럼 타입 확인 후 제거 또는 유지 판단.
-
-### 우선순위 4: MFA UI + Phase 15-D 활성 세션 카드 브라우저 직접 실행 (1-2h)
+### 우선순위 2: MFA UI + Phase 15-D 활성 세션 카드 브라우저 직접 실행 (1-2h)
 
 `docs/guides/mfa-browser-manual-qa.md` 의 8 시나리오 SOP + **세션 36 추가**: Phase 15-D 활성 세션 카드 3 시나리오.
 
@@ -288,10 +271,19 @@ grep -rn "::uuid" src/
 
 ## 알려진 이슈 및 주의사항
 
+### 세션 44 신규
+
+- **`src/lib/date-fields.ts` 헬퍼는 ALLOWED_TABLES 갱신 필수** — 새 테이블 라우트 추가 시 Set 에 테이블명 추가 안 하면 `테이블 화이트리스트 위반` throw 로 즉시 발견. 누락 위험 낮음.
+- **`COLUMN_RE = /^[a-z][a-z0-9_]*$/`** — PG snake_case 강제. camelCase (e.g. `createdAt`) 전달 시 throw. 헬퍼 호출부에서는 항상 SQL 컬럼명 그대로 사용.
+- **functions/route.ts nested runs select 에 `id: true` 추가** — runDateMap 헬퍼 호출 위해. 향후 select 변경 시 id 유지 주의.
+- **mfa/status enrollment.id select 추가** — findUnique({where:{userId}}) 가 id 미선택 → 헬퍼 호출 위해 select 에 추가. 응답 shape 영향 없음.
+- **수정 불필요 5 파일 (write-only)** — cron/[id]/run / webhooks/[id]/trigger / log-drains/[id]/test / functions/[id]/run / mfa/webauthn/authenticators/[id] DELETE — Prisma update 후 응답에 Date 미포함이라 시프트 영향 없음. 향후 응답 형태 변경 시 헬퍼 적용 필요.
+- **회귀 가드 자산 3종 누적**: `scripts/session43-parsing-repro.ts` (시프트 재현) + `scripts/session43-verify.sh` (users) + `scripts/session44-verify.sh` (webhooks/cron/log-drains). 향후 Prisma 패치 / adapter 교체 / 새 테이블 추가 시 30초 실행으로 회귀 즉시 탐지.
+
 ### 세션 43 신규
 
 - **`users.id` 컬럼 타입은 PG `text`** (Prisma `String @id` 기본 매핑, uuid 포맷 저장하지만 컬럼 타입 자체는 text). 신규 raw SQL 작성 시 `::uuid` 캐스트 금지 (text = uuid operator 오류). 다른 테이블 id 도 대개 text. `information_schema.columns` 로 사전 확인 필수.
-- **0-row 테이블 17 파일의 Date 직렬화 경로는 잠재 위험** — 해당 테이블에 데이터 유입 시 즉시 9h 시프트 발생. 데이터 추가 시점 회귀 가드 필요.
+- ~~**0-row 테이블 17 파일의 Date 직렬화 경로는 잠재 위험**~~ ✅ **세션 44 완결** — 12 파일 헬퍼 적용 (5 파일은 write-only 응답 미포함). 데이터 유입 시 자동 차단.
 - **`scripts/session43-parsing-repro.ts` + `session43-verify.sh` 는 지속 자산** — 향후 다른 테이블 재검증 시 30초 실행으로 시프트 상태 확인 가능.
 - ~~**Next.js 16 Set-Cookie Expires +9h cosmetic 시프트**~~ ❌ **세션 43 기각** — 재현 불가, `@edge-runtime/cookies` 소스는 UTC 기준 정확. 세션 42 관측값은 원인 불명 일시 현상.
 

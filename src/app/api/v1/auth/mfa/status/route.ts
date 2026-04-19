@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withAuth } from "@/lib/api-guard";
 import { errorResponse } from "@/lib/api-response";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 /**
  * GET /api/v1/auth/mfa/status
@@ -17,7 +18,7 @@ export const GET = withAuth(async (_request: NextRequest, user) => {
   const [enrollment, passkeys, recoveryRemaining] = await Promise.all([
     prisma.mfaEnrollment.findUnique({
       where: { userId: user.sub },
-      select: { confirmedAt: true, lockedUntil: true },
+      select: { id: true, confirmedAt: true, lockedUntil: true },
     }),
     prisma.webAuthnAuthenticator.findMany({
       where: { userId: user.sub },
@@ -36,19 +37,39 @@ export const GET = withAuth(async (_request: NextRequest, user) => {
     }),
   ]);
 
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const enrollmentDateMap = enrollment
+    ? await fetchDateFieldsText(
+        "mfa_enrollments",
+        [enrollment.id],
+        ["confirmed_at", "locked_until"],
+      )
+    : null;
+  const enrollmentDates = enrollment
+    ? enrollmentDateMap?.get(enrollment.id) ?? null
+    : null;
+  const passkeyDateMap = await fetchDateFieldsText(
+    "webauthn_authenticators",
+    passkeys.map((p) => p.id),
+    ["created_at", "last_used_at"],
+  );
+
   return NextResponse.json({
     success: true,
     data: {
       totp: {
         enrolled: Boolean(enrollment),
         confirmed: Boolean(enrollment?.confirmedAt),
-        lockedUntil: enrollment?.lockedUntil ?? null,
+        lockedUntil: toIsoOrNull(enrollmentDates?.locked_until),
       },
-      passkeys: passkeys.map((p) => ({
-        ...p,
-        createdAt: p.createdAt.toISOString(),
-        lastUsedAt: p.lastUsedAt?.toISOString() ?? null,
-      })),
+      passkeys: passkeys.map((p) => {
+        const d = passkeyDateMap.get(p.id);
+        return {
+          ...p,
+          createdAt: toIsoOrNull(d?.created_at),
+          lastUsedAt: toIsoOrNull(d?.last_used_at),
+        };
+      }),
       recoveryCodesRemaining: recoveryRemaining,
     },
   });

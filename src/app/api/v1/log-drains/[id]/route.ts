@@ -5,8 +5,25 @@ import { prisma } from "@/lib/prisma";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { writeAuditLog } from "@/lib/audit-log";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+async function withLogDrainDates<T extends { id: string }>(row: T) {
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText("log_drains", [row.id], [
+    "created_at",
+    "updated_at",
+    "last_delivered_at",
+  ]);
+  const d = dateMap.get(row.id);
+  return {
+    ...row,
+    createdAt: toIsoOrNull(d?.created_at),
+    updatedAt: toIsoOrNull(d?.updated_at),
+    lastDeliveredAt: toIsoOrNull(d?.last_delivered_at),
+  };
+}
 
 const patchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -20,7 +37,7 @@ export const GET = withRole(["ADMIN"], async (_req, _user, context) => {
   const { id } = await (context as RouteContext).params;
   const drain = await prisma.logDrain.findUnique({ where: { id } });
   if (!drain) return errorResponse("NOT_FOUND", "로그 드레인을 찾을 수 없습니다", 404);
-  return successResponse(drain);
+  return successResponse(await withLogDrainDates(drain));
 });
 
 export const PATCH = withRole(["ADMIN"], async (request: NextRequest, user, context) => {
@@ -54,7 +71,7 @@ export const PATCH = withRole(["ADMIN"], async (request: NextRequest, user, cont
     detail: `${user.email} -> ${updated.name}`,
   });
 
-  return successResponse(updated);
+  return successResponse(await withLogDrainDates(updated));
 });
 
 export const DELETE = withRole(["ADMIN"], async (request, user, context) => {

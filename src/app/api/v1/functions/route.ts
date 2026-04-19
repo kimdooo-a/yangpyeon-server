@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 export const runtime = "nodejs";
 
@@ -27,21 +28,38 @@ export const GET = withRole(
         runs: {
           orderBy: { startedAt: "desc" },
           take: 1,
-          select: { startedAt: true, status: true },
+          select: { id: true, startedAt: true, status: true },
         },
       },
     });
-    const data = rows.map((r) => ({
-      id: r.id,
-      name: r.name,
-      description: r.description,
-      runtime: r.runtime,
-      enabled: r.enabled,
-      updatedAt: r.updatedAt,
-      lastRun: r.runs[0]
-        ? { startedAt: r.runs[0].startedAt, status: r.runs[0].status }
-        : null,
-    }));
+    // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+    const fnDateMap = await fetchDateFieldsText(
+      "edge_functions",
+      rows.map((r) => r.id),
+      ["updated_at"],
+    );
+    const runIds = rows.flatMap((r) => r.runs.map((run) => run.id));
+    const runDateMap = await fetchDateFieldsText(
+      "edge_function_runs",
+      runIds,
+      ["started_at"],
+    );
+    const data = rows.map((r) => {
+      const fnD = fnDateMap.get(r.id);
+      const lastRun = r.runs[0];
+      const runD = lastRun ? runDateMap.get(lastRun.id) : null;
+      return {
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        runtime: r.runtime,
+        enabled: r.enabled,
+        updatedAt: toIsoOrNull(fnD?.updated_at),
+        lastRun: lastRun
+          ? { startedAt: toIsoOrNull(runD?.started_at), status: lastRun.status }
+          : null,
+      };
+    });
     return successResponse(data);
   }
 );

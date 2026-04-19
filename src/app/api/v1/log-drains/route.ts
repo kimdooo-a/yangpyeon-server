@@ -5,6 +5,31 @@ import { prisma } from "@/lib/prisma";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { writeAuditLog } from "@/lib/audit-log";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
+
+const LOG_DRAIN_DATE_FIELDS = [
+  "created_at",
+  "updated_at",
+  "last_delivered_at",
+] as const;
+
+async function attachLogDrainDates<T extends { id: string }>(rows: T[]) {
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText(
+    "log_drains",
+    rows.map((r) => r.id),
+    LOG_DRAIN_DATE_FIELDS,
+  );
+  return rows.map((r) => {
+    const d = dateMap.get(r.id);
+    return {
+      ...r,
+      createdAt: toIsoOrNull(d?.created_at),
+      updatedAt: toIsoOrNull(d?.updated_at),
+      lastDeliveredAt: toIsoOrNull(d?.last_delivered_at),
+    };
+  });
+}
 
 const createSchema = z.object({
   name: z.string().min(1).max(100),
@@ -19,7 +44,7 @@ export const GET = withRole(["ADMIN"], async () => {
   const drains = await prisma.logDrain.findMany({
     orderBy: { createdAt: "desc" },
   });
-  return successResponse(drains);
+  return successResponse(await attachLogDrainDates(drains));
 });
 
 export const POST = withRole(["ADMIN"], async (request: NextRequest, user) => {
@@ -58,5 +83,6 @@ export const POST = withRole(["ADMIN"], async (request: NextRequest, user) => {
     detail: `${user.email} -> ${created.name} (${created.type})`,
   });
 
-  return successResponse(created, 201);
+  const [withDates] = await attachLogDrainDates([created]);
+  return successResponse(withDates, 201);
 });

@@ -5,8 +5,25 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { ensureStarted, updateJob, removeJob } from "@/lib/cron/registry";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 export const runtime = "nodejs";
+
+async function withCronDates<T extends { id: string }>(row: T) {
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText("cron_jobs", [row.id], [
+    "created_at",
+    "updated_at",
+    "last_run_at",
+  ]);
+  const d = dateMap.get(row.id);
+  return {
+    ...row,
+    createdAt: toIsoOrNull(d?.created_at),
+    updatedAt: toIsoOrNull(d?.updated_at),
+    lastRunAt: toIsoOrNull(d?.last_run_at),
+  };
+}
 
 const patchSchemaAdmin = z.object({
   name: z.string().trim().min(1).max(80).optional(),
@@ -24,7 +41,7 @@ export const GET = withRole(["ADMIN", "MANAGER"], async (_req, _user, context) =
   const id = await getId(context);
   const row = await prisma.cronJob.findUnique({ where: { id } });
   if (!row) return errorResponse("NOT_FOUND", "Cron Job을 찾을 수 없습니다", 404);
-  return successResponse(row);
+  return successResponse(await withCronDates(row));
 });
 
 export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, user, context) => {
@@ -75,7 +92,7 @@ export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest,
     });
   }
 
-  return successResponse(updated);
+  return successResponse(await withCronDates(updated));
 });
 
 export const DELETE = withRole(["ADMIN", "MANAGER"], async (_req, _user, context) => {
