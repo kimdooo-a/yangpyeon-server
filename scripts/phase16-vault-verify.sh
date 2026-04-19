@@ -12,6 +12,7 @@
 #   BASE=http://localhost:3000 ./scripts/phase16-vault-verify.sh
 #
 # 실행 전제: migrate-env-to-vault.ts 1회 실행 + PM2 restart 완료.
+# 의존: node (accessToken 추출용). WSL nvm 환경 전제.
 
 set -euo pipefail
 
@@ -19,29 +20,27 @@ BASE="${BASE:-https://stylelucky4u.com}"
 EMAIL="${EMAIL:-kimdooo@stylelucky4u.com}"
 PASSWORD="${PASSWORD:-<ADMIN_PASSWORD>}"
 
-JAR=$(mktemp)
-trap 'rm -f "$JAR"' EXIT
-
 echo "=== Phase 16 Vault Verify ($BASE) ==="
 
-echo "--- 1) 로그인 ---"
-LOGIN=$(curl -s -c "$JAR" -X POST "$BASE/api/v1/auth/login" \
+echo "--- 1) 로그인 + accessToken 추출 ---"
+LOGIN=$(curl -s -X POST "$BASE/api/v1/auth/login" \
   -H "Content-Type: application/json" \
   -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}")
-OK=$(echo "$LOGIN" | node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(j.success===true||!!(j.data&&j.data.accessToken))")
-if [ "$OK" != "true" ]; then
+TOKEN=$(echo "$LOGIN" | node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(j.data && j.data.accessToken || '')")
+if [ -z "$TOKEN" ]; then
   echo '{"test":"login","pass":false,"response":'"$LOGIN"'}'
   exit 1
 fi
-echo '{"test":"login","pass":true}'
+echo "{\"test\":\"login\",\"pass\":true,\"accessToken_len\":${#TOKEN}}"
 
-echo "--- 2) MFA status 조회 ---"
-STATUS=$(curl -s -b "$JAR" "$BASE/api/v1/auth/mfa/status")
-if echo "$STATUS" | grep -q '"enabled"'; then
-  echo '{"test":"mfa_status","pass":true,"response":'"$STATUS"'}'
-else
+echo "--- 2) MFA status 조회 (Bearer) ---"
+STATUS=$(curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/v1/auth/mfa/status")
+# 성공 응답 예: {"success":true,"data":{"totp":{...},"passkeys":[...],"recoveryCodesRemaining":N}}
+OK=$(echo "$STATUS" | node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log(j.success===true && !!j.data && typeof j.data.totp === 'object')")
+if [ "$OK" != "true" ]; then
   echo '{"test":"mfa_status","pass":false,"response":'"$STATUS"'}'
   exit 1
 fi
+echo '{"test":"mfa_status","pass":true,"response":'"$STATUS"'}'
 
 echo "=== PASS ==="
