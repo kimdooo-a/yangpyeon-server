@@ -212,9 +212,11 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### 우선순위 0: Phase 16a 프로덕션 배포 + 회귀 가드 실행 (~20min, 필수 선행)
+### ~~우선순위 0: Phase 16a 프로덕션 배포 + 회귀 가드 실행~~ ✅ **세션 48 마감 시 완결**
 
-세션 48 에서 Phase 16a 코드는 완결되었으나 **프로덕션 미배포**. S49 진입 전에 배포 1회 + 회귀 가드 실행 필수.
+세션 48 내에서 이미 수행 완료 — `/home/smart/.luckystyle4u/secrets.env` 생성 + `/ypserver prod --skip-win-build` + migrate-env-to-vault + `phase16-vault-verify.sh` PASS + Vault decrypt E2E 실측 (`{"pass":true,"decrypted_len":64,"env_len":64}`). 부수 픽스: 스크립트 쿠키→Bearer 인증 방식 (`effaf52`).
+
+**참고용 절차 (재배포 또는 타 환경 반복 시)**:
 
 ```bash
 # 1) WSL — /etc/luckystyle4u/secrets.env 생성 (1회, 0640 권한 필수)
