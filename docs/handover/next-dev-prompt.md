@@ -47,7 +47,7 @@ docs/research/spikes/spike-016-seaweedfs-50gb-result.md          Pending (물리
 docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md    ADR-001~019
 docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md  §7.2.1~7.2.3
 docs/research/2026-04-supabase-parity/00-vision/07-dq-matrix.md       DQ-AC-1/AC-2/4.1/12.4 Resolved
-docs/solutions/2026-04-19-*.md (15건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37 추가 (누적 27건)
+docs/solutions/2026-04-19-*.md (16건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37·38 (누적 28건)
   - otplib-v13-breaking-noble-plugin.md                          세션 33 외부 라이브러리
   - simplewebauthn-v10-api-shape.md                              세션 33 외부 라이브러리
   - mfa-challenge-token-2fa-pattern.md                           세션 33 설계 패턴
@@ -55,9 +55,10 @@ docs/solutions/2026-04-19-*.md (15건)                             ⭐ Compound 
   - pg-timestamp-naive-js-date-tz-offset.md                      세션 34 디버깅
   - rate-limit-defense-in-depth-conflict.md                      세션 34 디버깅
   - opaque-refresh-rotation-reuse-detection.md                   세션 36 아키텍처
-  - login-finalize-helper-centralization.md                      ⭐ 세션 37 DRY 패턴
-  - session-revoke-user-intent-vs-defense.md                     ⭐ 세션 37 함수 분리
-  - revoked-reason-intent-tagging.md                             ⭐ 세션 37 버그픽스 (severity: functional)
+  - login-finalize-helper-centralization.md                      세션 37 DRY 패턴
+  - session-revoke-user-intent-vs-defense.md                     세션 37 함수 분리
+  - revoked-reason-intent-tagging.md                             세션 37 버그픽스 (severity: functional)
+  - ios-safari-ua-regex-trap.md                                  ⭐ 세션 38 bug-fix (Version/N ... Safari/N 중간 Mobile/ 토큰 끼임)
 docs/security/skill-audit-2026-04-19.md                          /ypserver safeguard 감사 PASS
 docs/MASTER-DEV-PLAN.md
 src/lib/cleanup-scheduler.ts                                      세션 35 신설 + 세션 36 CleanupActor 확장
