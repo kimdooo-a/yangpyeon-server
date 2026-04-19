@@ -34,6 +34,7 @@ import {
   Send,
   Table2,
   Lock,
+  Trash2,
 } from "lucide-react";
 
 type NavItem = {
@@ -77,6 +78,7 @@ const navItems: NavItem[] = [
   { href: "/settings/env", label: "환경변수", icon: <IconEnv size={18} />, group: "감사·설정" },
   { href: "/settings/api-keys", label: "API 키", icon: <KeyRound size={18} />, group: "감사·설정" },
   { href: "/settings/log-drains", label: "로그 드레인", icon: <Send size={18} />, group: "감사·설정" },
+  { href: "/settings/cleanup", label: "Cleanup 실행", icon: <Trash2 size={18} />, group: "감사·설정" },
 
   // 내 계정 (모든 사용자)
   { href: "/account/security", label: "MFA & 보안", icon: <Lock size={18} />, group: "내 계정" },
@@ -90,6 +92,7 @@ const ADMIN_ONLY_PATHS = [
   "/settings/users",
   "/settings/api-keys",
   "/settings/log-drains",
+  "/settings/cleanup",
   "/members",
   "/functions",
   "/database/backups",
@@ -190,7 +193,11 @@ export function Sidebar() {
         </div>
         <button
           onClick={async () => {
-            await fetch("/api/auth/logout", { method: "POST" });
+            // Phase 15-D: v1 세션 서버측 revoke 먼저 + 대시보드 쿠키 제거 순차 실행
+            await Promise.allSettled([
+              fetch("/api/v1/auth/logout", { method: "POST" }),
+              fetch("/api/auth/logout", { method: "POST" }),
+            ]);
             window.location.href = "/login";
           }}
           className="flex items-center gap-2 w-full text-xs text-gray-500 hover:text-gray-700 transition-colors text-left"

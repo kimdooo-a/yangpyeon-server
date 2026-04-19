@@ -4,13 +4,8 @@ import { errorResponse } from "@/lib/api-response";
 import { mfaChallengeSchema } from "@/lib/schemas/mfa";
 import { verifyMfaChallenge } from "@/lib/mfa/challenge";
 import { verifyMfaSecondFactor } from "@/lib/mfa/service";
-import {
-  createAccessToken,
-  createRefreshToken,
-  V1_REFRESH_COOKIE,
-  REFRESH_MAX_AGE,
-} from "@/lib/jwt-v1";
 import { applyRateLimit } from "@/lib/rate-limit-guard";
+import { finalizeLoginResponse, type LoginMethod } from "@/lib/sessions/login-finalizer";
 
 /**
  * POST /api/v1/auth/mfa/challenge — 2차 인증 (TOTP 또는 recovery code).
@@ -79,37 +74,15 @@ export async function POST(request: NextRequest) {
     return errorResponse("INVALID_CODE", "코드가 올바르지 않습니다", 401);
   }
 
-  const accessToken = await createAccessToken({
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-  });
-  const refreshToken = await createRefreshToken(user.id);
-
-  const response = NextResponse.json(
-    {
-      success: true,
-      data: {
-        accessToken,
-        mfaMethod: result.method,
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
-      },
+  return finalizeLoginResponse({
+    request,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     },
-    { status: 200 },
-  );
-
-  response.cookies.set(V1_REFRESH_COOKIE, refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: REFRESH_MAX_AGE,
-    path: "/api/v1/",
+    method: result.method as LoginMethod,
+    extraData: { mfaMethod: result.method },
   });
-
-  return response;
 }

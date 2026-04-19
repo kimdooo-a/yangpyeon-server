@@ -2,7 +2,11 @@ import { SignJWT, jwtVerify } from "jose";
 import type { Role } from "@/generated/prisma/client";
 
 const ACCESS_MAX_AGE = 15 * 60; // 15분
-const REFRESH_MAX_AGE = 7 * 24 * 60 * 60; // 7일
+
+/**
+ * Phase 15-D 이후: Refresh 는 DB-backed opaque 토큰 (src/lib/sessions/tokens.ts) 으로 이관.
+ * 이 모듈은 이제 access token(HS256) 만 다룸.
+ */
 
 export const V1_REFRESH_COOKIE = "v1_refresh_token";
 
@@ -14,24 +18,11 @@ function getAccessSecret() {
   return new TextEncoder().encode(secret);
 }
 
-function getRefreshSecret() {
-  const secret = process.env.JWT_V1_REFRESH_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error("JWT_V1_REFRESH_SECRET 환경변수가 설정되지 않았거나 너무 짧습니다 (최소 32자)");
-  }
-  return new TextEncoder().encode(secret);
-}
-
 export interface AccessTokenPayload {
   sub: string;
   email: string;
   role: Role;
   type: "access";
-}
-
-export interface RefreshTokenPayload {
-  sub: string;
-  type: "refresh";
 }
 
 export async function createAccessToken(payload: {
@@ -51,17 +42,6 @@ export async function createAccessToken(payload: {
     .sign(getAccessSecret());
 }
 
-export async function createRefreshToken(userId: string): Promise<string> {
-  return new SignJWT({
-    sub: userId,
-    type: "refresh",
-  })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(`${REFRESH_MAX_AGE}s`)
-    .sign(getRefreshSecret());
-}
-
 export async function verifyAccessToken(
   token: string
 ): Promise<AccessTokenPayload | null> {
@@ -74,16 +54,4 @@ export async function verifyAccessToken(
   }
 }
 
-export async function verifyRefreshToken(
-  token: string
-): Promise<RefreshTokenPayload | null> {
-  try {
-    const { payload } = await jwtVerify(token, getRefreshSecret());
-    if (payload.type !== "refresh") return null;
-    return payload as unknown as RefreshTokenPayload;
-  } catch {
-    return null;
-  }
-}
-
-export { ACCESS_MAX_AGE, REFRESH_MAX_AGE };
+export { ACCESS_MAX_AGE };

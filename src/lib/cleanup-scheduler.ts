@@ -97,18 +97,28 @@ export async function runCleanupTasks(
   return summary;
 }
 
+/**
+ * 수동 트리거 시 audit log에 actor 정보를 붙이기 위한 메타. 자동 스케줄러는 undefined.
+ */
+export interface CleanupActor {
+  userId: string;
+  email: string;
+  ip: string;
+}
+
 function writeCleanupAudit(
   action: "CLEANUP_EXECUTED" | "CLEANUP_EXECUTED_MANUAL",
   summary: CleanupSummary,
+  actor?: CleanupActor,
 ): void {
   try {
     writeAuditLogDb({
       timestamp: new Date().toISOString(),
-      method: "SYSTEM",
-      path: "/internal/cleanup-scheduler",
-      ip: "127.0.0.1",
+      method: actor ? "POST" : "SYSTEM",
+      path: actor ? "/api/admin/cleanup/run" : "/internal/cleanup-scheduler",
+      ip: actor?.ip ?? "127.0.0.1",
       action,
-      detail: JSON.stringify(summary),
+      detail: JSON.stringify(actor ? { actor, summary } : summary),
     });
   } catch {
     // audit 기록 실패가 cleanup 루프를 끊지 않도록 — 콘솔 경고만
@@ -140,11 +150,13 @@ export function ensureCleanupScheduler(): void {
 }
 
 /**
- * 관리자 수동 실행 — 추후 `/api/admin/cleanup/run` 라우트에서 래핑.
- * 현재는 export 만 — 수동 실행 UI 는 별도 세션.
+ * 관리자 수동 실행 — `/api/admin/cleanup/run` 라우트에서 래핑.
+ * actor 를 전달하면 audit log detail 에 actor 정보가 함께 기록됨.
  */
-export async function runCleanupsNow(): Promise<CleanupSummary> {
+export async function runCleanupsNow(
+  actor?: CleanupActor,
+): Promise<CleanupSummary> {
   const summary = await runCleanupTasks();
-  writeCleanupAudit("CLEANUP_EXECUTED_MANUAL", summary);
+  writeCleanupAudit("CLEANUP_EXECUTED_MANUAL", summary, actor);
   return summary;
 }

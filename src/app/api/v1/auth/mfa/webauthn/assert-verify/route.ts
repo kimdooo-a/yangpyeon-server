@@ -3,14 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { errorResponse } from "@/lib/api-response";
 import { verifyMfaChallenge } from "@/lib/mfa/challenge";
 import { verifyAuthentication, consumeChallenge } from "@/lib/mfa/webauthn";
-import {
-  createAccessToken,
-  createRefreshToken,
-  V1_REFRESH_COOKIE,
-  REFRESH_MAX_AGE,
-} from "@/lib/jwt-v1";
 import type { AuthenticationResponseJSON } from "@simplewebauthn/types";
 import { applyRateLimit } from "@/lib/rate-limit-guard";
+import { finalizeLoginResponse } from "@/lib/sessions/login-finalizer";
 
 interface AssertVerifyBody {
   challenge: string;
@@ -88,37 +83,15 @@ export async function POST(request: NextRequest) {
     return errorResponse("INVALID_CREDENTIALS", "사용자를 찾을 수 없습니다", 401);
   }
 
-  const accessToken = await createAccessToken({
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-  });
-  const refreshToken = await createRefreshToken(user.id);
-
-  const response = NextResponse.json(
-    {
-      success: true,
-      data: {
-        accessToken,
-        mfaMethod: "passkey",
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
-      },
+  return finalizeLoginResponse({
+    request,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
     },
-    { status: 200 },
-  );
-
-  response.cookies.set(V1_REFRESH_COOKIE, refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: REFRESH_MAX_AGE,
-    path: "/api/v1/",
+    method: "passkey",
+    extraData: { mfaMethod: "passkey" },
   });
-
-  return response;
 }
