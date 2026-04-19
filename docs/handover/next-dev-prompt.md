@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 40 종료 시점 — TIMESTAMPTZ 마이그레이션 완결 (17 모델 / 47 컬럼) + cleanup 정공법 정착 (Prisma binding-side 시프트 잔존 발견)
+## 필수 참조 파일 ⭐ 세션 41 종료 시점 — ORM Date 비교 전수 감사 완결 (4파일 8곳 raw SQL 전환) + Wave 충실이행도 87/100 평가
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session40-timestamptz-migration.md           ⭐ 최신 (TIMESTAMPTZ 마이그레이션 + cleanup 정공법 + binding-side 시프트 잔존 발견)
+docs/handover/260419-session41-orm-date-audit.md                  ⭐ 최신 (ORM Date 비교 전수 감사 + 3 전환 패턴 A/B/C + Wave 충실이행도 평가)
+docs/handover/260419-session40-timestamptz-migration.md           (TIMESTAMPTZ 마이그레이션 + cleanup 정공법 + binding-side 시프트 잔존 발견)
 docs/handover/260419-session39-session-expire-admin-revoke.md     (SESSION_EXPIRE per-row audit + 관리자 forced revoke + PG TZ 버그 국소 회피)
 docs/handover/260419-session38-phase-15d-touch-throttle-ua-label.md  (touch throttle + activity fingerprint + Playwright MCP)
 docs/handover/260419-session37-revoked-reason-intent-fix.md       (Session.revokedReason intent 태깅 + 자기파괴 버그 수정 + CK 3건)
@@ -49,7 +50,7 @@ docs/research/spikes/spike-016-seaweedfs-50gb-result.md          Pending (물리
 docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md    ADR-001~019
 docs/research/2026-04-supabase-parity/02-architecture/03-auth-advanced-blueprint.md  §7.2.1~7.2.3
 docs/research/2026-04-supabase-parity/00-vision/07-dq-matrix.md       DQ-AC-1/AC-2/4.1/12.4 Resolved
-docs/solutions/2026-04-19-*.md (19건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37·38·39·40 (누적 31건)
+docs/solutions/2026-04-19-*.md (20건)                             ⭐ Compound Knowledge 세션 33·34·35·36·37·38·39·40·41 (누적 32건)
   - otplib-v13-breaking-noble-plugin.md                          세션 33 외부 라이브러리
   - simplewebauthn-v10-api-shape.md                              세션 33 외부 라이브러리
   - mfa-challenge-token-2fa-pattern.md                           세션 33 설계 패턴
@@ -64,6 +65,7 @@ docs/solutions/2026-04-19-*.md (19건)                             ⭐ Compound 
   - prisma-orm-tz-naive-filter-gotcha.md                         ⭐ 세션 39 bug-fix + 세션 40 정정 (TIMESTAMPTZ 마이그레이션 후에도 binding-side 9h 시프트 잔존, 정공법 = raw SELECT + ::text)
   - per-row-audit-on-batch-delete.md                             ⭐ 세션 39 pattern (DB ops 는 entries 반환, audit 정책은 호출자 scheduler 에서 → 집계 + per-row 병행)
   - timestamp-to-timestamptz-migration-using-clause.md           ⭐ 세션 40 pattern (USING AT TIME ZONE '<server_tz>' 결정 + dry-run BEGIN/ROLLBACK + 한계 명시)
+  - orm-date-filter-audit-sweep.md                               ⭐ 세션 41 pattern (4파일 8곳 raw SQL 전환, A/B/C 전환 패턴 가이드 + 재발 방지 체크리스트 + 잔존 과제 2종 인계)
 docs/security/skill-audit-2026-04-19.md                          /ypserver safeguard 감사 PASS
 docs/MASTER-DEV-PLAN.md
 src/lib/cleanup-scheduler.ts                                      세션 35 신설 + 세션 36 CleanupActor 확장
@@ -85,7 +87,7 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      세션 37 (Ses
 scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 E2E (admin revoke + SESSION_EXPIRE audit 12 step 검증)
 ```
 
-## 현재 상태 (세션 40 종료 시점)
+## 현재 상태 (세션 41 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -96,7 +98,16 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
 - **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
 - **세션 35**: Cleanup Scheduler + CK 4건 + MFA QA 가이드 (commit `a29ac1b`)
-- **세션 40** ⭐ — TIMESTAMPTZ 마이그레이션 완결 (17 모델 / 47 DateTime 컬럼) + cleanup 정공법 정착
+- **세션 41** ⭐ — Wave 충실이행도 87/100 평가 + ORM Date 비교 전수 감사 (4파일 8곳 raw SQL 전환)
+  - Wave 1~5 (123 문서 / 106,588줄) 6차원 충실도 평가 — 기술 채택 98 / 스키마 95 / MVP 72 / ADR 95 / 스파이크 80 / 지식보존 100 — "설계-구현 정합성 A, 진도 C+"
+  - 세션 40 권장 7건 중 #1 (ORM 시간 비교 전수 검토) 선택 · 1-2h 스코프 · 즉시 착수
+  - 프로젝트 `src/` 정규식 2종 전수 스캔: `{lt|gt: (new Date|now)}` (ORM WHERE, 4건) + `row.\w+(At|Until) < new Date()` (JS-side, 4건) = **8곳 취약 패턴**
+  - **3 가지 전환 패턴 A/B/C** 설계·적용: A=cleanup (SELECT id + ORM deleteMany), B=목록+display (전체 raw SELECT with `::text`), C=ORM join 유지 (보조 boolean 쿼리)
+  - 수정 4 파일: `jwks/store.ts` (3 함수) / `mfa/webauthn.ts` (2) / `mfa/service.ts` (1 + `locked_until::text` 응답 복원) / `sessions/tokens.ts` (2)
+  - tsc 0 / vitest **244 PASS** (세션 40 대비 회귀 0) / 재스캔 양패턴 0 match
+  - **CK +1 신규** (31 → **32**): `orm-date-filter-audit-sweep.md` (pattern/high, 패턴 A/B/C + 체크리스트 + 잔존 과제 2종 — INSERT-side 시프트 / 기타 API route Date 직렬화)
+  - 커밋 `90ad952` 푸시 완료 (`25e908d → 90ad952`)
+- **세션 40** — TIMESTAMPTZ 마이그레이션 완결 (17 모델 / 47 DateTime 컬럼) + cleanup 정공법 정착
   - 6 권장 중 2·3b·5 자율 채택, HS256(잠금)·MFA biometric·SP-013/016 측정·kdygenesis 제외
   - schema.prisma 모든 DateTime 에 `@db.Timestamptz(3)` + migration `20260419180000_use_timestamptz` (17 ALTER TABLE, USING AT TIME ZONE 'Asia/Seoul')
   - pg_dump 5.3MB 백업 + BEGIN/ROLLBACK dry-run 17 ALTER OK + migrate deploy 적용
@@ -141,33 +152,25 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### 우선순위 1: 다른 모듈 ORM 시간 비교 전수 검토 ⭐ 즉시 착수 가능 (1-2h, 세션 40 후속)
+~~우선순위 1: 다른 모듈 ORM 시간 비교 전수 검토~~ ✅ **세션 41 완결** (4파일 8곳 raw SQL 전환, 3 전환 패턴 A/B/C 정립, CK `orm-date-filter-audit-sweep.md` 신규)
 
-세션 40 에서 cleanup.ts 만 정정. 다른 모듈에서 동일 패턴(`where: {field: {lt|gt|lte|gte: jsDate}}`)이 사용되면 binding-side 9h 시프트로 데이터 누락 발생 가능.
+### 우선순위 1: prisma INSERT timestamptz 시프트 검증 + 잔존 API route Date 직렬화 감사 ⭐ 신규 최상위 (~1.5h, 세션 41 CK 잔존 과제)
 
-**검색 명령**:
-```bash
-grep -rE "where:\\s*\\{[^}]*\\b(expiresAt|lastUsedAt|revokedAt|windowStart|retireAt|lockedUntil|usedAt|createdAt|updatedAt)\\b\\s*:\\s*\\{\\s*(lt|gt|lte|gte)\\s*:" src/
-```
-
-**대상 후보**:
-- `src/lib/sessions/tokens.ts` — listActiveSessions / findSessionByToken 의 expiresAt > NOW
-- `src/lib/mfa/webauthn.ts` — challenge expiresAt 비교
-- `src/lib/jwks/store.ts` — retireAt < NOW grace
-- `src/lib/mfa/service.ts` — locked_until 비교
-- `src/lib/rate-limit-db.ts` — 이미 PG 측 EXTRACT EPOCH 사용 (안전)
-
-**정공법 적용**: raw SELECT (PG NOW()-INTERVAL 위임 + `::text` 캐스팅) + ORM CRUD (id 기반).
-
-### 우선순위 2: prisma INSERT timestamptz 시프트 검증 (~30분)
-
-실제 사용자 로그인 후 PG 직접 SELECT 로 expires_at 정확성 확인. 만약 INSERT 시도 시프트하면 새 session 만료가 9h 빨리 됨 (보안 측면 over-conservative 이지만 UX 영향).
+**(A) INSERT 정확성 검증**: 실제 사용자 로그인 후 PG 직접 SELECT 로 `expires_at` 정확성 확인. 만약 INSERT 시프트하면 새 session 만료가 9h 빨리 됨. 시프트 확인 시 PG 측 `NOW() + INTERVAL '7d'` 로 `issueSession` / `rotateSession` / JWKS `rotateKey` / webauthn `create` 전부 INSERT 치환.
 
 ```bash
 # 로그인 후
 PGPASSWORD='Knp13579yan' psql -h localhost -p 5432 -U postgres -d luckystyle4u -c \
   "SELECT id, expires_at, expires_at AT TIME ZONE 'UTC' AS utc FROM sessions ORDER BY created_at DESC LIMIT 3;"
 ```
+
+**(B) 기타 API route Date 직렬화 감사** (세션 41 CK 잔존 과제 §2): audit_logs / cron / webhooks / filebox / 기타 API route 에서 ORM-read Date 를 `.toISOString()` 으로 응답에 넣는 경로가 9h 시프트를 가지고 있는지 grep + 개별 리뷰:
+```bash
+grep -rnE "\\.toISOString\\(\\)" src/app/api/
+```
+패턴 B (전체 raw SELECT with `::text`) 또는 패턴 D (response 직렬화 직전 보정) 적용 여부 결정.
+
+**참고**: 세션 42 초반에 `tokens.ts` issueSession / rotateSession 은 "JS-side expiresAt 직접 반환" 패턴으로 이미 부분 적용됨 — 호출자가 쿠키 Expires / 로그 / 응답 payload 에 쓰는 값은 정확한 UTC. 동일 패턴을 나머지 INSERT 경로에 확산.
 
 ### 우선순위 3: KST 03:00 자동 cleanup tick 관찰 (익일)
 
@@ -211,7 +214,16 @@ PGPASSWORD='Knp13579yan' psql -h localhost -p 5432 -U postgres -d luckystyle4u -
 ~~SESSION_EXPIRE audit~~ ✓ 세션 39 완결
 ~~관리자 forced revoke~~ ✓ 세션 39 완결
 
-~~우선순위 3b: PG TIMESTAMPTZ 컬럼 마이그레이션~~ ✅ **세션 40 완결** (17 모델 / 47 컬럼). 단, Prisma binding-side 시프트 잔존 발견 → 우선순위 1 (다른 모듈 전수 검토) 신규.
+~~우선순위 3b: PG TIMESTAMPTZ 컬럼 마이그레이션~~ ✅ **세션 40 완결** (17 모델 / 47 컬럼).
+~~다른 모듈 ORM 시간 비교 전수 검토~~ ✅ **세션 41 완결** (4파일 8곳 raw SQL 전환, 3 전환 패턴 A/B/C).
+
+### 우선순위 +: Phase 16 진입 고려 (24h, Wave 충실이행도 개선)
+
+세션 41 Wave 충실이행도 평가에서 "설계 충실도 A, 진도 C+" 진단. Phase 15-D 보강 마무리 후 Phase 16 진입으로 진도 승격 가능:
+- Vault VaultService AES-256-GCM envelope (8h)
+- Capistrano-style 배포 자동화 (8h)
+- Canary stylelucky4u.com 시간차 배포 (4h)
+- Infrastructure 페이지 (PM2 / PG / 디스크 실시간) + deploy_events UI (4h)
 
 ### 우선순위 6: SP-013/016 물리 측정 (13h, 환경 확보 시)
 - **SP-013 wal2json** (5h): PG + wal2json 설치 + 30분 DML + 슬롯 손상 recovery
