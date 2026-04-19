@@ -191,5 +191,59 @@ if (lockRows[0]?.locked && lockRows[0].lockedUntilText) {
 
 본 CK 는 **"Date 비교"** 경로만 다룬다. 별도 경로는 그대로 남음:
 
-- **INSERT-side binding 시프트**: `data: { expiresAt: new Date(Date.now() + TTL) }` 형태의 저장 경로. 현재 보안상 "9h 빨리 만료" 쪽이라 대부분 허용 범위이나, 정밀 검증 필요 (next-dev-prompt #2). 후보 해결: PG 측 `NOW() + INTERVAL '<TTL>'` 또는 adapter 재구성.
-- 그 외 HTTP 응답에서 ORM-read Date 를 `.toISOString()` 으로 직렬화하는 경로 — 본 감사에서 `listActiveSessions` 와 `verifyMfaSecondFactor` 만 커버. 나머지 API route 는 개별 리뷰 필요.
+- ~~**INSERT-side binding 시프트**~~ ✅ **세션 42 해소** — DB TTL = 604800 정확, 시프트 없음 확정. 선제적 방어로 `issueSession`/`rotateSession` 에서 read-back 제거.
+- **HTTP 응답 ORM-read Date 직렬화** — 세션 43 에서 **users 테이블 경로 4 파일 커버 + 재현 완료**. 나머지 파일(cron/webhooks/api-keys/log-drains/functions 등)은 해당 테이블이 현재 0 rows 라 잠재 위험만 존재, 데이터 유입 시점에 수정 이월.
+
+---
+
+## 세션 43 추가 — parsing-side 시프트 재현 + users 테이블 전수 수정
+
+세션 41 의 "잔존 과제 §2 (HTTP 응답 ORM-read Date 직렬화)" 를 진전.
+
+### 재현 실측 (/scripts/session43-parsing-repro.ts)
+
+tsx 로 `prisma.user.findMany({select:{createdAt:true}})` vs raw `EXTRACT(EPOCH FROM created_at)` 비교:
+
+```
+=== ORM findMany (parsing-side) ===
+{"id":"c0c0b305","ormCreatedIso":"2026-04-06T23:11:17.147Z"}
+=== raw ::text + EPOCH (authoritative) ===
+{"id":"c0c0b305","epochIsoCreated":"2026-04-06T14:11:17.000Z"}
+=== diff (ms) between ORM vs EPOCH ===
+{"id":"c0c0b305","diffMs":32400147,"diffHours":9.000040833}
+```
+
+**정확히 +9h (32,400,000ms)** — 세션 41 CK의 "parsing-side 시프트 잔존" 가설이 **TIMESTAMPTZ 컬럼에서도** 완벽히 재현됨. `r.createdAt.getTime()` 자체가 시프트되어 있어 caller 가 `.toISOString()` 뿐 아니라 만료 계산에도 쓰면 9h 판정 오차 발생 가능.
+
+### 수정 범위 (users 테이블 4 파일 7 핸들러)
+
+현재 프로덕션은 users 테이블만 데이터 존재 (admin 1명 + 테스트 2명). UI 가시 영향 확정된 경로만 이번 세션에 수정:
+
+| # | 파일 | 핸들러 | 패턴 |
+|---|------|------|------|
+| 1 | `src/app/api/v1/members/[id]/route.ts` | GET + PUT | 전체 raw SELECT (패턴 B) |
+| 2 | `src/app/api/v1/members/route.ts` | GET | 보조 raw SELECT + Map 병합 (패턴 C 확장) |
+| 3 | `src/app/api/v1/auth/me/route.ts` | GET + PUT | 전체 raw SELECT (패턴 B) |
+| 4 | `src/app/api/settings/users/route.ts` | GET + POST + PATCH | 전체 raw SELECT + create 후 재조회 |
+
+### 파생 교훈 — `$queryRaw` 타입 캐스팅 함정
+
+`WHERE id = ${id}::uuid` 로 작성했으나 `users.id` 컬럼이 PG `text`(Prisma `String @id` 기본 매핑) 였음. `operator does not exist: text = uuid` 로 500 발생.
+
+- **예방**: raw SQL 쓰기 전 `information_schema.columns` 로 실제 컬럼 타입 1회 확인.
+- **해결**: `::uuid` 캐스트 제거 → `WHERE id = ${id}` (text = text). `ANY(${ids}::uuid[])` → `ANY(${ids}::text[])`.
+- tsc 는 raw SQL 문자열 파라미터 타입을 검증 못함. **실배포 E2E 단계에서만 잡히는 부류의 버그** — 신규 raw SQL 도입 시 실 API 1회 curl 필수.
+
+### E2E 검증 결과
+
+배포 후 admin 로그인 + `/api/v1/auth/me` + `/api/v1/members` + `/api/v1/members/<id>` 호출, PG `AT TIME ZONE 'UTC'` 직접 조회와 응답 Date 비교:
+
+```
+응답 createdAt:    "2026-04-06T14:11:17.147Z"
+PG authoritative:  2026-04-06T14:11:17.147Z    ← 완벽 일치 (세션 41 이전 경로는 +9h)
+```
+
+### 후속 이월 (세션 44~)
+
+- **cron / webhooks / api-keys / log-drains / edge_functions / edge_function_runs / webauthn_authenticators / mfa_enrollments** 응답의 ORM-read Date 직렬화 경로 — 해당 테이블 유입 시 동일 패턴 B/C 적용. 현재 0 rows 로 실제 영향 없음.
+- **공용 헬퍼 `fetchDateFieldsText(table, ids)`** 도입 검토 — 7 핸들러 반복 코드 축소. 하지만 각 테이블 스키마별 필드명 상이하여 제네릭화 비용/이득 고려 필요.

@@ -11,26 +11,44 @@ export const GET = withRole(
   async (_request: NextRequest, _user, context) => {
     const { id } = await (context as RouteContext).params;
 
-    const member = await prisma.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        lastLoginAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
-
-    if (!member) {
+    // 세션 43: Date 필드는 raw SELECT + ::text 로 직접 읽어 Prisma 7 adapter-pg
+    // parsing-side +9h KST 시프트 회피 (CK orm-date-filter-audit-sweep 패턴 B/C).
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        email: string;
+        name: string | null;
+        phone: string | null;
+        role: string;
+        is_active: boolean;
+        last_login_at_text: string | null;
+        created_at_text: string;
+        updated_at_text: string;
+      }>
+    >`
+      SELECT id, email, name, phone, role, is_active,
+        (last_login_at::text) AS last_login_at_text,
+        (created_at::text)    AS created_at_text,
+        (updated_at::text)    AS updated_at_text
+      FROM users
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    const row = rows[0];
+    if (!row) {
       return errorResponse("NOT_FOUND", "회원을 찾을 수 없습니다", 404);
     }
-
-    return successResponse(member);
+    return successResponse({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      phone: row.phone,
+      role: row.role,
+      isActive: row.is_active,
+      lastLoginAt: row.last_login_at_text ? new Date(row.last_login_at_text).toISOString() : null,
+      createdAt: new Date(row.created_at_text).toISOString(),
+      updatedAt: new Date(row.updated_at_text).toISOString(),
+    });
   }
 );
 
@@ -57,21 +75,39 @@ export const PUT = withRole(
       return errorResponse("NOT_FOUND", "회원을 찾을 수 없습니다", 404);
     }
 
-    const updated = await prisma.user.update({
+    await prisma.user.update({
       where: { id },
       data: parsed.data,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        updatedAt: true,
-      },
     });
 
-    return successResponse(updated);
+    // 세션 43: update 직후 Date 는 raw SELECT ::text 로 재조회 (parsing-side 시프트 회피).
+    const rows = await prisma.$queryRaw<
+      Array<{
+        id: string;
+        email: string;
+        name: string | null;
+        phone: string | null;
+        role: string;
+        is_active: boolean;
+        updated_at_text: string;
+      }>
+    >`
+      SELECT id, email, name, phone, role, is_active,
+        (updated_at::text) AS updated_at_text
+      FROM users
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    const row = rows[0]!;
+    return successResponse({
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      phone: row.phone,
+      role: row.role,
+      isActive: row.is_active,
+      updatedAt: new Date(row.updated_at_text).toISOString(),
+    });
   }
 );
 
