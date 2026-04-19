@@ -80,3 +80,68 @@ const entries = rows.map((r) => ({
 - [ ] Prisma 반환 Date 를 UI 에 표시하기 전에 원본 DB 값과 대조
 - [ ] 가능한 한 `TIMESTAMPTZ` 컬럼으로 통일 (장기 해결)
 - [ ] 이 패턴이 재발견되면 TIMESTAMPTZ 마이그레이션을 기술부채 최상위로 승격
+
+---
+
+## 세션 40 추가 정정 — TIMESTAMPTZ 마이그레이션 후에도 binding-side 시프트 잔존
+
+세션 40 에서 모든 DateTime 컬럼을 `TIMESTAMPTZ(3)` 로 마이그레이션 적용 (CK `2026-04-19-timestamp-to-timestamptz-migration-using-clause.md`). 본 CK 의 "교훈 4번" 의 가설 ("컬럼 변경이 근본 해결") 이 절반만 맞음.
+
+### 재현 (E2E)
+
+마이그레이션 후 cleanup.ts 를 ORM `prisma.session.findMany({where:{expiresAt:{lt:cutoff}}})` 로 복원하여 배포. 세션 39 E2E 스크립트 재실행:
+
+- helper INSERT 만료 세션 2건 (past = `Date.now() - 25h`)
+- PG 직접 검증: `expires_at < NOW() - INTERVAL '1 day'` → 2 rows (만료 인식 ✓)
+- Prisma ORM cleanup: `summary.sessions: 0` (회귀!)
+
+### 원인
+
+PG 컬럼이 timestamptz 임에도 Prisma 7 adapter-pg 가:
+- **binding 측**: JS `Date` (UTC ms) 를 PG 쿼리 인자로 보낼 때 server timezone (KST) wall-clock 으로 변환하여 전송하는 듯
+- **parsing 측**: PG timestamptz 응답을 JS Date 로 변환 시 server timezone wall-clock 을 UTC ms 로 직접 해석
+
+즉 컬럼 측은 정확한 UTC offset 보존이지만, ORM↔PG 경계에서 양방향 시프트.
+
+### 정공법 — raw SELECT (PG NOW()-INTERVAL) + ::text + ORM DELETE
+
+`cleanup.ts` (세션 40 최종 형태):
+
+```typescript
+const rows = await prisma.$queryRaw<
+  Array<{ id: string; userId: string; expiresAt: string }>
+>`
+  SELECT id, user_id AS "userId", (expires_at::text) AS "expiresAt"
+  FROM sessions
+  WHERE expires_at < NOW() - INTERVAL '1 day'
+`;
+if (rows.length === 0) return { deleted: 0, expiredEntries: [] };
+const ids = rows.map((r) => r.id);
+const result = await prisma.session.deleteMany({
+  where: { id: { in: ids } },
+});
+return {
+  deleted: result.count,
+  expiredEntries: rows.map((r) => ({
+    id: r.id,
+    userId: r.userId,
+    expiresAt: new Date(r.expiresAt),  // ::text → ISO+offset 문자열 → Date
+  })),
+};
+```
+
+핵심:
+- **cutoff**: PG 측 `NOW() - INTERVAL '1 day'` 위임 — JS 측 cutoff Date binding 회피
+- **expires_at::text 캐스팅**: PG 가 정확한 ISO+offset 문자열 (예: `"2026-04-18 05:14:19.232+00"`) 반환 — pg adapter parsing 우회
+- **DELETE**: ORM `deleteMany({where:{id:{in:ids}}})` — id 기반이라 timezone 무관, race-safe
+
+### 교훈 (세션 40 추가)
+
+5. **TIMESTAMPTZ 마이그레이션은 컬럼 측 절반의 해결**. Prisma 7 adapter-pg 의 binding-side TZ 시프트는 별도. ORM filter (where: {field: {lt: jsDate}}) 사용 전 E2E 검증 필수.
+6. **시간 비교는 PG 위임이 안전한 디폴트**. `NOW() - INTERVAL '<duration>'` 패턴이 클라이언트 timezone 변환 경로 자체를 우회.
+7. **`::text` 캐스팅은 timestamptz 컬럼에서도 유효** — pg adapter parsing 우회. PG 가 직접 ISO 문자열 반환하면 JS `new Date()` 가 정확 파싱.
+
+### 영향 범위 — 다음 세션 후속 작업
+
+- **prisma 가 INSERT 시도 시프트하는지** 검증 미완 — 실제 사용자 로그인 시 만들어지는 session row 의 expires_at 정확성 확인 필요. 만약 시프트하면 새 session 만료가 9h 빨리 됨 (보안 측면 over-conservative 이지만 사용자 경험 영향).
+- **다른 모듈의 ORM 시간 비교 코드 전수 검토** — `tokens.ts`, `webauthn.ts`, `jwks/store.ts`, `mfa/service.ts` 등에서 `where: {expiresAt: {lt|gt|lte|gte: jsDate}}` 패턴 검색 후 동일 정공법 적용 필요.
