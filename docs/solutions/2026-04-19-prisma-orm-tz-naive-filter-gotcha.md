@@ -229,5 +229,5 @@ Set-Cookie: v1_refresh_token=...; Path=/api/v1/; Expires=Sun, 26 Apr 2026 06:52:
 ### 잔존 과제 업데이트
 
 - ~~§1 INSERT-side binding 시프트~~ ✅ **세션 42 해소** — 시프트 없음 확인, 선제적 방어로 read-back 제거.
-- §2 HTTP 응답 payload 에서 ORM-read Date 직렬화 경로의 전수 리뷰 — 여전히 세션 41 에서 listActiveSessions / verifyMfaSecondFactor 만 커버. 다른 API route 개별 리뷰 필요.
-- §3 (신규) Next.js 16 `cookies.set({ maxAge })` Set-Cookie Expires 헤더 +9h 시프트 — cosmetic, 브라우저 Max-Age 우선이라 실 영향 0. Node.js/Next.js 레이어 이슈로 추정 (Issue 리포트 가능).
+- §2 HTTP 응답 payload 에서 ORM-read Date 직렬화 경로 — **세션 43 진전**: parsing-side +9h 시프트 재현 완료, users 테이블 4 파일 수정 + E2E 완벽 검증. 0-row 테이블 경로는 데이터 유입 시 이월.
+- ~~§3 (신규) Next.js 16 `cookies.set({ maxAge })` Set-Cookie Expires 헤더 +9h 시프트~~ ❌ **세션 43 기각** — 재현 불가. 세션 43 실측: `Date: Sun, 19 Apr 2026 09:06:59 GMT` + `Expires=Sun, 26 Apr 2026 09:06:59 GMT` (정확히 +7d UTC). 세션 42 관측값(+9h)은 원인 불명의 일시적 현상. `@edge-runtime/cookies` 소스 추적 결과 `new Date(Date.now() + maxAge*1000).toUTCString()` 사용 — UTC 기준 정확. 추가 조사 불요.

@@ -32,18 +32,34 @@ export async function GET(request: NextRequest) {
   const auth = await requireRoleApi(request, "ADMIN");
   if (auth.response) return auth.response;
 
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isActive: true,
-      lastLoginAt: true,
-      createdAt: true,
-    },
-  });
+  // 세션 43: Date 필드는 raw SELECT + ::text 로 정확 읽기 (parsing-side 시프트 회피).
+  // ORDER BY created_at DESC 서버측 수행.
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      email: string;
+      name: string | null;
+      role: string;
+      is_active: boolean;
+      last_login_at_text: string | null;
+      created_at_text: string;
+    }>
+  >`
+    SELECT id, email, name, role, is_active,
+      (last_login_at::text) AS last_login_at_text,
+      (created_at::text)    AS created_at_text
+    FROM users
+    ORDER BY created_at DESC
+  `;
+  const users = rows.map((r) => ({
+    id: r.id,
+    email: r.email,
+    name: r.name,
+    role: r.role,
+    isActive: r.is_active,
+    lastLoginAt: r.last_login_at_text ? new Date(r.last_login_at_text).toISOString() : null,
+    createdAt: new Date(r.created_at_text).toISOString(),
+  }));
 
   return successResponse(users);
 }
@@ -79,24 +95,26 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = await hashPassword(password);
 
-  const user = await prisma.user.create({
+  const created = await prisma.user.create({
     data: {
       email,
       name: name ?? null,
       passwordHash,
       role: role as Role,
     },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isActive: true,
-      createdAt: true,
-    },
+    select: { id: true, email: true, name: true, role: true, isActive: true },
   });
 
-  return successResponse(user, 201);
+  // 세션 43: create 직후 createdAt 은 raw SELECT ::text 로 재조회.
+  const rows = await prisma.$queryRaw<Array<{ created_at_text: string }>>`
+    SELECT (created_at::text) AS created_at_text
+    FROM users
+    WHERE id = ${created.id}
+    LIMIT 1
+  `;
+  const createdAt = rows[0] ? new Date(rows[0].created_at_text).toISOString() : null;
+
+  return successResponse({ ...created, createdAt }, 201);
 }
 
 /**
@@ -132,19 +150,38 @@ export async function PATCH(request: NextRequest) {
   if (role !== undefined) updateData.role = role;
   if (isActive !== undefined) updateData.isActive = isActive;
 
-  const updated = await prisma.user.update({
+  await prisma.user.update({
     where: { id: userId },
     data: updateData,
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      isActive: true,
-      lastLoginAt: true,
-      createdAt: true,
-    },
   });
 
-  return successResponse(updated);
+  // 세션 43: update 직후 Date 필드는 raw SELECT ::text 로 재조회.
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      email: string;
+      name: string | null;
+      role: string;
+      is_active: boolean;
+      last_login_at_text: string | null;
+      created_at_text: string;
+    }>
+  >`
+    SELECT id, email, name, role, is_active,
+      (last_login_at::text) AS last_login_at_text,
+      (created_at::text)    AS created_at_text
+    FROM users
+    WHERE id = ${userId}
+    LIMIT 1
+  `;
+  const row = rows[0]!;
+  return successResponse({
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    role: row.role,
+    isActive: row.is_active,
+    lastLoginAt: row.last_login_at_text ? new Date(row.last_login_at_text).toISOString() : null,
+    createdAt: new Date(row.created_at_text).toISOString(),
+  });
 }

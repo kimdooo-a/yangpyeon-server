@@ -5,26 +5,44 @@ import { updateProfileSchema } from "@/lib/schemas/auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 export const GET = withAuth(async (_request, user) => {
-  const dbUser = await prisma.user.findUnique({
-    where: { id: user.sub },
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      role: true,
-      isActive: true,
-      lastLoginAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
-
-  if (!dbUser) {
+  // 세션 43: Date 필드는 raw SELECT + ::text 로 정확 읽기
+  // (Prisma 7 adapter-pg parsing-side +9h KST 시프트 회피, CK orm-date-filter-audit-sweep 패턴 B).
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      email: string;
+      name: string | null;
+      phone: string | null;
+      role: string;
+      is_active: boolean;
+      last_login_at_text: string | null;
+      created_at_text: string;
+      updated_at_text: string;
+    }>
+  >`
+    SELECT id, email, name, phone, role, is_active,
+      (last_login_at::text) AS last_login_at_text,
+      (created_at::text)    AS created_at_text,
+      (updated_at::text)    AS updated_at_text
+    FROM users
+    WHERE id = ${user.sub}
+    LIMIT 1
+  `;
+  const row = rows[0];
+  if (!row) {
     return errorResponse("NOT_FOUND", "사용자를 찾을 수 없습니다", 404);
   }
-
-  return successResponse(dbUser);
+  return successResponse({
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    phone: row.phone,
+    role: row.role,
+    isActive: row.is_active,
+    lastLoginAt: row.last_login_at_text ? new Date(row.last_login_at_text).toISOString() : null,
+    createdAt: new Date(row.created_at_text).toISOString(),
+    updatedAt: new Date(row.updated_at_text).toISOString(),
+  });
 });
 
 export const PUT = withAuth(async (request: NextRequest, user) => {
@@ -41,18 +59,35 @@ export const PUT = withAuth(async (request: NextRequest, user) => {
     return errorResponse("VALIDATION_ERROR", message, 400);
   }
 
-  const updated = await prisma.user.update({
+  await prisma.user.update({
     where: { id: user.sub },
     data: parsed.data,
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      phone: true,
-      role: true,
-      updatedAt: true,
-    },
   });
 
-  return successResponse(updated);
+  // 세션 43: update 직후 Date 필드는 raw SELECT ::text 로 재조회.
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      email: string;
+      name: string | null;
+      phone: string | null;
+      role: string;
+      updated_at_text: string;
+    }>
+  >`
+    SELECT id, email, name, phone, role,
+      (updated_at::text) AS updated_at_text
+    FROM users
+    WHERE id = ${user.sub}
+    LIMIT 1
+  `;
+  const row = rows[0]!;
+  return successResponse({
+    id: row.id,
+    email: row.email,
+    name: row.name,
+    phone: row.phone,
+    role: row.role,
+    updatedAt: new Date(row.updated_at_text).toISOString(),
+  });
 });
