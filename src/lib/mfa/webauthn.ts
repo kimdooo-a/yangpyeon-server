@@ -192,15 +192,31 @@ export async function verifyAuthentication(
 
 /**
  * 챌린지 소비 — 검증 성공 시 즉시 삭제 (OTP-like single-use). 만료된 건 조회 단계에서 제거.
+ *
+ * 세션 41: expires_at 만료 판정을 PG 서버측 NOW() 로 위임. Prisma 7 adapter-pg 의
+ *          parsing-side TZ 시프트 회피 — JS Date 재해석 없이 is_expired boolean 반환.
  */
 export async function consumeChallenge(
   challenge: string,
   purpose: "registration" | "authentication",
 ): Promise<{ userId: string | null } | null> {
-  const rec = await prisma.webAuthnChallenge.findUnique({ where: { challenge } });
-  if (!rec) return null;
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      userId: string | null;
+      purpose: string;
+      isExpired: boolean;
+    }>
+  >`
+    SELECT id, user_id AS "userId", purpose, (expires_at <= NOW()) AS "isExpired"
+    FROM webauthn_challenges
+    WHERE challenge = ${challenge}
+    LIMIT 1
+  `;
+  if (rows.length === 0) return null;
+  const rec = rows[0];
   if (rec.purpose !== purpose) return null;
-  if (rec.expiresAt <= new Date()) {
+  if (rec.isExpired) {
     await prisma.webAuthnChallenge.delete({ where: { id: rec.id } });
     return null;
   }
@@ -208,9 +224,18 @@ export async function consumeChallenge(
   return { userId: rec.userId };
 }
 
+/**
+ * 세션 41: cleanup 패턴 통일 (sessions/cleanup.ts + jwks/store.ts 와 동일).
+ *          raw SELECT NOW() 비교 → id 리스트 → ORM deleteMany.
+ */
 export async function cleanupExpiredChallenges(): Promise<{ removed: number }> {
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT id FROM webauthn_challenges WHERE expires_at < NOW()
+  `;
+  if (rows.length === 0) return { removed: 0 };
+  const ids = rows.map((r) => r.id);
   const res = await prisma.webAuthnChallenge.deleteMany({
-    where: { expiresAt: { lt: new Date() } },
+    where: { id: { in: ids } },
   });
   return { removed: res.count };
 }

@@ -27,8 +27,26 @@ export async function verifyMfaSecondFactor(
   if (!enrollment.confirmedAt) return { ok: false, reason: "NOT_CONFIRMED" };
 
   const now = new Date();
-  if (enrollment.lockedUntil && enrollment.lockedUntil > now) {
-    return { ok: false, reason: "LOCKED", lockedUntil: enrollment.lockedUntil };
+  // 세션 41: enrollment.lockedUntil (ORM read-back) 은 Prisma 7 adapter-pg TZ 시프트 (+9h KST)
+  //          가 있어 `now` 와 직접 비교 불가. PG 측 `locked_until > NOW()` 로 위임 +
+  //          `locked_until::text` 캐스팅으로 정확한 ISO 문자열 수신 → JS Date 재구성.
+  const lockRows = await prisma.$queryRaw<
+    Array<{ locked: boolean; lockedUntilText: string | null }>
+  >`
+    SELECT
+      (locked_until IS NOT NULL AND locked_until > NOW()) AS locked,
+      (locked_until::text) AS "lockedUntilText"
+    FROM mfa_enrollments
+    WHERE user_id = ${userId}
+    LIMIT 1
+  `;
+  const lockInfo = lockRows[0];
+  if (lockInfo?.locked && lockInfo.lockedUntilText) {
+    return {
+      ok: false,
+      reason: "LOCKED",
+      lockedUntil: new Date(lockInfo.lockedUntilText),
+    };
   }
 
   if (input.code) {

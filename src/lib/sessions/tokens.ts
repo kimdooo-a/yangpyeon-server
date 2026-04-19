@@ -114,7 +114,12 @@ export async function findSessionByToken(token: string): Promise<SessionLookup> 
   });
   if (!row) return { status: "not_found", session: null };
   if (row.revokedAt) return { status: "revoked", session: row };
-  if (row.expiresAt < new Date()) return { status: "expired", session: row };
+  // 세션 41: row.expiresAt (ORM read-back) 은 Prisma 7 adapter-pg parsing-side TZ 시프트
+  //          (+9h KST) 가 있어 `new Date()` 와 직접 비교 불가. PG 측 expires_at <= NOW() 로 위임.
+  const expiredRows = await prisma.$queryRaw<Array<{ expired: boolean }>>`
+    SELECT (expires_at <= NOW()) AS expired FROM sessions WHERE id = ${row.id}
+  `;
+  if (expiredRows[0]?.expired) return { status: "expired", session: row };
   if (!row.user || !row.user.isActive) return { status: "user_invalid", session: row };
   return { status: "active", session: row };
 }
@@ -222,35 +227,48 @@ export interface ActiveSessionSummary {
 /**
  * 사용자의 활성 세션 목록 — revokedAt IS NULL AND expiresAt > NOW().
  * currentSessionId 전달 시 current 플래그 계산.
+ *
+ * 세션 41: 전체 쿼리를 raw SELECT 로 재작성하여 두 가지 TZ 시프트 동시 회피:
+ *   - WHERE cutoff (`expires_at > NOW()`)  : binding-side 시프트 회피
+ *   - SELECT 날짜 컬럼 (`::text` 캐스팅)      : parsing-side 시프트 회피 →
+ *     PG 가 정확한 ISO+offset 문자열 반환 → JS new Date() 정확 파싱 →
+ *     toISOString() 도 정확한 UTC. UI 에 9h 시프트된 시간이 표시되지 않음.
  */
 export async function listActiveSessions(
   userId: string,
   currentSessionId?: string,
 ): Promise<ActiveSessionSummary[]> {
-  const rows = await prisma.session.findMany({
-    where: {
-      userId,
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-    },
-    orderBy: { lastUsedAt: "desc" },
-    select: {
-      id: true,
-      ip: true,
-      userAgent: true,
-      createdAt: true,
-      lastUsedAt: true,
-      expiresAt: true,
-    },
-  });
+  const rows = await prisma.$queryRaw<
+    Array<{
+      id: string;
+      ip: string | null;
+      userAgent: string | null;
+      createdAt: string;
+      lastUsedAt: string;
+      expiresAt: string;
+    }>
+  >`
+    SELECT
+      id,
+      ip,
+      user_agent AS "userAgent",
+      (created_at::text) AS "createdAt",
+      (last_used_at::text) AS "lastUsedAt",
+      (expires_at::text) AS "expiresAt"
+    FROM sessions
+    WHERE user_id = ${userId}
+      AND revoked_at IS NULL
+      AND expires_at > NOW()
+    ORDER BY last_used_at DESC
+  `;
   return rows.map((r) => ({
     id: r.id,
     ip: r.ip,
     userAgent: r.userAgent,
     userAgentLabel: parseUserAgent(r.userAgent),
-    createdAt: r.createdAt.toISOString(),
-    lastUsedAt: r.lastUsedAt.toISOString(),
-    expiresAt: r.expiresAt.toISOString(),
+    createdAt: new Date(r.createdAt).toISOString(),
+    lastUsedAt: new Date(r.lastUsedAt).toISOString(),
+    expiresAt: new Date(r.expiresAt).toISOString(),
     current: currentSessionId === r.id,
   }));
 }
