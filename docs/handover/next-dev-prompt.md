@@ -26,12 +26,16 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 세션 45 종료 시점 — HS256 legacy 제거 + 이월 6건 현실성 분류
+## 필수 참조 파일 ⭐ 세션 46 종료 시점 — Phase 16 설계 + 구현 플랜 완결 (브레인스토밍 + 플랜 체인)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session45-hs256-removal.md                   ⭐ 최신 (HS256 제거 + 이월 판정 매트릭스)
+docs/handover/260419-session46-phase-16-design-plan.md            ⭐ 최신 (Phase 16 설계 425줄 + 플랜 997줄 = 1,422줄, 코드 0)
+docs/superpowers/specs/2026-04-19-phase-16-design.md              ⭐⭐ Phase 16 설계 (ADR-020 초안, 5 sub-phase 35h)
+docs/superpowers/plans/2026-04-19-phase-16-plan.md                ⭐⭐ Phase 16 플랜 (S47/S48 풀 디테일 + S49~S52 outline)
+docs/solutions/2026-04-19-progressive-large-scale-plan-just-in-time.md  ⭐ CK +1 (33) — 점진적 플래닝 원칙
+docs/handover/260419-session45-hs256-removal.md                   (HS256 제거 + Phase 15 Auth 완전 종결)
 docs/handover/260419-session44-zero-row-tables-date-fix.md        (12 API 헬퍼 적용 + 5 미수정 판별 + E2E 5건 diff_ms=0)
 docs/handover/260419-session43-users-date-fix.md                  (users 4 API 파일 7 핸들러 패턴 B/C 수정 + §3 기각)
 docs/handover/260419-session42-insert-audit.md                    (INSERT 시프트 검증 + 선제적 방어 + §3 신규)
@@ -91,11 +95,22 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      세션 37 (Ses
 scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 E2E (admin revoke + SESSION_EXPIRE audit 12 step 검증)
 ```
 
-## 현재 상태 (세션 45 종료 시점)
+## 현재 상태 (세션 46 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
+- **Phase 15 Auth Advanced A-D 완전 종결** (세션 32~45)
 - **kdywave Wave 1-5 완주**: 123 문서 / 106,588줄
+- **세션 46** ⭐ — Phase 16 설계 + 구현 플랜 완결 (브레인스토밍 + 플랜 체인, ~3h)
+  - 세션 45 이월 6건 매트릭스 평가 → Phase 16 분해 최우선 선정
+  - KST tick 조기 이월 (PM2 uptime 0.44h, 24h+ 미충족) / kdygenesis Phase 16 §9 흡수
+  - Wave 5 Phase 16 40h → **35h 보정** (세션 33 JWKS core 5h 회수)
+  - 5 sub-phase 확정: 16a Vault 8h / 16b Capistrano 10h / 16c PM2+Canary 10h / 16d UI 4h / 16e JWKS 3h
+  - 드리프트 방지 3원칙 내재 (SP-017/018/019 선행 / `@db.Timestamptz(3)` 강제 / 회귀 가드 스크립트)
+  - **점진적 계획 원칙**: S47/S48 풀 디테일 591줄 + S49~S52 outline 406줄 = 997줄
+  - 총 1,422줄 문서 2건 (commit `089374a` + `92c4b9e`), 코드 변경 0, tsc/vitest 회귀 0
+  - CK +1 (32→**33**): `progressive-large-scale-plan-just-in-time.md`
+- **세션 45**: HS256 legacy 제거 + Phase 15 Auth 완전 종결 (40분, commit `dac8c34`)
 - **세션 30**: 우선 스파이크 7건 완결 (5 실측 + 2 축약)
 - **세션 31**: safeguard + ADR/DQ 반영 + CK 5건 (타 터미널)
 - **세션 32**: Phase 15 Step 1-2 — Prisma Session + argon2id 자동 재해시
@@ -185,6 +200,20 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
   - **우선순위 4**: Compound Knowledge 6건 중 세션 34 unstaged 2건 확인(pg-timestamp-naive / rate-limit-defense-in-depth) + 신규 4건 Agent 2대 병렬 작성(otplib-v13 / simplewebauthn-v10 / mfa-challenge-token / bcrypt-argon2-rehash, 총 703줄). **CK 누적 23건**.
 
 ## 추천 다음 작업
+
+### 우선순위 1: S47 Phase 16 스파이크 3건 즉시 진입 (6h, 최우선)
+
+`docs/superpowers/plans/2026-04-19-phase-16-plan.md §"세션 47"` 풀 디테일 참조.
+- **SP-017 AES-GCM envelope** (2h) — pure node:crypto 실험, 리스크 최저. IV 충돌 (1M 샘플) + tamper 탐지 + rotation <500ms 검증
+- **SP-018 symlink atomic swap** (1h) — WSL 실행, 1000 reads × 100 swaps 실패율 <0.1% 검증
+- **SP-019 PM2 cluster+SQLite** (3h) — **최고 위험**. WAL 4 worker 경합 / instrumentation 중복 / v6 delete 버그. `pm2 delete all --namespace` safeguard 준수 필수 (세션 30 사고 재발 방지)
+
+실행 방식:
+- `superpowers:subagent-driven-development` — 태스크별 fresh subagent + 리뷰 포인트
+- `superpowers:executing-plans` — 현 세션 inline 실행
+
+3 PASS 시 → **S48 16a Vault 즉시 진입 가능** (플랜 풀 디테일 준비 완료, 8h TDD 20+ tests).
+FAIL 시 → Phase 16 설계 §3 해당 sub-phase 재검토.
 
 ~~우선순위 1: 다른 모듈 ORM 시간 비교 전수 검토~~ ✅ **세션 41 완결** (4파일 8곳 raw SQL 전환, 3 전환 패턴 A/B/C 정립, CK `orm-date-filter-audit-sweep.md` 신규)
 ~~우선순위 (A) INSERT-side binding 시프트 검증~~ ✅ **세션 42 완결** — DB TTL 604800 정확, 가설 기각, §1 해소. 부수적으로 `issueSession`/`rotateSession` 선제적 방어 적용 (read-back 제거).

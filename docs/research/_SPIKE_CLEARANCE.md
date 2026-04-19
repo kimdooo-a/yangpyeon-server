@@ -22,3 +22,4 @@
 | 2026-04-19 | SP-016 SeaweedFS 50GB | SPIKE | Tech | Pending (축약) | docs/research/spikes/spike-016-seaweedfs-50gb-result.md | ADR-008 (측정 대기) |
 | 2026-04-19 | SP-017 Vault AES-256-GCM envelope | SPIKE | Tech | Go | spikes/sp-017-vault-crypto/ | Phase 16a (16a Vault) |
 | 2026-04-19 | SP-018 symlink atomic swap + PM2 reload | SPIKE | Tech | Go (16b) / 16c cluster 정당화 | spikes/sp-018-symlink-swap/ | Phase 16b, 16c |
+| 2026-04-19 | SP-019 PM2 cluster:4 + better-sqlite3 + v6 delete | SPIKE | Tech | Conditional Go (scheduler fork 분리 필수) | spikes/sp-019-pm2-cluster/ | Phase 16c |
