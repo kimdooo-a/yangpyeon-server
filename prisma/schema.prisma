@@ -380,3 +380,24 @@ enum DrainType {
   LOKI
   WEBHOOK
 }
+
+/// Phase 16a Vault — envelope 암호화된 시크릿 저장소 (ADR-020)
+/// 참조: docs/superpowers/specs/2026-04-19-phase-16-design.md §16a
+/// MASTER_KEY (KEK) 로 DEK 없이 직접 암호화 (Hybrid 경량 envelope).
+///   encryptedValue = AES-256-GCM(MASTER_KEY, iv)(plaintext)
+///   tag = GCM auth tag (tamper 탐지, SP-017 검증)
+/// kekVersion: rotateKek 수행 시 증가. 구 버전 row 는 신 MASTER_KEY 로 재암호화 후 갱신.
+/// name: 조회 키 (예: "mfa.master_key", "jwks.active_kid"). @unique — name 기준 단일 버전 유지.
+model SecretItem {
+  id             String    @id @default(cuid())
+  name           String    @unique
+  encryptedValue Bytes     @map("encrypted_value")
+  iv             Bytes
+  tag            Bytes
+  kekVersion     Int       @default(1) @map("kek_version")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  rotatedAt      DateTime? @map("rotated_at") @db.Timestamptz(3)
+
+  @@index([name])
+  @@map("secret_items")
+}
