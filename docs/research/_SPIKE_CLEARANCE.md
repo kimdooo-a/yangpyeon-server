@@ -20,3 +20,4 @@
 | 2026-04-19 | SP-012 isolated-vm v6 Node v24 | SPIKE | Tech | Go | docs/research/spikes/spike-012-isolated-vm-v6-result.md | ADR-009 (재검토 트리거 1 해소) |
 | 2026-04-19 | SP-013 wal2json 슬롯 | SPIKE | Tech | Pending (축약) | docs/research/spikes/spike-013-wal2json-slot-result.md | ADR-010 (측정 대기) |
 | 2026-04-19 | SP-016 SeaweedFS 50GB | SPIKE | Tech | Pending (축약) | docs/research/spikes/spike-016-seaweedfs-50gb-result.md | ADR-008 (측정 대기) |
+| 2026-04-19 | SP-017 Vault AES-256-GCM envelope | SPIKE | Tech | Go | spikes/sp-017-vault-crypto/ | Phase 16a (16a Vault) |
