@@ -163,14 +163,21 @@ export async function revokeSession(
 }
 
 /**
- * 사용자의 모든 활성 세션 revoke — reuse 탐지 시 defense-in-depth.
- * 세션 37: revokedReason="reuse_detected" 로 기록.
+ * 사용자의 모든 활성 세션 revoke.
+ *
+ * 세션 37: reuse 탐지 시 defense-in-depth 용으로 "reuse_detected" 태깅.
+ * 세션 39: reason 파라미터로 범용화 — admin 강제 revoke ("admin") 등 재사용.
+ * 기본값은 하위 호환을 위해 "reuse_detected" 유지.
+ *
  * @returns revoke 된 세션 수
  */
-export async function revokeAllUserSessions(userId: string): Promise<number> {
+export async function revokeAllUserSessions(
+  userId: string,
+  reason: SessionRevokeReason = "reuse_detected",
+): Promise<number> {
   const result = await prisma.session.updateMany({
     where: { userId, revokedAt: null },
-    data: { revokedAt: new Date(), revokedReason: "reuse_detected" },
+    data: { revokedAt: new Date(), revokedReason: reason },
   });
   return result.count;
 }
