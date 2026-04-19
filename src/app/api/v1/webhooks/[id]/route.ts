@@ -5,8 +5,25 @@ import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { validateWebhookUrl } from "@/lib/webhooks/deliver";
 import { writeAuditLog } from "@/lib/audit-log";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+async function withWebhookDates<T extends { id: string }>(row: T) {
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText("webhooks", [row.id], [
+    "created_at",
+    "updated_at",
+    "last_triggered_at",
+  ]);
+  const d = dateMap.get(row.id);
+  return {
+    ...row,
+    createdAt: toIsoOrNull(d?.created_at),
+    updatedAt: toIsoOrNull(d?.updated_at),
+    lastTriggeredAt: toIsoOrNull(d?.last_triggered_at),
+  };
+}
 
 const patchSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -21,7 +38,7 @@ export const GET = withRole(["ADMIN", "MANAGER"], async (_req, _user, context) =
   const { id } = await (context as RouteContext).params;
   const wh = await prisma.webhook.findUnique({ where: { id } });
   if (!wh) return errorResponse("NOT_FOUND", "웹훅을 찾을 수 없습니다", 404);
-  return successResponse(wh);
+  return successResponse(await withWebhookDates(wh));
 });
 
 export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, user, context) => {
@@ -57,7 +74,7 @@ export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest,
     detail: `${user.email} -> ${updated.name}`,
   });
 
-  return successResponse(updated);
+  return successResponse(await withWebhookDates(updated));
 });
 
 export const DELETE = withRole(["ADMIN", "MANAGER"], async (request, user, context) => {

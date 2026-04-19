@@ -5,6 +5,33 @@ import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { issueApiKey } from "@/lib/auth/keys";
 import { writeAuditLog } from "@/lib/audit-log";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
+
+const API_KEY_DATE_FIELDS = [
+  "created_at",
+  "updated_at",
+  "last_used_at",
+  "revoked_at",
+] as const;
+
+async function attachApiKeyDates<T extends { id: string }>(rows: T[]) {
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText(
+    "api_keys",
+    rows.map((r) => r.id),
+    API_KEY_DATE_FIELDS,
+  );
+  return rows.map((r) => {
+    const d = dateMap.get(r.id);
+    return {
+      ...r,
+      createdAt: toIsoOrNull(d?.created_at),
+      updatedAt: toIsoOrNull(d?.updated_at),
+      lastUsedAt: toIsoOrNull(d?.last_used_at),
+      revokedAt: toIsoOrNull(d?.revoked_at),
+    };
+  });
+}
 
 const ALLOWED_SCOPES = ["read", "write", "admin"] as const;
 
@@ -29,7 +56,7 @@ export const GET = withRole(["ADMIN"], async () => {
       createdAt: true,
     },
   });
-  return successResponse(keys);
+  return successResponse(await attachApiKeyDates(keys));
 });
 
 export const POST = withRole(["ADMIN"], async (request: NextRequest, user) => {
@@ -67,9 +94,10 @@ export const POST = withRole(["ADMIN"], async (request: NextRequest, user) => {
     });
 
     // 평문 키를 1회만 반환 (이후 조회 불가)
+    const [apiKeyWithDates] = await attachApiKeyDates([result.apiKey]);
     return successResponse(
       {
-        apiKey: result.apiKey,
+        apiKey: apiKeyWithDates,
         plaintext: result.issued.plaintext,
         prefix: result.issued.prefix,
       },

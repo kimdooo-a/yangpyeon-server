@@ -5,6 +5,27 @@ import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { validateWebhookUrl } from "@/lib/webhooks/deliver";
 import { writeAuditLog } from "@/lib/audit-log";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
+
+const WEBHOOK_DATE_FIELDS = ["created_at", "updated_at", "last_triggered_at"] as const;
+
+async function attachWebhookDates<T extends { id: string }>(rows: T[]) {
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText(
+    "webhooks",
+    rows.map((r) => r.id),
+    WEBHOOK_DATE_FIELDS,
+  );
+  return rows.map((r) => {
+    const d = dateMap.get(r.id);
+    return {
+      ...r,
+      createdAt: toIsoOrNull(d?.created_at),
+      updatedAt: toIsoOrNull(d?.updated_at),
+      lastTriggeredAt: toIsoOrNull(d?.last_triggered_at),
+    };
+  });
+}
 
 const ALLOWED_TABLES = [
   "users",
@@ -29,7 +50,7 @@ export const GET = withRole(["ADMIN", "MANAGER"], async () => {
   const webhooks = await prisma.webhook.findMany({
     orderBy: { createdAt: "desc" },
   });
-  return successResponse(webhooks);
+  return successResponse(await attachWebhookDates(webhooks));
 });
 
 export const POST = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, user) => {
@@ -74,5 +95,6 @@ export const POST = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, 
     detail: `${user.email} -> ${created.name} (${created.sourceTable}/${created.event})`,
   });
 
-  return successResponse(created, 201);
+  const [withDates] = await attachWebhookDates([created]);
+  return successResponse(withDates, 201);
 });

@@ -3,8 +3,23 @@ import { z } from "zod";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 export const runtime = "nodejs";
+
+async function withFunctionDates<T extends { id: string }>(row: T) {
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText("edge_functions", [row.id], [
+    "created_at",
+    "updated_at",
+  ]);
+  const d = dateMap.get(row.id);
+  return {
+    ...row,
+    createdAt: toIsoOrNull(d?.created_at),
+    updatedAt: toIsoOrNull(d?.updated_at),
+  };
+}
 
 const MAX_CODE_SIZE = 256 * 1024;
 
@@ -32,7 +47,7 @@ export const GET = withRole(["ADMIN"], async (_req, user, context) => {
   const fn = await ensureOwner(id, user.sub);
   if (fn === null) return errorResponse("NOT_FOUND", "함수를 찾을 수 없습니다", 404);
   if (fn === "forbidden") return errorResponse("FORBIDDEN", "소유자만 조회할 수 있습니다", 403);
-  return successResponse(fn);
+  return successResponse(await withFunctionDates(fn));
 });
 
 export const PATCH = withRole(["ADMIN"], async (request: NextRequest, user, context) => {
@@ -55,7 +70,10 @@ export const PATCH = withRole(["ADMIN"], async (request: NextRequest, user, cont
     where: { id },
     data: parsed.data,
   });
-  return successResponse({ id: updated.id, updatedAt: updated.updatedAt });
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText("edge_functions", [updated.id], ["updated_at"]);
+  const d = dateMap.get(updated.id);
+  return successResponse({ id: updated.id, updatedAt: toIsoOrNull(d?.updated_at) });
 });
 
 export const DELETE = withRole(["ADMIN"], async (_req, user, context) => {

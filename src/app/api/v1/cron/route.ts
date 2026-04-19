@@ -4,8 +4,28 @@ import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { ensureStarted, addJob } from "@/lib/cron/registry";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 export const runtime = "nodejs";
+
+const CRON_DATE_FIELDS = ["created_at", "updated_at", "last_run_at"] as const;
+
+async function attachCronDates<T extends { id: string }>(rows: T[]) {
+  const dateMap = await fetchDateFieldsText(
+    "cron_jobs",
+    rows.map((r) => r.id),
+    CRON_DATE_FIELDS,
+  );
+  return rows.map((r) => {
+    const d = dateMap.get(r.id);
+    return {
+      ...r,
+      createdAt: toIsoOrNull(d?.created_at),
+      updatedAt: toIsoOrNull(d?.updated_at),
+      lastRunAt: toIsoOrNull(d?.last_run_at),
+    };
+  });
+}
 
 const scheduleRegex = /^(\*|[\d,\-\/\s]+|every\s+\d+\s*[mh])$/i;
 
@@ -28,7 +48,8 @@ const createSchema = z.object({
 export const GET = withRole(["ADMIN", "MANAGER"], async () => {
   ensureStarted();
   const rows = await prisma.cronJob.findMany({ orderBy: { createdAt: "desc" } });
-  return successResponse(rows);
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  return successResponse(await attachCronDates(rows));
 });
 
 // POST: 신규 (MANAGER 이상)
@@ -55,7 +76,8 @@ export const POST = withRole(["ADMIN", "MANAGER"], async (request: NextRequest) 
       },
     });
     if (row.enabled) await addJob(row.id);
-    return successResponse(row, 201);
+    const [withDates] = await attachCronDates([row]);
+    return successResponse(withDates, 201);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "생성 실패";
     return errorResponse("CREATE_FAILED", msg, 400);

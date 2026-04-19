@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { writeAuditLog } from "@/lib/audit-log";
+import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -18,6 +19,10 @@ export const DELETE = withRole(["ADMIN"], async (request: NextRequest, user, con
     select: { id: true, name: true, prefix: true, revokedAt: true },
   });
 
+  // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
+  const dateMap = await fetchDateFieldsText("api_keys", [updated.id], ["revoked_at"]);
+  const d = dateMap.get(updated.id);
+
   writeAuditLog({
     timestamp: new Date().toISOString(),
     method: "DELETE",
@@ -27,5 +32,10 @@ export const DELETE = withRole(["ADMIN"], async (request: NextRequest, user, con
     detail: `${user.email} -> ${updated.name} (${updated.prefix})`,
   });
 
-  return successResponse(updated);
+  return successResponse({
+    id: updated.id,
+    name: updated.name,
+    prefix: updated.prefix,
+    revokedAt: toIsoOrNull(d?.revoked_at),
+  });
 });
