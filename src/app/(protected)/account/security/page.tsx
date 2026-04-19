@@ -34,6 +34,7 @@ interface SessionInfo {
   id: string;
   ip: string | null;
   userAgent: string | null;
+  userAgentLabel: string;
   createdAt: string;
   lastUsedAt: string;
   expiresAt: string;
@@ -512,8 +513,11 @@ export default function MfaSecurityPage() {
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-gray-500 truncate mt-0.5">
-                      {s.userAgent ?? "(User-Agent 없음)"}
+                    <div
+                      className="text-xs text-gray-500 truncate mt-0.5"
+                      title={s.userAgent ?? "(User-Agent 없음)"}
+                    >
+                      {s.userAgentLabel}
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">
                       시작: {new Date(s.createdAt).toLocaleString("ko-KR")} · 마지막 사용:{" "}

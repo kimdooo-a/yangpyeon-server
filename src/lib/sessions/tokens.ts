@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@/generated/prisma/client";
+import { parseUserAgent } from "./activity";
 
 /**
  * Phase 15-D Refresh Token Rotation (세션 36 / Blueprint §7.2.2).
@@ -88,6 +89,7 @@ export interface SessionLookup {
     revokedAt: Date | null;
     revokedReason: string | null;
     expiresAt: Date;
+    lastUsedAt: Date;
     ip: string | null;
     userAgent: string | null;
     user: { id: string; email: string; role: Role; isActive: boolean } | null;
@@ -104,6 +106,7 @@ export async function findSessionByToken(token: string): Promise<SessionLookup> 
       revokedAt: true,
       revokedReason: true,
       expiresAt: true,
+      lastUsedAt: true,
       ip: true,
       userAgent: true,
       user: { select: { id: true, email: true, role: true, isActive: true } },
@@ -201,6 +204,8 @@ export interface ActiveSessionSummary {
   id: string;
   ip: string | null;
   userAgent: string | null;
+  /** 세션 38 — parseUserAgent 로 생성한 사람 읽기 쉬운 label. 원본 userAgent 는 툴팁용으로 보존. */
+  userAgentLabel: string;
   createdAt: string;
   lastUsedAt: string;
   expiresAt: string;
@@ -235,6 +240,7 @@ export async function listActiveSessions(
     id: r.id,
     ip: r.ip,
     userAgent: r.userAgent,
+    userAgentLabel: parseUserAgent(r.userAgent),
     createdAt: r.createdAt.toISOString(),
     lastUsedAt: r.lastUsedAt.toISOString(),
     expiresAt: r.expiresAt.toISOString(),
