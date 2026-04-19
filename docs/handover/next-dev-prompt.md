@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 41 종료 시점 — ORM Date 비교 전수 감사 완결 (4파일 8곳 raw SQL 전환) + Wave 충실이행도 87/100 평가
+## 필수 참조 파일 ⭐ 세션 42 종료 시점 — Prisma INSERT timestamptz 시프트 검증 완결 (CK 잔존 과제 §1 해소) + 선제적 방어 (issueSession/rotateSession read-back 제거) + §3 신규 (Next.js cookies Expires +9h cosmetic)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session41-orm-date-audit.md                  ⭐ 최신 (ORM Date 비교 전수 감사 + 3 전환 패턴 A/B/C + Wave 충실이행도 평가)
+docs/handover/260419-session42-insert-audit.md                    ⭐ 최신 (INSERT 시프트 검증 + 선제적 방어 + §3 신규)
+docs/handover/260419-session41-orm-date-audit.md                  (ORM Date 비교 전수 감사 + 3 전환 패턴 A/B/C + Wave 충실이행도 평가)
 docs/handover/260419-session40-timestamptz-migration.md           (TIMESTAMPTZ 마이그레이션 + cleanup 정공법 + binding-side 시프트 잔존 발견)
 docs/handover/260419-session39-session-expire-admin-revoke.md     (SESSION_EXPIRE per-row audit + 관리자 forced revoke + PG TZ 버그 국소 회피)
 docs/handover/260419-session38-phase-15d-touch-throttle-ua-label.md  (touch throttle + activity fingerprint + Playwright MCP)
@@ -87,7 +88,7 @@ prisma/migrations/20260419170000_add_session_revoked_reason/      세션 37 (Ses
 scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 E2E (admin revoke + SESSION_EXPIRE audit 12 step 검증)
 ```
 
-## 현재 상태 (세션 41 종료 시점)
+## 현재 상태 (세션 42 종료 시점)
 
 ### 완료된 Phase
 - Phase 1~14c-γ 전부 완료
@@ -98,7 +99,14 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 - **세션 33**: Phase 15 Step 3·4·5·6 서버측 일괄 완결 (commit `58a517b`)
 - **세션 34**: Phase 15 UI 통합 + 라이브 디버깅 2건 (commit `9a6b4ff`)
 - **세션 35**: Cleanup Scheduler + CK 4건 + MFA QA 가이드 (commit `a29ac1b`)
-- **세션 41** ⭐ — Wave 충실이행도 87/100 평가 + ORM Date 비교 전수 감사 (4파일 8곳 raw SQL 전환)
+- **세션 42** ⭐ — Prisma INSERT timestamptz 시프트 검증 완결 (CK 잔존 과제 §1 해소) + 선제적 방어
+  - 세션 41 CK 잔존 과제 §1 (`prisma-orm-tz-naive-filter-gotcha` 의 "INSERT-side binding 시프트" 가설) 실측 검증
+  - `curl POST /api/v1/auth/login` + `psql EXTRACT(EPOCH FROM expires_at - created_at)` → **DB TTL = 604800 sec 정확** → **시프트 없음** 확정, §1 해소
+  - 부수 발견 (A): `prisma.session.create({select:{expiresAt}})` read-back 은 여전히 parsing-side +9h 시프트 → `issueSession`/`rotateSession` 에서 read-back 제거 + JS-side expiresAt 반환 (선제적 방어, caller 영향 0)
+  - 부수 발견 (B): Set-Cookie `Expires=... GMT` 가 `Max-Age=604800` 로부터 계산될 때 +9h 시프트 — RFC 6265 §5.2.2 Max-Age 우선이라 cosmetic, 실 동작 영향 0. §3 신규 과제로 이월
+  - 검증: tsc 0 / vitest 244 PASS (회귀 0) / `/ypserver prod` rsync+build+PM2 ↺=12 / E2E 재검증 새 세션 TTL 604800 정확
+  - CK +1 갱신 (32 유지): `prisma-orm-tz-naive-filter-gotcha.md` 에 "세션 42 추가 검증" 섹션 추가 (§1 해소 + §3 신규)
+- **세션 41** — Wave 충실이행도 87/100 평가 + ORM Date 비교 전수 감사 (4파일 8곳 raw SQL 전환)
   - Wave 1~5 (123 문서 / 106,588줄) 6차원 충실도 평가 — 기술 채택 98 / 스키마 95 / MVP 72 / ADR 95 / 스파이크 80 / 지식보존 100 — "설계-구현 정합성 A, 진도 C+"
   - 세션 40 권장 7건 중 #1 (ORM 시간 비교 전수 검토) 선택 · 1-2h 스코프 · 즉시 착수
   - 프로젝트 `src/` 정규식 2종 전수 스캔: `{lt|gt: (new Date|now)}` (ORM WHERE, 4건) + `row.\w+(At|Until) < new Date()` (JS-side, 4건) = **8곳 취약 패턴**
@@ -153,28 +161,43 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 ## 추천 다음 작업
 
 ~~우선순위 1: 다른 모듈 ORM 시간 비교 전수 검토~~ ✅ **세션 41 완결** (4파일 8곳 raw SQL 전환, 3 전환 패턴 A/B/C 정립, CK `orm-date-filter-audit-sweep.md` 신규)
+~~우선순위 (A) INSERT-side binding 시프트 검증~~ ✅ **세션 42 완결** — DB TTL 604800 정확, 가설 기각, §1 해소. 부수적으로 `issueSession`/`rotateSession` 선제적 방어 적용 (read-back 제거).
 
-### 우선순위 1: prisma INSERT timestamptz 시프트 검증 + 잔존 API route Date 직렬화 감사 ⭐ 신규 최상위 (~1.5h, 세션 41 CK 잔존 과제)
+### 우선순위 1: KST 03:00 자동 cleanup tick 관찰 (익일 이후)
 
-**(A) INSERT 정확성 검증**: 실제 사용자 로그인 후 PG 직접 SELECT 로 `expires_at` 정확성 확인. 만약 INSERT 시프트하면 새 session 만료가 9h 빨리 됨. 시프트 확인 시 PG 측 `NOW() + INTERVAL '7d'` 로 `issueSession` / `rotateSession` / JWKS `rotateKey` / webauthn `create` 전부 INSERT 치환.
-
+세션 35 cleanup-scheduler 의 자동 실행을 프로덕션 실측 확인:
 ```bash
-# 로그인 후
-PGPASSWORD='Knp13579yan' psql -h localhost -p 5432 -U postgres -d luckystyle4u -c \
-  "SELECT id, expires_at, expires_at AT TIME ZONE 'UTC' AS utc FROM sessions ORDER BY created_at DESC LIMIT 3;"
+wsl -e bash -c "source ~/.nvm/nvm.sh && pm2 logs dashboard --lines 200 | grep -i cleanup"
+# audit_logs WHERE action='CLEANUP_EXECUTED' (자동) vs 'CLEANUP_EXECUTED_MANUAL' (UI)
 ```
+PM2 restart 누적 ↺=12 — uptime 24h+ 확보 위해 당분간 재배포 없이 대기 필요.
 
-**(B) 기타 API route Date 직렬화 감사** (세션 41 CK 잔존 과제 §2): audit_logs / cron / webhooks / filebox / 기타 API route 에서 ORM-read Date 를 `.toISOString()` 으로 응답에 넣는 경로가 9h 시프트를 가지고 있는지 grep + 개별 리뷰:
+### 우선순위 2: 기타 API route Date 직렬화 전수 리뷰 (1-2h, 세션 41 CK 잔존 과제 §2)
+
+세션 41 에서 `listActiveSessions` / `verifyMfaSecondFactor` 만 커버. 나머지 API route 에서 ORM-read Date 를 `.toISOString()` 으로 응답에 넣는 경로가 9h 시프트를 가지고 있는지 grep + 개별 리뷰:
+
 ```bash
 grep -rnE "\\.toISOString\\(\\)" src/app/api/
+grep -rnE "\\.[a-zA-Z]+At:\\s*[a-zA-Z]+\\.[a-zA-Z]+At" src/app/api/
 ```
+
+**스캔 대상**:
+- `src/app/api/audit/**` — audit_logs timestamp
+- `src/app/api/cron/**` — lastRunAt / nextRunAt
+- `src/app/api/webhooks/**` — deliveredAt / queuedAt
+- `src/app/api/v1/tables/**` — 테이블 편집기 row.created_at / updated_at display
+
 패턴 B (전체 raw SELECT with `::text`) 또는 패턴 D (response 직렬화 직전 보정) 적용 여부 결정.
 
-**참고**: 세션 42 초반에 `tokens.ts` issueSession / rotateSession 은 "JS-side expiresAt 직접 반환" 패턴으로 이미 부분 적용됨 — 호출자가 쿠키 Expires / 로그 / 응답 payload 에 쓰는 값은 정확한 UTC. 동일 패턴을 나머지 INSERT 경로에 확산.
+### 우선순위 3: Next.js 16 Set-Cookie Expires 헤더 +9h 근본 조사 (세션 42 CK §3, 1h)
 
-### 우선순위 3: KST 03:00 자동 cleanup tick 관찰 (익일)
+세션 42 에서 발견한 cosmetic 시프트. `response.cookies.set({ maxAge: N })` 로 설정한 쿠키의 Set-Cookie 응답 헤더 `Expires=` 속성이 local wall-clock (KST) 을 GMT 로 라벨. RFC 6265 Max-Age 우선이라 브라우저 실 만료는 정확하지만 외부 observability 도구가 Expires 를 파싱하면 혼란 가능.
 
-세션 40 종료 시점 KST 15시. 익일 KST 03:00 첫 자동 tick 발생. `audit_logs WHERE action='CLEANUP_EXECUTED'` 신규 엔트리 확인.
+**조사 단계**:
+1. Next.js 16 `next/server` `NextResponse.prototype.cookies.set` 소스 추적 (`node_modules/next/dist/...`)
+2. 쿠키 헤더 빌더가 `maxAge` 로부터 Expires 를 계산하는지, `expires` 옵션 미전달 시 동작
+3. `Date.prototype.toUTCString()` 사용 여부 vs local wall-clock 직접 사용
+4. 재현 가능하면 Next.js 이슈 리포트
 
 ### 우선순위 4: MFA UI + Phase 15-D 활성 세션 카드 브라우저 직접 실행 (1-2h)
 
@@ -251,6 +274,12 @@ grep -rnE "\\.toISOString\\(\\)" src/app/api/
 ```
 
 ## 알려진 이슈 및 주의사항
+
+### 세션 42 신규
+
+- **Prisma `session.create({ select: { expiresAt: true } })` read-back 은 여전히 parsing-side +9h 시프트** — INSERT 자체(DB 저장값)는 정확(TTL 604800) 이지만, create 결과의 `session.expiresAt` Date 는 adapter-pg parsing 경계에서 +9h. 세션 42 에서 `issueSession`/`rotateSession` 은 JS-side 원본 반환으로 선제적 방어 적용. 다른 `prisma.<model>.create({select: {someAt}})` 경로도 동일 함정 가능.
+- **Next.js 16 `response.cookies.set({ maxAge })` Set-Cookie `Expires` 헤더 +9h cosmetic 시프트** — RFC 6265 §5.2.2 에 따라 Max-Age 우선이라 브라우저 실제 만료는 정확. 외부 observability 도구가 Expires 를 파싱하면 혼란 가능. Next.js 내부 cookies 빌더가 maxAge 로부터 Expires 계산 시 local wall-clock 사용 추정. 근본 조사는 CK §3 신규 과제.
+- ~~**prisma INSERT 시도 시프트하는지 검증 미완**~~ ✅ **세션 42 해소** — DB TTL 604800 정확, 시프트 없음.
 
 ### 세션 40 신규
 

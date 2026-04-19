@@ -43,6 +43,9 @@ export interface IssuedSession {
 export async function issueSession(params: IssueSessionParams): Promise<IssuedSession> {
   const token = generateOpaqueToken();
   const tokenHash = hashToken(token);
+  // 세션 42: JS-side 에서 만든 expiresAt (Date.now() + 7d UTC ms) 을 그대로 반환.
+  // create().select 로 다시 읽으면 Prisma 7 adapter-pg parsing-side TZ 시프트(+9h KST)
+  // 때문에 호출자가 쿠키 Expires / 로그 / 응답 payload 에 써서 혼란 발생. DB 는 정상.
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_MAX_AGE_MS);
   const session = await prisma.session.create({
     data: {
@@ -52,9 +55,9 @@ export async function issueSession(params: IssueSessionParams): Promise<IssuedSe
       userAgent: params.userAgent ?? null,
       expiresAt,
     },
-    select: { id: true, expiresAt: true },
+    select: { id: true },
   });
-  return { token, sessionId: session.id, expiresAt: session.expiresAt };
+  return { token, sessionId: session.id, expiresAt };
 }
 
 export type SessionLookupStatus =
@@ -142,6 +145,7 @@ export async function rotateSession(params: {
     });
     const token = generateOpaqueToken();
     const tokenHash = hashToken(token);
+    // 세션 42: JS-side expiresAt 직접 반환 (issueSession 과 동일 이유).
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_MAX_AGE_MS);
     const created = await tx.session.create({
       data: {
@@ -151,9 +155,9 @@ export async function rotateSession(params: {
         userAgent: params.userAgent ?? null,
         expiresAt,
       },
-      select: { id: true, expiresAt: true },
+      select: { id: true },
     });
-    return { token, sessionId: created.id, expiresAt: created.expiresAt };
+    return { token, sessionId: created.id, expiresAt };
   });
 }
 
