@@ -112,7 +112,8 @@ export function parseUserAgent(raw: string | null | undefined): string {
 | 신규 | `src/lib/sessions/activity.ts` / `activity.test.ts` |
 | 수정 | `tokens.ts` / `sessions/route.ts` / `account/security/page.tsx` |
 | 테스트 | 206 → 231 (+25, 회귀 0) |
-| 커밋 | `b454e3c feat(auth): 세션 38 — Phase 15-D 보강 (touch throttle + activity fingerprint)` |
+| 커밋 | `b454e3c feat(auth): 세션 38 — Phase 15-D 보강 (touch throttle + activity fingerprint)` + `d9e68bf docs: /cs 세션 38 마감` |
+| Compound Knowledge | +1 (`2026-04-19-ios-safari-ua-regex-trap.md` — bug-fix/high). **누적 27 → 28건** |
 
 ## 알려진 이슈 / 주의사항
 
