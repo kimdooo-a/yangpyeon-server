@@ -26,12 +26,14 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 49 종료 시점 — S49 플랜 풀 디테일 확장 + Phase 16a 프로덕션 배포 완결 (16b 구현은 미실행)
+## 필수 참조 파일 ⭐ 세션 50 종료 시점 — Next.js standalone 실행 패키지 + WSL 프로덕션 배포 전환 완결
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session49-s49b-plan-expansion-phase16a-deploy.md  ⭐⭐ 최신 (S49 outline→848줄 풀 디테일 + Phase 16a prod 4 Step 완결, Task 49-1 디스패치 직전 사용자 /cs interrupt, 실구현 0건)
+docs/handover/260419-session50-standalone-package.md              ⭐⭐ 최신 (standalone 재도입 + pack-standalone.sh + WSL `ypserver` PM2 online HTTP 200 Ready 0ms, Capistrano 진입 대신 rsync 경로 실증)
+docs/solutions/2026-04-19-nextjs-standalone-output-misunderstanding.md  ⭐ CK +1 (34) — 세션 3 결정 역전 사례 + Next.js standalone 별개 제품 인식
+docs/handover/260419-session49-s49b-plan-expansion-phase16a-deploy.md  (S49 outline→848줄 풀 디테일 + Phase 16a prod 4 Step 완결, Task 49-1 디스패치 직전 사용자 /cs interrupt, 실구현 0건)
 docs/handover/260419-session48-phase16a-vault.md                  (Phase 16a 구현 +528/-33 12파일, tsc 0 / vitest 264 / build 0, 커밋 6건)
 docs/handover/260419-session47-phase16-spikes.md                  (3 스파이크 PASS, Clearance +3, S48 진입 Clearance 확보)
 docs/handover/260419-session46-phase-16-design-plan.md            (Phase 16 설계 425줄 + 플랜 997줄 = 1,422줄, 코드 0)
