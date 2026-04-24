@@ -790,7 +790,10 @@ ADR-018 (레이어 구조)
 │                           ◄──── ADR-007 Auth Advanced   │
 │                                                          │
 │ ADR-015 Operations ◄──── ADR-005 DB Ops (백업)           │
-│                    ◄──── ADR-013 시크릿 관리              │
+│       │            ◄──── ADR-013 시크릿 관리              │
+│       │ Capistrano symlink/releases 부분만 부분 대체       │
+│       ▼                                                   │
+│ ADR-020 standalone+rsync+pm2 reload (세션 50, 활성)        │
 │                                                          │
 │ ADR-010 Realtime (wal2json + 포팅)                       │
 │   │                                                      │
@@ -862,7 +865,7 @@ ADR-018 (레이어 구조)
 | Data API | ADR-012, ADR-016 |
 | Observability | ADR-013 |
 | UX Quality | ADR-014 |
-| Operations | ADR-015 |
+| Operations | ADR-015 (Capistrano 부분 ADR-020에 의해 부분 대체), ADR-020 (standalone+rsync 활성) |
 | 전 카테고리 | ADR-001 (Multi-tenancy), ADR-018 (레이어 구조) |
 
 ### 4.2 상태별 분포
@@ -877,7 +880,7 @@ ADR-018 (레이어 구조)
 | Phase | 관련 ADR |
 |-------|----------|
 | 15 (Auth Advanced) | ADR-007 |
-| 16 (Observability + Operations) | ADR-013, ADR-015 |
+| 16 (Observability + Operations) | ADR-013, ADR-015, ADR-020 (16 부분 대체) |
 | 17 (Auth Core + Storage) | ADR-006, ADR-008, ADR-019 |
 | 18 (SQL + Table Editor) | ADR-002, ADR-003, ADR-017 |
 | 19 (Edge Fn + Realtime) | ADR-009, ADR-010 |
