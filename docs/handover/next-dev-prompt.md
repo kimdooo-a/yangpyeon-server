@@ -26,13 +26,18 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 세션 50 종료 시점 — Next.js standalone 실행 패키지 + WSL 프로덕션 배포 전환 완결
+## 필수 참조 파일 ⭐ 세션 51 종료 시점 — kdywave 이행도 평가(A- 85/100) + ADR-020 신설 + 로드맵 공수 재보정
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260419-session50-standalone-package.md              ⭐⭐ 최신 (standalone 재도입 + pack-standalone.sh + WSL `ypserver` PM2 online HTTP 200 Ready 0ms, Capistrano 진입 대신 rsync 경로 실증)
-docs/solutions/2026-04-19-nextjs-standalone-output-misunderstanding.md  ⭐ CK +1 (34) — 세션 3 결정 역전 사례 + Next.js standalone 별개 제품 인식
+docs/handover/260425-session51-kdywave-eval-adr020.md             ⭐⭐⭐ 최신 (이행도 A- 85/100 + ADR-020 신설 + ADR-015 부분 대체 + Git 태그 3건 소급 + 로드맵 §8.1.1 시나리오 A/B 병기)
+docs/solutions/2026-04-25-adr-numbering-and-partial-supersession.md  ⭐⭐ CK +1 (35) — 신규 ADR 등록 3 위치 검색 / Deprecated/Superseded 전체/부분 3 모드 / 보완 블록 표준 형식 / 5 핵심 산출물 선택적 전파 패턴
+docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md     ⭐ ADR-020 (Next.js standalone+rsync+pm2 reload, 활성) + ADR-015 §세션 50 보완 (Capistrano 부분 대체) — 세션 51 갱신
+docs/research/2026-04-supabase-parity/05-roadmap/00-roadmap-overview.md  ⭐ §1.2 870h→916h / §8.1.1 시나리오 A 53-54주 vs B 25주 병기 / §13 위험 신호 2건 / §14.3 거버넌스 (세션 51 갱신)
+docs/research/2026-04-supabase-parity/05-roadmap/05-rollout-strategy.md  ⭐ 헤더 부분 대체 통지 (Capistrano = 유보 자산, ADR-020 활성, 세션 51)
+docs/handover/260419-session50-standalone-package.md              ⭐ (standalone 재도입 + pack-standalone.sh + WSL `ypserver` PM2 online HTTP 200 Ready 0ms, Capistrano 진입 대신 rsync 경로 실증)
+docs/solutions/2026-04-19-nextjs-standalone-output-misunderstanding.md  CK (34) — 세션 3 결정 역전 사례 + Next.js standalone 별개 제품 인식
 docs/handover/260419-session49-s49b-plan-expansion-phase16a-deploy.md  (S49 outline→848줄 풀 디테일 + Phase 16a prod 4 Step 완결, Task 49-1 디스패치 직전 사용자 /cs interrupt, 실구현 0건)
 docs/handover/260419-session48-phase16a-vault.md                  (Phase 16a 구현 +528/-33 12파일, tsc 0 / vitest 264 / build 0, 커밋 6건)
 docs/handover/260419-session47-phase16-spikes.md                  (3 스파이크 PASS, Clearance +3, S48 진입 Clearance 확보)
@@ -215,7 +220,31 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### ~~우선순위 0: Phase 16a 프로덕션 배포 + 회귀 가드 실행~~ ✅ **세션 48/49 2단계 완결**
+### 우선순위 0 (S52 즉시): 사용자 진행 중 3 파일 의도 확인 + Windows 재부팅 자동복구 실증
+
+**S51 cs 시점 git working tree 잔존**:
+- `M scripts/pack-standalone.sh` — 본 대화 외 사용자 추가 수정 추정
+- `M standalone/install-native-linux.sh` — S50 알려진 이슈 #1(700 패키지 인플레이션) 개선 작업 추정
+- `?? scripts/wsl-build-deploy.sh` — 신규 미추적, S50 우선순위 0 항목 진행 추정
+
+**대응 절차**:
+1. 사용자에게 3 파일 의도 확인 (각각 무엇을 하려 했는지)
+2. 의도 파악 후 cs 커밋에 합류 또는 별도 처리
+3. **Windows 재부팅 1회 리허설** — WSL → PM2 → cloudflared 자동 복구 체인 실증 (S50 이슈 #2)
+
+### 우선순위 0-2 (S52 후속): /kdywave --feedback 정식 모드 (36 잔여 파일 일괄)
+
+**상태**: S51에서 5 핵심 산출물(README / 01-adr-log §2 / §0.4 / 05-operations-blueprint / 04-integration/02-cloudflare-deployment)에만 cross-reference. 36개 잔여(주로 05-roadmap의 milestones·release-plan·risk-register·cost-tco 등)는 ADR-015 단독 언급 상태.
+
+**실행 방법**: `/kdywave --feedback` 모드 진입 → ADR-020 신설 사실을 일괄 자동 전파. Wave 1 deep-dive 73문서와 _archived/는 역사 보존 원칙 유지(미수정).
+
+### ~~우선순위 1: S49 Phase 16b Capistrano 배포 자동화~~ ⚠️ **S51에서 ADR-020으로 부분 대체 — 사실상 보류**
+
+**S51 변경**: ADR-020(Next.js standalone + rsync + pm2 reload)이 ADR-015의 *Capistrano-style symlink/releases* 부분을 대체. 4 재진입 트리거(rsync 미정합 1회+/롤백 부재 30초+/사용자 2명+/canary 분기) 충족 시 재가동될 **유보 자산**으로 보존.
+
+**현재 활성 배포 경로**: `standalone/` 패키지 빌드 → `rsync --delete /mnt/e/.../standalone/ ~/ypserver/` → `pm2 reload ypserver`. ADR-020 본문 + S50 handover 참조.
+
+### ~~우선순위 0 (구): Phase 16a 프로덕션 배포 + 회귀 가드 실행~~ ✅ **세션 48/49 2단계 완결**
 
 - **세션 48**: user-home 경로 `/home/smart/.luckystyle4u/secrets.env` 로 1차 설치 + migrate + verify PASS (Vault decrypt E2E `decrypted_len:64` 일치).
 - **세션 49**: plan 기본 경로 `/etc/luckystyle4u/secrets.env` 로 재설치 (사용자 sudo) + `~/dashboard/.env.production` 에 `MASTER_KEY_PATH` append + Phase 2 전구간 재배포 (PM2 ↺=19 pid=52616 HTTP 307) + migrate-env-to-vault `already migrated` (dev/prod 동일 인스턴스) + `phase16-vault-verify.sh` `=== PASS ===`.

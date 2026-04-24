@@ -14,6 +14,12 @@
 
 <!-- 날짜 그룹별로 정리합니다. 최신이 위로 올라갑니다. -->
 
+### 2026-04-25
+
+| 세션 | 파일 | 주요 작업 |
+|------|------|-----------|
+| 51 | [260425-session51-kdywave-eval-adr020.md](./260425-session51-kdywave-eval-adr020.md) | **kdywave 문서 이행도 평가(A- 85/100) + ADR-020 신설 + 로드맵 재보정 + Git 태그 3건 소급 (~3h, 자율 실행)** — 사용자 "kdywave 문서 이행도 평가" 요청에 3중 Wave 레이어(platform-evolution-S/supabase-M/2026-04-supabase-parity-L) 진행 vs 실구현 6차원 평가 → 종합 **A- 85/100**. 이행 강점(역방향 피드백 0건/Phase 15 1주 압축) + 결함 3건 식별 (R1 ADR-015 vs 실구현 불일치 / R2 standalone 700-패키지 인플레이션 / R3 계획외 timestamptz 캐스케이드 5세션). 사용자 "즉시 권장 조치 순차적 모두 진행" → "모두 진행" 2차 지시로 **6 작업 자율 완료**. **Task 1 ADR-020 신설**: ADR-019 점유 발견 → 020으로 변경, 5 편집 (§0.4 표/ADR-015 §세션 50 보완 4 재진입 트리거 정량화/ADR-020 신규 본문 4 후속 P0/§3.1 다음 번호 021/05-rollout-strategy.md 헤더 부분 대체 통지). **Task 2 Git 태그 소급 3건**: v0.1.0-alpha.0(b4287b0=세션31)·alpha.1(9d2a61e=세션39 Phase 15 완료)·alpha.2(c4794d4=세션48 Phase 16a Vault) 모두 정확 SHA에 생성 + 원격 push. **Task 3 로드맵 공수 재보정**: §1.2 핵심 수치 870h→916h·50주→25-54주 / §8.1 25% 상향 / §8.1.1 신설 (계획외 +46h 표 + 실측 속도 50h+/주 + 시나리오 A 53-54주 vs B 25주 병기 + 측정 지표 3건) / §13 위험 신호 2건 (하향 이탈 -50%/계획외 15%) / §14.3 거버넌스 (Phase 완료 git 태그 + 자동 측정). **Task 6 kdywave --feedback 부분 전파**: 41 영향 파일 중 5 핵심에 cross-reference (README row 14·01-adr-log §2 그래프·05-operations-blueprint·04-integration/02-cloudflare-deployment). Wave 1 deep-dive 73문서와 _archived/는 역사 보존 미수정. **커밋 2건 + push**: 7a45c7b(ADR/로드맵 3 파일) + 7d68b00(피드백 4 파일) → main 정상. **CK +1** (34→**35**): `2026-04-25-adr-numbering-and-partial-supersession.md` (pattern/high — 신규 ADR 등록 3 위치 검색 + Deprecated/Superseded 전체/부분 3 모드 + 보완 블록 표준 형식). 코드 변경 0건 (docs 한정). **사용자 진행 중 3 파일 보존** (M pack-standalone.sh / M install-native-linux.sh / ?? wsl-build-deploy.sh — 본 대화 외 사용자 작업, 다음 세션 의도 확인 필요). **이월** (S52+): 사용자 작업 3건 의도 확인 / Windows 재부팅 자동복구 실증 (S50 이슈 #2) / kdywave --feedback 정식 모드 (36 잔여 파일 일괄) / _CHECKPOINT_KDYWAVE.md §보완 행 / S50 이월 (pm2-logrotate/postgresql systemd) / S49 이월 (KEK 퍼즐/MASTER_KEY_PATH 통일 등) |
+
 ### 2026-04-19
 
 | 세션 | 파일 | 주요 작업 |
