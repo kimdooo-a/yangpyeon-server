@@ -3,7 +3,8 @@
 > Wave 4 · Tier 3 · I2 Integration 클러스터 산출물
 > 작성일: 2026-04-18 (세션 28, kdywave W4-I2)
 > 상위: [CLAUDE.md](../../../../CLAUDE.md) → [docs/research/](../../) → [2026-04-supabase-parity/](../) → [04-integration/](./) → **이 문서**
-> 연관: [../02-architecture/05-operations-blueprint.md](../02-architecture/05-operations-blueprint.md) · [../02-architecture/01-adr-log.md](../02-architecture/01-adr-log.md) (ADR-015)
+> 연관: [../02-architecture/05-operations-blueprint.md](../02-architecture/05-operations-blueprint.md) · [../02-architecture/01-adr-log.md](../02-architecture/01-adr-log.md) (ADR-015 + ADR-020)
+> ⚠️ **2026-04-19 세션 50 갱신**: Capistrano symlink/releases 메커니즘 부분은 ADR-020(standalone+rsync+pm2 reload)에 의해 부분 대체. canary.stylelucky4u.com 시간차 배포·Cloudflare Tunnel 통합 부분은 그대로 유효.
 > 관련 솔루션: [../../../../docs/solutions/2026-04-18-cloudflare-tunnel-quic-tuning-partial-fix.md](../../../../docs/solutions/2026-04-18-cloudflare-tunnel-quic-tuning-partial-fix.md)
 
 ---

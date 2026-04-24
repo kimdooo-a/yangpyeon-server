@@ -4,7 +4,7 @@
 > 작성일: 2026-04-18 (세션 28)
 > 상위: [CLAUDE.md](../../../../CLAUDE.md) → [docs/research/](../../) → [2026-04-supabase-parity/](../) → [02-architecture/](./) → **이 문서**
 > 연관: [00-system-overview.md](./00-system-overview.md) · [01-adr-log.md](./01-adr-log.md) · [02-data-model-erd.md](./02-data-model-erd.md)
-> 상위 ADR: ADR-015 (Capistrano-style + PM2 cluster:4 + canary 서브도메인)
+> 상위 ADR: ADR-015 (Capistrano-style + PM2 cluster:4 + canary 서브도메인) — ⚠️ **2026-04-19 세션 50에서 ADR-020 신설로 *Capistrano-style symlink/releases 부분 대체(Superseded)*. 본 문서의 Capistrano 디렉토리/배포 파이프라인 §은 트리거 충족 시 재가동되는 유보 자산. 현 활성 배포 경로는 [01-adr-log.md ADR-020](./01-adr-log.md) (standalone + rsync + pm2 reload).** PM2 cluster:4 / canary 서브도메인 부분은 그대로 유효.
 
 ---
 
