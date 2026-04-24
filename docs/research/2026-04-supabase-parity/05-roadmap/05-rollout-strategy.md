@@ -1,9 +1,12 @@
 # 05. 롤아웃 전략 — Capistrano-style + PM2 cluster:4 + Canary 서브도메인 통합
 
+> ⚠️ **부분 대체 통지 (2026-04-19, 세션 50)** — 본 문서의 *Capistrano-style symlink + releases/* 메커니즘은 **ADR-020(Next.js standalone + rsync + pm2 reload)으로 부분 대체**되었습니다. *PM2 cluster:4* 와 *canary.stylelucky4u.com 시간차 검증* 부분은 그대로 유효. Capistrano 재진입 트리거 4건은 [01-adr-log.md ADR-015 §세션 50 보완](../02-architecture/01-adr-log.md) 및 [ADR-020](../02-architecture/01-adr-log.md) 참조. 본 문서의 §3·§6 내용은 트리거 충족 시 재가동되는 **유보 자산**으로 보존합니다 (역사 삭제 금지 원칙).
+
 > Wave 5 · R3 에이전트 산출물
-> 작성일: 2026-04-18 (세션 28)
+> 작성일: 2026-04-18 (세션 28) · 부분 대체 통지: 2026-04-19 (세션 50)
 > 상위: [CLAUDE.md](../../../../CLAUDE.md) → [docs/research/](../../) → [2026-04-supabase-parity/](../) → [05-roadmap/](./) → **이 문서**
 > 연관:
+> - [02-architecture/01-adr-log.md ADR-020](../02-architecture/01-adr-log.md) (현 활성 배포 경로 — standalone + rsync + pm2 reload)
 > - [02-architecture/05-operations-blueprint.md](../02-architecture/05-operations-blueprint.md) (ADR-015 Capistrano + PM2 cluster:4 + canary 원본)
 > - [04-integration/02-cloudflare-deployment-integration.md](../04-integration/02-cloudflare-deployment-integration.md) (Tunnel 통합 계약)
 > - [04-go-no-go-checklist.md](./04-go-no-go-checklist.md) (게이트 기준 연동)
