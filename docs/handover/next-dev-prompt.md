@@ -26,21 +26,31 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 56 종료 시점 (§보완 2 포함) — ADR-021 audit fail-soft + 마이그레이션 self-heal + audit-failure 메트릭 + Wave registry 정합성
+## 필수 참조 파일 ⭐ 세션 57 종료 시점 — yangpyeon-aggregator-spec v1.0 → v1.1 정합화 (81→0 에러)
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260425-session56-audit-fail-soft-migration-self-heal.md ⭐⭐⭐ 최신 (3-부 구조: 본문 audit fail-soft 4층 결함 해결 + ADR-021 정식화 + 11 콜사이트 sweep + 빌드 게이트 [6/8][7/8] + 부팅 self-heal / §보완 1 audit-failure 카운터 메트릭 (ADR-021 §amendment-1, GET /api/admin/audit/health) / §보완 2 Wave registry 정합성 — 7+1 위치 동기화 + 5 핵심 산출물 cross-reference + _CHECKPOINT B-04)
-docs/research/decisions/ADR-021-audit-cross-cutting-fail-soft.md ⭐⭐ 정식 ADR (감사 로그 cross-cutting fail-soft + 마이그레이션 self-heal, §2.4 Postgres 통합 보류, §5 재검토 트리거 5건)
-docs/solutions/2026-04-25-audit-fail-soft-and-migration-self-heal.md ⭐⭐ CK +1 (40) — 4층 결함 일괄 해결 / cross-cutting + 도메인 임계 경로 fail-tied 안티패턴 / 빌드 게이트 fail-fast vs 부팅 self-heal best-effort 이중화 / standalone 패키저 마이그레이션 동봉 비대칭 결함
+docs/handover/260426-session57-aggregator-spec-rewrite.md ⭐⭐⭐ 최신 (Approach B 시도 → 81 에러 → 백아웃 → spec 18 파일 일괄 정합화 → tsc 셋업 외 0 에러 검증)
+docs/assets/yangpyeon-aggregator-spec/README.md ⭐⭐ v1.1 changelog (큐레이션 4필드 + 'promoted' enum + asChild 회피 + Prisma 경로)
+docs/assets/yangpyeon-aggregator-spec/02-applying-the-patch.md ⭐⭐ Step 1 분할 (1-1 npm 3종 + 1-2 shadcn 9종 + 1-3 Prisma 경로 명시)
+docs/solutions/2026-04-26-spec-typecheck-driven-rewrite.md ⭐⭐ CK +1 (41) — 외부 스펙 type-check 검증 의무 / scratch 적용→tsc→백아웃 표준 패턴 / yangpyeon 5 컨벤션 명시 / 셋업 갭 vs 실제 결함 분리 / spec schema 보강 vs 코드 다이어트 결정
 
-⚠ 세션 57 우선 작업 P0 (~7시간 후): 2026-04-26 03:00 KST cleanup cron 결과 확인
+⚠ 세션 58 우선 작업 P0: spec 적용 (사용자 결정 시) — 02-applying-the-patch.md 그대로 따라가기
+   1. npm install rss-parser cheerio @google/genai
+   2. npx shadcn@latest add tabs table badge input select textarea checkbox switch label
+   3. CronKind enum에 AGGREGATOR 추가 (수동) + schema-additions.prisma append
+   4. src/lib/aggregator/ + src/app/api/v1/almanac/ + src/app/admin/aggregator/ + api-guard-publishable.ts cp
+   5. cron/runner.ts + data-api/allowlist.ts + types/supabase-clone.ts 머지
+   6. npx prisma generate + npx tsc --noEmit (0 에러 기대)
+   7. (사용자 승인 후) prisma migrate dev / pm2 reload
+
+⚠ 세션 58 우선 작업 P1 (S56 이월): 2026-04-26 03:00 KST cleanup cron 결과 확인
    wsl -- bash -lic 'pm2 logs ypserver --lines 80 --nostream | grep -A2 "audit log write failed"'
-   → 5일 연속 발생하던 audit log write failed 가 사라져야 함 (S54 진단 패치 + S56 safeAudit + Step 1 마이그레이션 적용 ROI 검증)
+   → 5일 연속 발생하던 audit log write failed 가 사라져야 함
    동시에: curl -H 'Authorization: Bearer <ADMIN>' http://localhost:3000/api/admin/audit/health → §보완 1 카운터 (ok: true / failed: 0)
 
-⚠ 세션 57 우선 작업 P1: ADR-021 placeholder 충돌 6 위치 cascade 정정 (세션 56 §보완 2 §D 표 참조)
+⚠ 세션 58 우선 작업 P2 (S56 이월): ADR-021 placeholder 충돌 6 위치 cascade 정정 (세션 56 §보완 2 §D 표 참조)
    - 02-architecture/01-adr-log.md §1029 (Realtime 백프레셔)
    - 02-architecture/16-ux-quality-blueprint.md §1570 (AI 챗 영구 저장)
    - 05-roadmap/03-risk-register.md §649·651 (Next.js 17 업그레이드)

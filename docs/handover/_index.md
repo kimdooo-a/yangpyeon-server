@@ -14,6 +14,12 @@
 
 <!-- 날짜 그룹별로 정리합니다. 최신이 위로 올라갑니다. -->
 
+### 2026-04-26
+
+| 세션 | 파일 | 주요 작업 |
+|------|------|-----------|
+| 57 | [260426-session57-aggregator-spec-rewrite.md](./260426-session57-aggregator-spec-rewrite.md) | **yangpyeon-aggregator-spec v1.0 → v1.1 정합화 (~3h)** — `docs/assets/yangpyeon-aggregator-spec/` v1.0(2026-04-25 작성) 검토에서 P0 결함(`suggestedCategoryId` vs `suggestedCategorySlug`) 1건 발견 → Approach B(`feat/aggregator-v1`) 적용 시도 시 **81 컴파일 에러 / 21 파일 영향** 폭발. 4 카테고리 분류: (A) 스펙 자체 스키마와 코드 불일치 ~30 (`nameKo` vs `name`, staging에 없는 필드 `qualityFlag`/`reviewedById`/`track`/`thumbnailUrl`/`externalUrl` 사용, `'published'` 미존재 enum, ContentSource.id Int 미인지, ContentSourceKind 소문자) / (B) Prisma 경로 ~5 (`@prisma/client` → `@/generated/prisma/client`) / (C) yangpyeon 어댑터 ~12 (`session.userId` → `session.sub`, `AuditEntry.actor` 미존재, `extractClientIp(req)` → `(headers)`, `ApiKey.expiresAt` 미존재, `Button asChild` 미지원) / (D) 환경 셋업 누락 ~24 (npm 3 + shadcn 9, Step 1에서 예고). 평가: 스펙 v1.0이 type-check 한 번도 안 거친 초안. **백아웃 + 스펙 재작성** (경로 2) 사용자 결정 → R-1 백아웃 (브랜치 삭제 + 추적 4파일 git checkout + 4 디렉터리 rm + prisma generate) → R-2 `spec/aggregator-fixes` 브랜치 → R-3 yangpyeon 7 계약 사실 확인 → R-4~R-7 18 파일 일괄 정합화. **핵심 결정**: (1) 큐레이션 4필드 ContentIngestedItem 추가 (qualityFlag/reviewedById/reviewedAt/reviewNote, FK 비참조), (2) ContentIngestStatus에 'promoted' 추가, (3) asChild 회피 (Link with className / controlled Dialog), (4) ContentSourceKind 대문자 강제, (5) ID 타입 정정 (Source Number / Item·Category String cuid), (6) seed-aggregator.ts → `import { prisma } from "@/lib/prisma"` lazy proxy, (7) promote.ts excerpt/track/publishedAt 필수 폴백 + ContentItem 비참조 필드 제거, (8) AuditEntry shape 정합 + `extractClientIp(request.headers)`, (9) api-guard-publishable expiresAt 로직 제거. **R-8 검증** (scratch 적용 → tsc → 백아웃 패턴): src/ 18 에러 모두 TS2307 missing module — 9 shadcn + 3 npm + 0 외 = **셋업 외 잔존 에러 0개**. 즉 spec 자체는 즉시 적용 가능 상태. README/02-applying-the-patch에 v1.1 changelog + Step 1 분할 (1-1 npm 3 / 1-2 shadcn 9 / 1-3 Prisma 경로) 명시. **CK +1** (40→**41**): `2026-04-26-spec-typecheck-driven-rewrite.md` (pattern/high — 외부 스펙 type-check 검증 의무 / scratch 적용 → tsc → 백아웃 표준 패턴 / yangpyeon 5 컨벤션 명시 / 셋업 갭 vs 실제 결함 분리 / spec schema 보강 vs 코드 다이어트 결정). 코드 변경 0 (spec 자산만 수정, `feat/aggregator-v1`은 백아웃되어 main 영향 0). 본 세션 산출물은 `spec/aggregator-fixes` 브랜치 단일 커밋으로 흡수. **이월** (S58+): spec 적용 세션 — 02-applying-the-patch 그대로 따라가면 0 에러 보장 / S56 이월(03:00 KST cron 검증 + ADR-021 placeholder cascade) / S55·56 이월(다른 글로벌 스킬 audit drift) / S54·53 잔존 6항 |
+
 ### 2026-04-25
 
 | 세션 | 파일 | 주요 작업 |

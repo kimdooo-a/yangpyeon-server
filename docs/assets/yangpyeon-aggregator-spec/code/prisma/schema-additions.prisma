@@ -1,0 +1,222 @@
+// =============================================================================
+// Almanac × yangpyeon-server — 콘텐츠 어그리게이터 스키마 추가분
+// -----------------------------------------------------------------------------
+// 사용법:
+//   1) 이 파일의 enum/model 블록을 yangpyeon-server의 prisma/schema.prisma 끝에
+//      그대로 복사 붙여넣기 (generator/datasource 블록은 절대 중복 금지).
+//   2) 기존 enum CronKind 정의(파일 367행 부근)에 AGGREGATOR 한 값을 추가:
+//
+//        enum CronKind {
+//          SQL
+//          FUNCTION
+//          WEBHOOK
+//          AGGREGATOR    // <-- 신규 (콘텐츠 수집 cron 잡)
+//        }
+//
+//      ⚠️ enum CronKind 자체는 이 파일에서 다시 선언하지 말 것
+//         (Prisma가 "Type already defined" 에러를 내고 빌드가 끊김).
+//
+//   3) `npx prisma format && npx prisma migrate dev --name aggregator_init`
+//   4) `pnpm tsx prisma/seed-aggregator.ts` 로 카테고리/소스 시드.
+//
+// 컨벤션:
+//   - 컬럼명: camelCase + @map("snake_case")
+//   - 테이블명: @@map("snake_case_plural")
+//   - DateTime: @db.Timestamptz(3)
+//   - 소스 id는 Int autoincrement (수가 많지 않고 외부 ID와 매칭 안 함)
+//   - 콘텐츠 id는 String cuid (URL slug 충돌 회피, 분산 가능성)
+// =============================================================================
+
+
+// -----------------------------------------------------------------------------
+// Enums (신규 — 기존 schema.prisma 에 동일 이름 enum 없음을 확인했음)
+// -----------------------------------------------------------------------------
+
+/// 콘텐츠 소스 종류 — 수집기 디스패처가 분기 기준으로 사용
+/// - RSS:        표준 RSS/Atom 피드 (rss-parser)
+/// - HTML:       cheerio 셀렉터 기반 스크랩 (parserConfig.list/title/link 셀렉터 필수)
+/// - API:        JSON/GraphQL 엔드포인트 (parserConfig.headers/queryParams 활용)
+/// - FIRECRAWL:  RSS/HTML이 모두 막히거나 SPA인 경우 Firecrawl SaaS 폴백
+enum ContentSourceKind {
+  RSS
+  HTML
+  API
+  FIRECRAWL
+}
+
+/// 수집된 원본 아이템의 처리 상태 머신
+///   pending      → 큐에 들어옴 (정규화 직전)
+///   classifying  → AI 분류 진행 중
+///   ready        → 분류 완료, promote 대기
+///   promoted     → ContentItem 으로 승격 완료 (재처리 제외용)
+///   rejected     → 광고/저품질/지역 부적합 등으로 거부
+///   duplicate    → urlHash 중복 감지
+enum ContentIngestStatus {
+  pending
+  classifying
+  ready
+  promoted
+  rejected
+  duplicate
+}
+
+/// 발행된 콘텐츠 품질 플래그 — 피드 노출 정책 결정에 사용
+/// - auto_ok:        AI 자동 분류만으로 노출 가능
+/// - manual_review:  편집자 검수 대기 (낮은 컨피던스, 민감 토픽)
+/// - blocked:        절대 노출 금지 (어뷰즈/저작권 침해 등)
+enum ContentQualityFlag {
+  auto_ok
+  manual_review
+  blocked
+}
+
+
+// -----------------------------------------------------------------------------
+// Models
+// -----------------------------------------------------------------------------
+
+/// 콘텐츠 카테고리 — Track(대분류) × Slug(소분류) 트리
+/// 트랙: hustle / work / build / invest / learn / community
+model ContentCategory {
+  id          String   @id @default(cuid())
+  track       String   // "hustle" | "work" | "build" | "invest" | "learn" | "community"
+  slug        String   @unique
+  name        String   // 한국어 표시명
+  nameEn      String?  @map("name_en")
+  description String?
+  icon        String?  // Lucide 아이콘 이름 (예: "Rocket", "Briefcase")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // 관계
+  items   ContentItem[]   @relation("CategoryItems")
+  sources ContentSource[] @relation("CategoryDefaultSources")
+
+  @@unique([track, slug])
+  @@index([track, sortOrder])
+  @@map("content_categories")
+}
+
+/// 콘텐츠 소스 정의 — 어떤 RSS/HTML/API 에서 수집할지
+model ContentSource {
+  id                  Int               @id @default(autoincrement())
+  slug                String            @unique // 예: "openai-blog"
+  name                String            // 사람이 읽는 이름 (예: "OpenAI Blog")
+  url                 String            // RSS URL / HTML 페이지 / API 엔드포인트
+  kind                ContentSourceKind
+  defaultTrack        String?           @map("default_track")        // 분류 힌트
+  defaultCategoryId   String?           @map("default_category_id")  // 카테고리 외래키
+  country             String?           // ISO 639-1 또는 "ko"/"en"/"ja"
+  parserConfig        Json              @default("{}") @map("parser_config") // 셀렉터/헤더/페이지네이션
+  active              Boolean           @default(true)
+  consecutiveFailures Int               @default(0) @map("consecutive_failures")
+  lastFetchedAt       DateTime?         @map("last_fetched_at") @db.Timestamptz(3)
+  lastSuccessAt       DateTime?         @map("last_success_at") @db.Timestamptz(3)
+  lastError           String?           @map("last_error")
+  notes               String?
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // 관계
+  defaultCategory ContentCategory?      @relation("CategoryDefaultSources", fields: [defaultCategoryId], references: [id])
+  ingestedItems   ContentIngestedItem[] @relation("SourceIngested")
+  items           ContentItem[]         @relation("SourceItems")
+
+  @@index([active, lastFetchedAt])
+  @@map("content_sources")
+}
+
+/// 수집기가 가져온 원본 아이템 (정규화 전)
+/// urlHash로 중복 제거 → 통과 시 ContentItem 으로 승격
+model ContentIngestedItem {
+  id                  String              @id @default(cuid())
+  sourceId            Int                 @map("source_id")
+  urlHash             String              @unique @map("url_hash") // sha256(canonical_url)
+  url                 String
+  title               String
+  summary             String?             @db.Text
+  contentHtml         String?             @db.Text @map("content_html") // 250자 발췌 권장 (저작권)
+  author              String?
+  imageUrl            String?             @map("image_url")
+  publishedAt         DateTime?           @map("published_at") @db.Timestamptz(3)
+  fetchedAt           DateTime            @default(now()) @map("fetched_at") @db.Timestamptz(3)
+  rawJson             Json                @default("{}") @map("raw_json") // 원본 응답 전체 보존
+  status              ContentIngestStatus @default(pending)
+  suggestedTrack       String?             @map("suggested_track")
+  suggestedCategorySlug String?            @map("suggested_category_slug") // 분류기가 제안한 슬러그 — promote 시 categoryId로 룩업
+  aiSummary           String?             @db.Text @map("ai_summary")
+  aiTags              String[]            @default([]) @map("ai_tags")
+  aiLanguage          String?             @map("ai_language")
+  errorMsg            String?             @map("error_msg")
+  processedAt         DateTime?           @map("processed_at") @db.Timestamptz(3)
+
+  // 큐레이션 (관리자 검토) 필드 — admin/aggregator/items 페이지에서 사용
+  qualityFlag         ContentQualityFlag  @default(auto_ok) @map("quality_flag")
+  reviewedById        String?             @map("reviewed_by_id") // User.id (FK 비참조 — 운영 단순화)
+  reviewedAt          DateTime?           @map("reviewed_at") @db.Timestamptz(3)
+  reviewNote          String?             @db.Text @map("review_note")
+
+  // 관계
+  source        ContentSource @relation("SourceIngested", fields: [sourceId], references: [id], onDelete: Cascade)
+  promotedItem  ContentItem?  @relation("IngestedToItem")
+
+  @@index([status, fetchedAt])
+  @@index([sourceId, fetchedAt])
+  @@map("content_ingested_items")
+}
+
+/// 발행된 콘텐츠 (피드/카테고리 페이지에 노출되는 단위)
+model ContentItem {
+  id              String             @id @default(cuid())
+  ingestedItemId  String?            @unique @map("ingested_item_id") // 1:1 역참조
+  sourceId        Int                @map("source_id")
+  track           String             // "hustle" | "work" | ...
+  categoryId      String?            @map("category_id")
+  slug            String             @unique // SEO friendly slug
+  title           String
+  excerpt         String             @db.Text
+  aiSummary       String?            @db.Text @map("ai_summary")
+  keywords        String[]           @default([])
+  tags            String[]           @default([])
+  language        String?
+  url             String             // canonical 외부 URL
+  imageUrl        String?            @map("image_url")
+  author          String?
+  publishedAt     DateTime           @map("published_at") @db.Timestamptz(3)
+  firstSeenAt     DateTime           @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+  score           Float              @default(0) // popularity proxy (HN points + reactions 등)
+  pinned          Boolean            @default(false)
+  featured        Boolean            @default(false)
+  qualityFlag     ContentQualityFlag @default(auto_ok) @map("quality_flag")
+  viewCount       Int                @default(0) @map("view_count")
+  clickCount      Int                @default(0) @map("click_count")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // 관계
+  source       ContentSource         @relation("SourceItems", fields: [sourceId], references: [id])
+  category     ContentCategory?      @relation("CategoryItems", fields: [categoryId], references: [id])
+  ingestedItem ContentIngestedItem?  @relation("IngestedToItem", fields: [ingestedItemId], references: [id])
+  metrics      ContentItemMetric[]   @relation("ItemMetrics")
+
+  @@index([track, publishedAt(sort: Desc)])
+  @@index([categoryId, publishedAt(sort: Desc)])
+  @@index([qualityFlag])
+  @@index([featured, publishedAt(sort: Desc)])
+  @@map("content_items")
+}
+
+/// 일별 콘텐츠 노출/클릭 메트릭 — 트렌딩 알고리즘 입력
+model ContentItemMetric {
+  itemId String   @map("item_id")
+  date   DateTime @db.Date
+  views  Int      @default(0)
+  clicks Int      @default(0)
+
+  item ContentItem @relation("ItemMetrics", fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, date])
+  @@index([date])
+  @@map("content_item_metrics")
+}
