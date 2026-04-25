@@ -86,9 +86,14 @@ async function runSessionsCleanupWithAudit(): Promise<number> {
         action: "SESSION_EXPIRE",
         detail: buildSessionExpireAuditDetail(entry),
       });
-    } catch {
+    } catch (err) {
+      // 의도: audit 실패가 cleanup 루프를 끊지 않도록 catch.
+      // 단, 에러 객체를 로그에 노출하여 silent failure 진단 가능성을 보장(세션 51 후속).
       // eslint-disable-next-line no-console
-      console.warn("[cleanup-scheduler] SESSION_EXPIRE audit write failed", entry.id);
+      console.warn(
+        "[cleanup-scheduler] SESSION_EXPIRE audit write failed",
+        { entryId: entry.id, error: err instanceof Error ? { message: err.message, stack: err.stack } : err },
+      );
     }
   }
   return result.deleted;
@@ -148,10 +153,14 @@ function writeCleanupAudit(
       action,
       detail: JSON.stringify(actor ? { actor, summary } : summary),
     });
-  } catch {
-    // audit 기록 실패가 cleanup 루프를 끊지 않도록 — 콘솔 경고만
+  } catch (err) {
+    // 의도: audit 실패가 cleanup 루프를 끊지 않도록 catch.
+    // 단, 에러 객체를 로그에 노출하여 silent failure 진단 가능성을 보장(세션 51 후속).
     // eslint-disable-next-line no-console
-    console.warn("[cleanup-scheduler] audit log write failed", summary);
+    console.warn(
+      "[cleanup-scheduler] audit log write failed",
+      { summary, action, error: err instanceof Error ? { message: err.message, stack: err.stack } : err },
+    );
   }
 }
 
