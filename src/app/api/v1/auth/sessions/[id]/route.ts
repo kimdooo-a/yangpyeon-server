@@ -3,7 +3,7 @@ import { withAuth } from "@/lib/api-guard";
 import { errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
 import { revokeSession } from "@/lib/sessions/tokens";
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 import { extractClientIp } from "@/lib/audit-log";
 
 /**
@@ -35,7 +35,7 @@ export const DELETE = withAuth(
       } catch {
         // race — 이미 revoke 된 경우 무시
       }
-      writeAuditLogDb({
+      safeAudit({
         timestamp: new Date().toISOString(),
         method: "DELETE",
         path: request.nextUrl.pathname,

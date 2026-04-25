@@ -7,7 +7,7 @@ import {
   checkTablePolicy,
   redactSensitiveValues,
 } from "@/lib/db/table-policy";
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 
 interface ColumnAction {
   action: "set" | "null";
@@ -260,7 +260,7 @@ export const PATCH = withRole(
           );
           if (currentRows.length > 0) {
             const current = currentRows[0]!;
-            writeAuditLogDb({
+            safeAudit({
               timestamp: new Date().toISOString(),
               method: "PATCH",
               path: `/api/v1/tables/${table}/composite`,
@@ -283,7 +283,7 @@ export const PATCH = withRole(
         }
         return errorResponse("NOT_FOUND", "행을 찾을 수 없음", 404);
       }
-      writeAuditLogDb({
+      safeAudit({
         timestamp: new Date().toISOString(),
         method: "PATCH",
         path: `/api/v1/tables/${table}/composite`,
@@ -390,7 +390,7 @@ export const DELETE = withRole(
       if (rowCount === 0) {
         return errorResponse("NOT_FOUND", "행을 찾을 수 없음", 404);
       }
-      writeAuditLogDb({
+      safeAudit({
         timestamp: new Date().toISOString(),
         method: "DELETE",
         path: `/api/v1/tables/${table}/composite`,

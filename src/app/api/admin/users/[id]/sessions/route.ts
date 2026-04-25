@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withRole } from "@/lib/api-guard";
 import { errorResponse } from "@/lib/api-response";
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 import { extractClientIp } from "@/lib/audit-log";
 import { revokeAllUserSessions } from "@/lib/sessions/tokens";
 
@@ -14,7 +14,7 @@ import { revokeAllUserSessions } from "@/lib/sessions/tokens";
  * 대상 사용자 브라우저의 stale /refresh 는 조용히 `SESSION_REFRESH_REJECTED` 401.
  *
  * 감사 로그: `SESSION_ADMIN_REVOKE_ALL` (actor + target + revokedCount).
- * 즉시 DB 기록(`writeAuditLogDb`) 으로 버퍼 flush 대기 없이 영속화.
+ * 즉시 DB 기록(`safeAudit` — fail-soft, ADR-021) 으로 버퍼 flush 대기 없이 영속화.
  */
 export const DELETE = withRole(
   ["ADMIN"],
@@ -35,7 +35,7 @@ export const DELETE = withRole(
 
     const revokedCount = await revokeAllUserSessions(target.id, "admin");
 
-    writeAuditLogDb({
+    safeAudit({
       timestamp: new Date().toISOString(),
       method: request.method,
       path: request.nextUrl.pathname,

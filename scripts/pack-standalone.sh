@@ -111,7 +111,7 @@ for f in "${HELPERS[@]}"; do
   fi
 done
 
-echo "[5/5] prisma 마이그레이션 복사 (운영 시 마이그레이션 실행용)"
+echo "[5/5] prisma + drizzle 마이그레이션 복사 (운영 시 마이그레이션 실행용)"
 if [[ -d "$ROOT/prisma/migrations" ]]; then
   mkdir -p "$DEST/prisma"
   if command -v rsync >/dev/null 2>&1; then
@@ -121,6 +121,18 @@ if [[ -d "$ROOT/prisma/migrations" ]]; then
     cp -a "$ROOT/prisma/migrations" "$DEST/prisma/migrations"
   fi
   cp "$ROOT/prisma/schema.prisma" "$DEST/prisma/schema.prisma"
+fi
+
+# Drizzle (SQLite) 마이그레이션 — instrumentation.ts 의 applyPendingMigrations() 가
+# 우선 탐색하는 경로 `db-migrations/` 로 복사. ADR-021 self-heal 안전망.
+if [[ -d "$ROOT/src/lib/db/migrations" ]]; then
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete "$ROOT/src/lib/db/migrations/" "$DEST/db-migrations/"
+  else
+    rm -rf "$DEST/db-migrations"
+    cp -a "$ROOT/src/lib/db/migrations" "$DEST/db-migrations"
+  fi
+  echo "  ↳ drizzle migrations → $DEST/db-migrations/"
 fi
 
 # 크기 보고

@@ -7,7 +7,7 @@ import {
   checkTablePolicy,
   redactSensitiveValues,
 } from "@/lib/db/table-policy";
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 
 interface ColumnAction {
   action: "set" | "null";
@@ -190,7 +190,7 @@ export const POST = withRole(
 
     try {
       const { rows } = await runReadwrite(sql, insertVals);
-      writeAuditLogDb({
+      safeAudit({
         timestamp: new Date().toISOString(),
         method: "POST",
         path: `/api/v1/tables/${table}`,

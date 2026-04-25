@@ -44,7 +44,7 @@ fi
 
 mkdir -p "$WSL_BUILD_DIR"
 
-echo "[1/6] Windows 워킹트리 → WSL 네이티브 빌드 디렉토리 동기화"
+echo "[1/8] Windows 워킹트리 → WSL 네이티브 빌드 디렉토리 동기화"
 # /mnt/e (NTFS) → ~/dev (ext4): npm install/빌드 I/O 가속을 위해 소스만 복사
 rsync -a --delete \
   --exclude 'node_modules/' \
@@ -62,7 +62,7 @@ rsync -a --delete \
 
 cd "$WSL_BUILD_DIR"
 
-echo "[2/6] 의존성 설치"
+echo "[2/8] 의존성 설치"
 if [[ -f package-lock.json ]]; then
   # CI 모드: lockfile 엄격 (재현성 우선). 실패 시 install fallback.
   npm ci || {
@@ -73,10 +73,10 @@ else
   npm install
 fi
 
-echo "[3/6] Next.js 프로덕션 빌드 (next build)"
+echo "[3/8] Next.js 프로덕션 빌드 (next build)"
 npm run build
 
-echo "[4/6] standalone 패키징 (scripts/pack-standalone.sh)"
+echo "[4/8] standalone 패키징 (scripts/pack-standalone.sh)"
 bash scripts/pack-standalone.sh
 
 # 사후 검증: 패키지 .node 가 ELF 인지 확인
@@ -94,7 +94,7 @@ for f in "$WSL_BUILD_DIR/standalone/.next/node_modules/"better-sqlite3-*/build/R
 done
 
 echo ""
-echo "[5/6] 배포 디렉토리 동기화 ($DEPLOY_DIR) — .env / data / logs 보존"
+echo "[5/8] 배포 디렉토리 동기화 ($DEPLOY_DIR) — .env / data / logs 보존"
 mkdir -p "$DEPLOY_DIR"
 # exclude 는 반드시 leading `/` 로 앵커링.
 #   `data/` (no anchor) 는 경로 어느 깊이의 동명 디렉토리도 보호해
@@ -111,7 +111,19 @@ cd "$DEPLOY_DIR"
 bash install-native-linux.sh
 
 echo ""
-echo "[6/6] PM2 재시작"
+echo "[6/8] Drizzle 마이그레이션 적용 (운영 DB) — ADR-021 빌드타임 게이트"
+# build dir 의 better-sqlite3 (Linux .node) + 마이그레이션 SQL 사용 → deploy DB 에 적용.
+SQLITE_DB_PATH="$DEPLOY_DIR/data/dashboard.db" \
+DRIZZLE_MIGRATIONS_DIR="$WSL_BUILD_DIR/src/lib/db/migrations" \
+  node "$WSL_BUILD_DIR/scripts/run-migrations.cjs"
+
+echo ""
+echo "[7/8] 스키마 검증 — 필수 테이블 존재 보장 (실패 시 PM2 reload 차단)"
+SQLITE_DB_PATH="$DEPLOY_DIR/data/dashboard.db" \
+  node "$WSL_BUILD_DIR/scripts/verify-schema.cjs"
+
+echo ""
+echo "[8/8] PM2 재시작"
 if command -v pm2 >/dev/null 2>&1; then
   if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
     pm2 restart "$APP_NAME" --update-env

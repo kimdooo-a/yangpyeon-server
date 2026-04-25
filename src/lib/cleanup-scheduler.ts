@@ -1,4 +1,4 @@
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 import {
   cleanupExpiredSessions,
   buildSessionExpireAuditDetail,
@@ -77,24 +77,17 @@ export function computeCleanupWindow(
 async function runSessionsCleanupWithAudit(): Promise<number> {
   const result = await cleanupExpiredSessions();
   for (const entry of result.expiredEntries) {
-    try {
-      writeAuditLogDb({
+    safeAudit(
+      {
         timestamp: new Date().toISOString(),
         method: "SYSTEM",
         path: "/internal/cleanup-scheduler/session-expire",
         ip: "127.0.0.1",
         action: "SESSION_EXPIRE",
         detail: buildSessionExpireAuditDetail(entry),
-      });
-    } catch (err) {
-      // 의도: audit 실패가 cleanup 루프를 끊지 않도록 catch.
-      // 단, 에러 객체를 로그에 노출하여 silent failure 진단 가능성을 보장(세션 51 후속).
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[cleanup-scheduler] SESSION_EXPIRE audit write failed",
-        { entryId: entry.id, error: err instanceof Error ? { message: err.message, stack: err.stack } : err },
-      );
-    }
+      },
+      `cleanup-scheduler:SESSION_EXPIRE:${entry.id}`,
+    );
   }
   return result.deleted;
 }
@@ -144,24 +137,17 @@ function writeCleanupAudit(
   summary: CleanupSummary,
   actor?: CleanupActor,
 ): void {
-  try {
-    writeAuditLogDb({
+  safeAudit(
+    {
       timestamp: new Date().toISOString(),
       method: actor ? "POST" : "SYSTEM",
       path: actor ? "/api/admin/cleanup/run" : "/internal/cleanup-scheduler",
       ip: actor?.ip ?? "127.0.0.1",
       action,
       detail: JSON.stringify(actor ? { actor, summary } : summary),
-    });
-  } catch (err) {
-    // 의도: audit 실패가 cleanup 루프를 끊지 않도록 catch.
-    // 단, 에러 객체를 로그에 노출하여 silent failure 진단 가능성을 보장(세션 51 후속).
-    // eslint-disable-next-line no-console
-    console.warn(
-      "[cleanup-scheduler] audit log write failed",
-      { summary, action, error: err instanceof Error ? { message: err.message, stack: err.stack } : err },
-    );
-  }
+    },
+    `cleanup-scheduler:${action}`,
+  );
 }
 
 async function tick(): Promise<void> {

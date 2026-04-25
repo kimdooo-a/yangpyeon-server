@@ -52,7 +52,11 @@ export function flushBufferToDb(): number {
 }
 
 /**
- * 감사 로그 직접 DB 기록 (API Route에서 사용)
+ * 감사 로그 직접 DB 기록 — 저수준 (throw 가능).
+ *
+ * 도메인 라우트에서는 `safeAudit` 을 사용하라. audit 쓰기 실패가 도메인 응답을
+ * 깨뜨리면 안 된다는 invariant 는 ADR-021 에 정식화되어 있다.
+ * @internal
  */
 export function writeAuditLogDb(entry: AuditEntry): void {
   const db = getDb();
@@ -66,6 +70,29 @@ export function writeAuditLogDb(entry: AuditEntry): void {
     userAgent: entry.userAgent ?? null,
     detail: entry.detail ?? null,
   }).run();
+}
+
+/**
+ * 감사 로그 안전 기록 — fail-soft.
+ *
+ * cross-cutting observability 가 도메인 임계 경로(로그인/세션/CRUD)를 절대
+ * 깨뜨리지 않게 보장한다. 실패 시 console.warn 으로 err 객체를 노출하되
+ * 호출자에게는 throw 하지 않는다 (세션 54 진단 패턴 + ADR-021 일반화).
+ *
+ * 모든 도메인 라우트는 이 함수만 사용해야 한다.
+ */
+export function safeAudit(entry: AuditEntry, context?: string): void {
+  try {
+    writeAuditLogDb(entry);
+  } catch (err) {
+    console.warn("[audit] write failed", {
+      context: context ?? entry.action ?? `${entry.method} ${entry.path}`,
+      error:
+        err instanceof Error
+          ? { message: err.message, stack: err.stack }
+          : err,
+    });
+  }
 }
 
 /**

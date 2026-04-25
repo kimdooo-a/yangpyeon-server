@@ -7,7 +7,7 @@ import {
   revokeAllUserSessions,
   REFRESH_TOKEN_MAX_AGE_SEC,
 } from "@/lib/sessions/tokens";
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 import { extractClientIp } from "@/lib/audit-log";
 import { applyRateLimit } from "@/lib/rate-limit-guard";
 
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
     if (isRotationReuse) {
       const revoked = await revokeAllUserSessions(lookup.session.userId);
-      writeAuditLogDb({
+      safeAudit({
         timestamp: new Date().toISOString(),
         method: "POST",
         path: request.nextUrl.pathname,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         }),
       });
     } else {
-      writeAuditLogDb({
+      safeAudit({
         timestamp: new Date().toISOString(),
         method: "POST",
         path: request.nextUrl.pathname,
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
     role: user.role,
   });
 
-  writeAuditLogDb({
+  safeAudit({
     timestamp: new Date().toISOString(),
     method: "POST",
     path: request.nextUrl.pathname,

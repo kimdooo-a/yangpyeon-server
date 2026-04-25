@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { V1_REFRESH_COOKIE } from "@/lib/jwt-v1";
 import { findSessionByToken, revokeSession } from "@/lib/sessions/tokens";
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 import { extractClientIp } from "@/lib/audit-log";
 
 /**
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       } catch {
         // 동시성 race — 이미 revoke 된 경우 무시
       }
-      writeAuditLogDb({
+      safeAudit({
         timestamp: new Date().toISOString(),
         method: "POST",
         path: request.nextUrl.pathname,
