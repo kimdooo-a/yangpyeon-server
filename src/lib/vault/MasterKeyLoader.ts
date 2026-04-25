@@ -15,6 +15,13 @@ import { statSync, readFileSync } from "node:fs";
  * Windows dev 환경에서는 statSync 의 mode 가 POSIX 그대로 반환되지 않아
  * 실행 시 에러 발생 가능 — 실제 사용은 WSL/Linux 한정, 테스트는 mock 기반.
  */
+
+export const DEFAULT_MASTER_KEY_PATH = "/etc/luckystyle4u/secrets.env";
+
+export function resolveMasterKeyPath(): string {
+  return process.env.MASTER_KEY_PATH ?? DEFAULT_MASTER_KEY_PATH;
+}
+
 export function loadMasterKey(path: string): Buffer {
   let stat;
   try {
