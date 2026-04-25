@@ -26,18 +26,32 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 55 종료 시점 — ypserver 스킬 v2 리팩터 + 세션 54 패치 운영 반영 + CK +1
+## 필수 참조 파일 ⭐ 세션 56 종료 시점 (§보완 2 포함) — ADR-021 audit fail-soft + 마이그레이션 self-heal + audit-failure 메트릭 + Wave registry 정합성
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260425-session55-ypserver-skill-v2-deploy.md ⭐⭐⭐ 최신 (ypserver 글로벌 스킬 v1→v2 전면 리팩터: ~/dashboard→~/ypserver, Phase 1 Windows next build 삭제, wsl-build-deploy.sh 단일 위임 / 세션 54 cleanup-scheduler 패치 운영 반영 PM2 ↺=4 / HTTP 307 × 3 + ERR_DLOPEN_FAILED 0건 / cleanup-scheduler.ts diff 0 / 세션 54 패치는 04-26 03:00 KST cron에서 자기 검증 예정 / CK-39 신규)
-docs/solutions/2026-04-25-skill-ops-drift-pattern.md   ⭐⭐ CK +1 (39) — 글로벌 스킬 vs 운영 진화 분기 패턴 / 사용자 직감 트리거 / 갱신-우선 배포 순서 / drift 진단 절차 (3단계: 핸드오버 정독 → 메모리 vs 스킬 가정 비교 → 운영 산출물 매칭)
-docs/handover/260425-session54-audit-silent-failure-diagnostic.md ⭐⭐ 직전 (cleanup-scheduler.ts 두 catch 블록 진단 패치 + 다른 터미널 ELF 가설 부분 기각 + 블로킹 5건 사유 영구 기록 + Turbopack 워닝 보류 + CK-38)
-docs/solutions/2026-04-25-cleanup-scheduler-audit-silent-failure.md  ⭐⭐ CK (38) — `catch {}` vs `catch (err) + structured log` 진단성 1bit vs 다차원 비대칭 / 격리 패턴 표준 형식 / silent-failure-hunter 적용 영역 / 검증 비용 비대칭 ROI
+docs/handover/260425-session56-audit-fail-soft-migration-self-heal.md ⭐⭐⭐ 최신 (3-부 구조: 본문 audit fail-soft 4층 결함 해결 + ADR-021 정식화 + 11 콜사이트 sweep + 빌드 게이트 [6/8][7/8] + 부팅 self-heal / §보완 1 audit-failure 카운터 메트릭 (ADR-021 §amendment-1, GET /api/admin/audit/health) / §보완 2 Wave registry 정합성 — 7+1 위치 동기화 + 5 핵심 산출물 cross-reference + _CHECKPOINT B-04)
+docs/research/decisions/ADR-021-audit-cross-cutting-fail-soft.md ⭐⭐ 정식 ADR (감사 로그 cross-cutting fail-soft + 마이그레이션 self-heal, §2.4 Postgres 통합 보류, §5 재검토 트리거 5건)
+docs/solutions/2026-04-25-audit-fail-soft-and-migration-self-heal.md ⭐⭐ CK +1 (40) — 4층 결함 일괄 해결 / cross-cutting + 도메인 임계 경로 fail-tied 안티패턴 / 빌드 게이트 fail-fast vs 부팅 self-heal best-effort 이중화 / standalone 패키저 마이그레이션 동봉 비대칭 결함
 
-⚠ 세션 55 우선 작업: 2026-04-26 03:00 KST cleanup cron 결과 확인 → 5일 연속 audit failed의 진짜 원인이 처음으로 노출됨 (세션 54 패치 ROI 실현 마지막 1마일)
+⚠ 세션 57 우선 작업 P0 (~7시간 후): 2026-04-26 03:00 KST cleanup cron 결과 확인
    wsl -- bash -lic 'pm2 logs ypserver --lines 80 --nostream | grep -A2 "audit log write failed"'
+   → 5일 연속 발생하던 audit log write failed 가 사라져야 함 (S54 진단 패치 + S56 safeAudit + Step 1 마이그레이션 적용 ROI 검증)
+   동시에: curl -H 'Authorization: Bearer <ADMIN>' http://localhost:3000/api/admin/audit/health → §보완 1 카운터 (ok: true / failed: 0)
+
+⚠ 세션 57 우선 작업 P1: ADR-021 placeholder 충돌 6 위치 cascade 정정 (세션 56 §보완 2 §D 표 참조)
+   - 02-architecture/01-adr-log.md §1029 (Realtime 백프레셔)
+   - 02-architecture/16-ux-quality-blueprint.md §1570 (AI 챗 영구 저장)
+   - 05-roadmap/03-risk-register.md §649·651 (Next.js 17 업그레이드)
+   - 07-appendix/01-kdygenesis-handoff.md §4 (PM2 cluster vs cron-worker)
+   - 07-appendix/02-final-summary.md §4 (동일)
+   - 07-appendix/02-dq-final-resolution.md §591-592 (Next.js 17 + 마이그레이션 롤백 5초)
+
+docs/handover/260425-session55-ypserver-skill-v2-deploy.md (ypserver 글로벌 스킬 v1→v2 전면 리팩터: ~/dashboard→~/ypserver, Phase 1 Windows next build 삭제, wsl-build-deploy.sh 단일 위임 / CK-39)
+docs/solutions/2026-04-25-skill-ops-drift-pattern.md  CK (39) — 글로벌 스킬 vs 운영 진화 분기 패턴 / 사용자 직감 트리거 / 갱신-우선 배포 순서 / drift 진단 절차
+docs/handover/260425-session54-audit-silent-failure-diagnostic.md (cleanup-scheduler.ts 두 catch 블록 진단 패치 + CK-38) — S56 본문이 ROI 실증 (5일 연속 audit failed → 12:52:52 SqliteError 표면화)
+docs/solutions/2026-04-25-cleanup-scheduler-audit-silent-failure.md  CK (38) — `catch {}` vs `catch (err) + structured log` 진단성 1bit vs 다차원 비대칭 / 검증 비용 비대칭 ROI
 docs/handover/260425-session53-priority-0-2-cascade.md            ⭐⭐ 직전 (ADR placeholder cascade 5건 정정 / _CHECKPOINT §보완 / pm2-logrotate 영속 / KEK 사실상 해결 확인 / MASTER_KEY_PATH 헬퍼화 / rotateKek 4 테스트 / SecretItem @@index 제거 + §보완: 본 터미널 commit 1ad026f + WSL 재배포 + prisma migrate deploy + E2E 5/5 PASS + audit log 가설 부분 보류)
 docs/solutions/2026-04-25-git-bash-wsl-path-conversion-trap.md    ⭐⭐ CK (37) — Git Bash → wsl 인자 자동 PATH 변환 함정 (UNC 충돌/PATH 슬래시 제거/`/mnt/e` prefix). MSYS_NO_PATHCONV=1 + Windows-측 wrapper + 명시 nvm source 3중 패턴. 시행착오 4회 휴리스틱화.
 docs/handover/260425-session52-wsl-build-pipeline.md              ⭐⭐ (L2 WSL 네이티브 빌드 + L1 self-heal + pack-standalone 3 버그 수정 + rsync 앵커링 함정 해결)

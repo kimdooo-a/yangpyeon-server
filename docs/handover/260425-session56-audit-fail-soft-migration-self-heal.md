@@ -284,4 +284,90 @@ curl -sS http://localhost:3000/api/admin/audit/health \
 ```
 
 ---
+
+## §보완 2 — Wave Registry 정합성 + 5 핵심 산출물 cross-reference (2026-04-25, 본 세션 후속)
+
+> 사용자 "wave 개발 진척도" 리포트 → "순차적으로 진행... 가능한 것부터" 후속. 세션 51 ADR-020 등록 패턴(wave registry 다중 위치 동기화 + 5 핵심 cross-reference 전파)을 ADR-021 에도 동일 적용.
+> 시간 제약: 03:00 KST cron 검증은 ~7시간 후라 불가, kdywave --feedback 잔여는 `_archived` 1건뿐(역사 보존 원칙)이라 100% 완료, 실제 가능 작업은 wave registry 정합성.
+
+### A. 사전 검증 (claim 100% 입증)
+
+| 항목 | claim (solution doc + ADR-021) | 실측 | 결과 |
+|---|---|---|---|
+| `npx tsc --noEmit` | 0 errors | 0 errors | ✅ |
+| vitest | 13 PASS (cleanup-scheduler) | **16 files / 268 PASS 전수** (회귀 0) | ✅ + 보너스 |
+| 운영 DB | verify-schema OK | DB 4096 → 36864 bytes / `db-migrations/` 존재 | ✅ |
+| 빌드 게이트 | wsl-build-deploy [6/8][7/8] | 스크립트 diff 정확히 일치 | ✅ |
+| safeAudit sweep | 11 콜사이트 변환 | grep 결과 11 콜사이트 100% 변환, `writeAuditLogDb` 직접 호출 0건 (정의 + safeAudit 내부만) | ✅ |
+| 운영 헬스 | login API 401 in 232ms | `POST /api/v1/auth/login` 401 in 232ms (이전 throw 500 → fail-soft 401) | ✅ |
+| ROI 입증 (S54 → S56 사슬) | silent failure 가시화 | PM2 로그 `2026-04-20 ~ 25` 매일 03:00 KST `[cleanup-scheduler] audit log write failed` **5일 연속** → 12:52:52 SqliteError 표면화 → 4층 일괄 해결 | ✅ |
+
+### B. ADR-021 wave registry 7+1 위치 동기화 (`02-architecture/01-adr-log.md`)
+
+세션 51 ADR-020 등록 + 세션 52 §B-03 placeholder cascade 패턴 결합:
+
+1. **§0.4 ADR 상태 요약 표** — ADR-021 행 추가 (Phase 16, Accepted)
+2. **§1 ADR 본문** — ADR-021 condensed 9-필드 항목 (정식 본문 `docs/research/decisions/ADR-021-...md` 참조 링크)
+3. **§2 의존/대체 관계 그래프** — ADR-020 → ADR-021 화살표 + "§2.3 sweep — 모든 도메인 라우트가 safeAudit 만 사용" 노트
+4. **§3.1 신규 ADR 추가 규칙** — "025부터" → "**026부터** (ADR-021 세션 56 등록)"
+5. **§4.1 카테고리별 ADR 수** — Operations 행에 ADR-021 추가
+6. **§4.2 상태별 분포** — Accepted **19건 → 21건** (ADR-019/020/021 추가)
+7. **§4.3 Phase 매핑** — Phase 16 에 ADR-021 (audit fail-soft) 추가
+8. **§5 향후 예상 ADR** — ~~ADR-021 (예상): 마이그레이션 롤백 5초~~ 취소선 + "ADR-020 `~/ypserver.previous` swap 으로 사실상 충족, 별도 ADR 미발행, 운영상 문제 시 ADR-026 후보 슬롯" 안내
+
+### C. ADR-021 cross-reference 5 핵심 산출물 전파
+
+세션 51 의 5 핵심 패턴 동일 적용:
+
+| 파일 | 변경 |
+|---|---|
+| `02-architecture/01-adr-log.md` | B 항목의 7+1 위치 동기화 자체 |
+| `02-architecture/04-observability-blueprint.md` 헤더 | ADR-021 banner — "감사 로그 cross-cutting fail-soft invariant 가 LoggingService/MetricsService 설계에도 동일 적용" |
+| `02-architecture/05-operations-blueprint.md` 헤더 | ADR-021 banner — "ADR-020 standalone+rsync 경로에 빌드타임 게이트 + 부팅 self-heal 2단계 추가, §4 배포 플로우의 *migrate* 단계 invariant 화" |
+| `02-architecture/02-data-model-erd.md` §5.1.1 | SQLite audit_logs 노트 — "비동기 실패 허용 원칙은 ADR-021 으로 정식화, safeAudit 만 호출, 빈 DB 시나리오는 빌드 게이트 + self-heal 로 차단" |
+| `README.md` row 12 Observability | 채택안 — "node:crypto envelope + jose JWKS ES256 + audit cross-cutting fail-soft (ADR-021, safeAudit + drizzle self-heal, 세션 56)" |
+| `_CHECKPOINT_KDYWAVE.md` §보완 B-04 신설 | + 누적 변경 요약 표 갱신 (정식 ADR 수 18→**21**, ADR-021 cross-reference 0→5, 다음 ADR 번호 019→**026**) |
+
+### D. 알려진 placeholder 충돌 6 위치 (다음 세션 P1 cascade 정정)
+
+ADR-021 (예상) 표기를 다른 후보로 사용 중인 파일 — 본 세션 56 의 정식 ADR-021 (audit fail-soft) 와 의미는 충돌 없음 (registry 본문은 audit fail-soft 로 정정 완료, placeholder 는 (예상) 표기 자연 분리). 다음 세션 P1 으로 ADR-022~025 또는 ADR-026 슬롯 cascade 재할당:
+
+| # | 파일 | 충돌 컨텍스트 |
+|---|---|---|
+| 1 | `02-architecture/01-adr-log.md` §1029 | DQ-1.10/11 (Realtime 백프레셔) → ADR-021 (예상) |
+| 2 | `02-architecture/16-ux-quality-blueprint.md` §1570 | AI 챗 메시지 영구 저장 (`AiThread`/`AiMessage`) → ADR-021 (예상) |
+| 3 | `05-roadmap/03-risk-register.md` §649·651 | Next.js 17 업그레이드 전략 → ADR-021 예상 |
+| 4 | `07-appendix/01-kdygenesis-handoff.md` §4 | PM2 cluster vs cron-worker 분리 → ADR-021 슬롯 권장 |
+| 5 | `07-appendix/02-final-summary.md` §4 | 동일 (PM2 cluster/cron-worker) |
+| 6 | `07-appendix/02-dq-final-resolution.md` §591-592 | "ADR-020: 마이그레이션 롤백 5초" + "ADR-021: Next.js 17 업그레이드" 둘 다 잘못된 placeholder |
+
+세션 52 §B-03 패턴은 placeholder 를 한 칸씩 밀어내는 cascade — 다음 세션에서 일괄 정정 권장.
+
+### E. 본 §보완 검증
+
+- `grep "ADR-021" docs/research/2026-04-supabase-parity` → **11 hits** (5 핵심 cross-reference + 6 placeholder 인지 + 본 _CHECKPOINT)
+- 정식 ADR-021 본문 (audit fail-soft, "Accepted") 와 placeholder 6 위치 ("(예상)") 는 표기·문맥상 자연 분리
+- ADR-020 cross-reference (35 파일) + ADR-021 cross-reference (5 핵심) = 누적 cross-cutting 정합성 사슬 정상
+
+### F. 세션 56 종합 (본문 + §보완 1 + §보완 2)
+
+| 영역 | 산출물 |
+|---|---|
+| 본문 (audit fail-soft + migration self-heal) | ADR-021 신설 / 4층 결함 해결 / 11 콜사이트 sweep / 빌드 게이트 [6/8][7/8] / 부팅 self-heal / commit `638d764` |
+| §보완 1 (audit-failure 카운터 메트릭) | 4 파일 (3 신규 + 1 수정) / 9 단위 테스트 / `GET /api/admin/audit/health` / ADR-021 §amendment-1 |
+| §보완 2 (wave registry 정합성) | 7+1 위치 동기화 + 5 핵심 cross-reference 전파 + _CHECKPOINT B-04 + placeholder 충돌 6 위치 인지 |
+
+### G. 다음 작업 제안 (§보완 2 후속)
+
+**우선순위 0 (시간 도래 시 — ~7시간 후)**:
+1. **2026-04-26 03:00 KST cleanup cron 결과 확인** — `wsl -- bash -lic 'pm2 logs ypserver --lines 80 --nostream | grep -A2 "audit log write failed"'`. 5일 연속 발생하던 audit log write failed 가 사라져야 함. 동시에 `curl /api/admin/audit/health` 로 §보완 1 카운터 측정.
+
+**우선순위 1 (이번 주)**:
+2. **placeholder 충돌 6 위치 cascade 정정** — D 항목 표 / 세션 52 §B-03 동일 패턴
+3. (선택) **다른 글로벌 스킬 audit drift 점검** — S55 이월 (`kdyship`/`kdydeploy`/`kdycicd`)
+
+**우선순위 2 (이월)**:
+4. S54/S53 잔존 6항 (`_test_session` drop / DATABASE_URL rotation / 브라우저 E2E CSRF / MFA biometric / SP-013·016 / Windows 재부팅 실증)
+
+---
 [← handover/_index.md](./_index.md)

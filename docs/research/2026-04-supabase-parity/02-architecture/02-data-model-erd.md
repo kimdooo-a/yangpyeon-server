@@ -1214,6 +1214,8 @@ export async function middleware(req: NextRequest) {
 
 **특징**: 고속, 파손 허용, 365일 보관 후 삭제.
 
+> ⚠️ **ADR-021 통지 (2026-04-25, 세션 56)**: 본 §의 "비동기, 실패 허용" 원칙은 [ADR-021](./01-adr-log.md) 으로 정식화 — 도메인 라우트는 `safeAudit(entry, context?)` (`src/lib/audit-log-db.ts`) 만 호출. `writeAuditLogDb` 는 `@internal`. SQLite 빈 DB / 마이그레이션 미적용 시나리오는 `wsl-build-deploy.sh [6/8] migrate / [7/8] verify` 빌드 게이트 + `instrumentation.ts` 부팅 self-heal 2단계로 차단. 정식 본문: [`docs/research/decisions/ADR-021-audit-cross-cutting-fail-soft.md`](../../decisions/ADR-021-audit-cross-cutting-fail-soft.md).
+
 #### 5.1.2 PostgreSQL `audit_logs_pg` — 비즈니스 엔티티 변경
 
 **저장 대상**: role 변경, policy CRUD, user delete 등 "되돌릴 수 없거나 감사 필요" 이벤트.
