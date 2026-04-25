@@ -1,5 +1,8 @@
 # 02. DQ 최종 해결 (Final Resolution) — 양평 부엌 서버 대시보드
 
+> ⚠️ **ADR-015 부분 대체 통지 (2026-04-25, 세션 51)**: 본 문서가 참조하는 *Capistrano-style symlink/releases* 배포 메커니즘은 [ADR-020](../02-architecture/01-adr-log.md) (Next.js standalone + rsync + pm2 reload, 세션 50)에 의해 부분 대체. PM2 cluster:4 / canary 서브도메인은 유효. 4 재진입 트리거(트래픽 100만+/팀 2명+/3환경/B2B) 충족 시 Capistrano 경로 재가동 가능.
+> ⚠️ **ADR 번호 placeholder 충돌 정정 (2026-04-25)**: 본 문서의 "ADR-020: 마이그레이션 롤백 5초 구현 패턴(Phase 16 스파이크 결과)"은 실제 ADR-020(standalone+rsync+pm2 reload, 세션 50)과 충돌. 마이그레이션 롤백 패턴 후보는 향후 **ADR-022** 슬롯으로 재할당 권장.
+
 > Wave 5 · Tier 2 (A1) 산출물 — kdywave W5-A1 (Agent Appendix-1)
 > 작성일: 2026-04-18 (세션 28+)
 > 상위: [CLAUDE.md](../../../../CLAUDE.md) → [docs/research/](../../) → [2026-04-supabase-parity/](../) → [07-appendix/](./) → **이 문서**

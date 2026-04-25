@@ -1,5 +1,7 @@
 # 00. Integration Overview — 양평 부엌 서버 대시보드 통합 아키텍처 지도
 
+> ⚠️ **ADR-015 부분 대체 통지 (2026-04-25, 세션 51)**: 본 문서가 참조하는 *Capistrano-style symlink/releases* 배포 메커니즘은 [ADR-020](../02-architecture/01-adr-log.md) (Next.js standalone + rsync + pm2 reload, 세션 50)에 의해 부분 대체. PM2 cluster:4 / canary 서브도메인은 유효. 4 재진입 트리거(트래픽 100만+/팀 2명+/3환경/B2B) 충족 시 Capistrano 경로 재가동 가능.
+
 > **Wave 4 · Tier 3 · I1 Integration 클러스터 (Agent I1-A)**
 > 작성일: 2026-04-18 (세션 28)
 > 상위: [CLAUDE.md](../../../../CLAUDE.md) → [docs/research/](../../) → [2026-04-supabase-parity/](../) → [04-integration/](./) → **이 문서**
