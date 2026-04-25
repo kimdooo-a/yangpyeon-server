@@ -34,7 +34,7 @@ export interface CleanupResult {
 
 /**
  * SESSION_EXPIRE 감사 로그 detail 페이로드 생성. 순수 함수 — 단위 테스트 대상.
- * scheduler 가 각 expired entry 에 대해 호출하여 `writeAuditLogDb({..., detail})` 로 넘긴다.
+ * scheduler 가 각 expired entry 에 대해 호출하여 `safeAudit({..., detail})` 로 넘긴다.
  */
 export function buildSessionExpireAuditDetail(entry: ExpiredSessionEntry): string {
   return JSON.stringify({

@@ -5,7 +5,7 @@ import {
   findSessionByToken,
 } from "@/lib/sessions/tokens";
 import { V1_REFRESH_COOKIE } from "@/lib/jwt-v1";
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 import { extractClientIp } from "@/lib/audit-log";
 
 /**
@@ -32,7 +32,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
 
   const count = await revokeAllExceptCurrent(user.sub, currentSessionId);
 
-  writeAuditLogDb({
+  safeAudit({
     timestamp: new Date().toISOString(),
     method: "POST",
     path: request.nextUrl.pathname,

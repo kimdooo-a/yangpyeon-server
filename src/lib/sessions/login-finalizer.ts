@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAccessToken, V1_REFRESH_COOKIE } from "@/lib/jwt-v1";
 import { issueSession, REFRESH_TOKEN_MAX_AGE_SEC } from "./tokens";
-import { writeAuditLogDb } from "@/lib/audit-log-db";
+import { safeAudit } from "@/lib/audit-log-db";
 import { extractClientIp } from "@/lib/audit-log";
 import type { Role } from "@/generated/prisma/client";
 
@@ -51,7 +51,7 @@ export async function finalizeLoginResponse(
     userAgent,
   });
 
-  writeAuditLogDb({
+  safeAudit({
     timestamp: new Date().toISOString(),
     method: "POST",
     path: params.request.nextUrl.pathname,
