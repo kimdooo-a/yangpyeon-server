@@ -217,11 +217,20 @@ cumulative:
 - **보존 원칙**: `01-research/14-operations/*` (Wave 1 deep-dive 73문서) 및 `_archived/`는 역사 보존 — 미수정
 - **검증**: 29개 파일 모두 ADR-020 banner 정상 삽입 확인 (`grep "ADR-015 부분 대체 통지" → 29 hits`)
 
+### B-04 (2026-04-25, 세션 56): ADR-021 신설 — 감사 로그 cross-cutting fail-soft + 마이그레이션 self-heal
+- **트리거**: 세션 56 진입 직후 사용자 로그인이 "서버 연결 오류" 차단 (PM2 로그 `2026-04-25 12:52:52 SqliteError: no such table: audit_logs`). 세션 54 silent-failure 진단 패치가 5일치 매일 03:00 KST `[cleanup-scheduler] audit log write failed` 누적을 가시화한 ROI 직접 입증. 4층 결함(L1 빈 DB / L2 빌드 게이트 부재 / L3 fail-tied 도메인 / L4 sweep 미완) 일괄 해결.
+- **결과물**: 신규 `docs/research/decisions/ADR-021-audit-cross-cutting-fail-soft.md` + `docs/solutions/2026-04-25-audit-fail-soft-and-migration-self-heal.md` + `src/lib/db/migrate.ts` + `scripts/{run-migrations,verify-schema}.cjs` + 수정 13개 파일 (audit-log-db.ts safeAudit 정의, 11개 도메인 콜사이트 sweep, instrumentation.ts self-heal, pack-standalone.sh + wsl-build-deploy.sh 빌드 게이트 [6/8][7/8])
+- **시정 조치 — 5 핵심 산출물 cross-reference**: 본 _CHECKPOINT B-04 (이 항목) + `02-architecture/01-adr-log.md` §0.4/§1/§2/§3.1/§4.1/§4.2/§4.3/§5 동기화 (7 위치) + `02-architecture/04-observability-blueprint.md` 헤더 ADR-021 banner + `02-architecture/05-operations-blueprint.md` 헤더 ADR-021 banner + `02-architecture/02-data-model-erd.md` §5.1.1 audit_logs ADR-021 노트 + `README.md` row 12 Observability 채택안 갱신
+- **placeholder 처리**: ADR-021 슬롯이 "마이그레이션 롤백 5초" 에서 "audit cross-cutting fail-soft + migration self-heal" 로 점유. 롤백 5초는 ADR-020 의 `~/ypserver.previous` swap (~3-5초) 으로 사실상 충족 → 별도 ADR 미발행, 운영상 문제 발생 시 ADR-026 후보 슬롯
+- **알려진 placeholder 충돌 6 위치 (다음 세션 P1 cascade 정정 대상)**: ADR-021 (예상) 표기를 다른 후보로 사용 중인 파일 — 본 세션 56 의 5 핵심 cross-reference 와는 별개로 인지만 함. 정식 ADR-021 (audit fail-soft) 와 충돌 없음 (본 §0.4/§1 표는 audit fail-soft 로 정정 완료). 미수정 6 위치: `02-architecture/01-adr-log.md §5 표 행 1029(Realtime 백프레셔)`, `02-architecture/16-ux-quality-blueprint.md §1570(AI 챗 영구 저장)`, `05-roadmap/03-risk-register.md §649·651(Next.js 17 업그레이드)`, `07-appendix/01-kdygenesis-handoff.md §4(PM2 cluster vs cron-worker)`, `07-appendix/02-final-summary.md §4(동일)`, `07-appendix/02-dq-final-resolution.md §591-592(Next.js 17 + 마이그레이션 롤백 5초)`. 다음 세션 P1: 각각 ADR-022~025 또는 ADR-026 슬롯으로 재할당 (세션 52 §B-03 cascade 패턴 동일 적용).
+- **검증**: tsc 0 / vitest 268 PASS (전수, 회귀 0) / 운영 DB 4096→36864 bytes 마이그레이션 성공 / login API 401 in 232ms (이전 throw 500 → fail-soft 401 복구) / `grep "ADR-021" docs/research/2026-04-supabase-parity → 본 _CHECKPOINT 포함 5+ 파일 hit`
+
 ### 누적 변경 요약 (2026-04-19 ~ 2026-04-25)
-| 항목 | Wave 5 종료 (2026-04-18) | 현재 (2026-04-25) | 변동 |
+| 항목 | Wave 5 종료 (2026-04-18) | 현재 (2026-04-25, 세션 56 후) | 변동 |
 |------|----------------------|-----------------|------|
-| 정식 ADR 수 | 18 (ADR-001~018) | 20 (ADR-019, ADR-020 추가) | +2 |
+| 정식 ADR 수 | 18 (ADR-001~018) | 21 (ADR-019/020/021 추가) | +3 |
 | ADR-015/Capistrano 단독 언급 파일 | 40 | 5 (Wave 1 deep-dive 3 + _archived 1 + _CHECKPOINT 1) | -35 |
 | ADR-020 cross-reference 파일 | 0 | 35 (S51 6건 + S52 29건) | +35 |
-| 역방향 피드백 (Wave 1-5 채택안 변경) | 0 | 0 (Capistrano는 부분 대체일뿐 채택안 자체는 유보 자산) | 변동 없음 |
-| 다음 ADR 번호 | 019 | 025 (021~024는 §5 예상 후보로 reserved) | +6 |
+| ADR-021 cross-reference 파일 | 0 | 5 (S56 5 핵심 — 01-adr-log/04-obs/05-ops/02-erd/README + _CHECKPOINT) | +5 |
+| 역방향 피드백 (Wave 1-5 채택안 변경) | 0 | 0 (ADR-021 은 cross-cutting 신설일뿐 기존 채택안 변경 없음) | 변동 없음 |
+| 다음 ADR 번호 | 019 | 026 (022~025는 §5 예상 후보로 reserved) | +7 |

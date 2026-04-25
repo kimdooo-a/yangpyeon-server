@@ -6,6 +6,8 @@
 > 연관: [00-system-overview.md](./00-system-overview.md) · [01-adr-log.md](./01-adr-log.md) · [02-data-model-erd.md](./02-data-model-erd.md)
 > 상위 ADR: ADR-015 (Capistrano-style + PM2 cluster:4 + canary 서브도메인) — ⚠️ **2026-04-19 세션 50에서 ADR-020 신설로 *Capistrano-style symlink/releases 부분 대체(Superseded)*. 본 문서의 Capistrano 디렉토리/배포 파이프라인 §은 트리거 충족 시 재가동되는 유보 자산. 현 활성 배포 경로는 [01-adr-log.md ADR-020](./01-adr-log.md) (standalone + rsync + pm2 reload).** PM2 cluster:4 / canary 서브도메인 부분은 그대로 유효.
 
+> ⚠️ **ADR-021 빌드 게이트 통지 (2026-04-25, 세션 56)**: ADR-020 의 standalone+rsync 경로에 [ADR-021](./01-adr-log.md) 이 빌드타임 fail-fast 게이트 + 부팅 self-heal 2단계를 추가했다. `wsl-build-deploy.sh` `[6/8] run-migrations.cjs` + `[7/8] verify-schema.cjs` 가 1차 게이트 (verify 실패 시 PM2 reload 차단). `pack-standalone.sh` 가 drizzle 마이그레이션을 `<bundle>/db-migrations/` 로 동봉. `instrumentation.ts` `applyPendingMigrations()` 가 부팅 2차 자가치유 (warn-only). 본 문서 §4 배포 플로우의 *migrate* 단계가 이로써 invariant 화. 정식 본문: [`docs/research/decisions/ADR-021-audit-cross-cutting-fail-soft.md`](../../decisions/ADR-021-audit-cross-cutting-fail-soft.md).
+
 ---
 
 ## 0. 문서 구조

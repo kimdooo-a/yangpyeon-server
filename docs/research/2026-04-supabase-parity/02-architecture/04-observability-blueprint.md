@@ -1,5 +1,7 @@
 # 04. Observability Blueprint — 양평 부엌 서버 대시보드 (카테고리 12)
 
+> ⚠️ **ADR-021 cross-cutting fail-soft 통지 (2026-04-25, 세션 56)**: 감사 로그(audit_logs) 쓰기 실패는 도메인 임계 경로 응답을 절대 깨뜨리지 않는다는 invariant 가 [ADR-021](./01-adr-log.md) 으로 정식화. 모든 도메인 라우트는 `safeAudit(entry, context?)` (`src/lib/audit-log-db.ts`) 만 사용. `writeAuditLogDb` 는 `@internal`. 본 Blueprint 의 LoggingService/MetricsService 설계도 동일 원칙 — observability 가 도메인을 인질로 잡지 않음. drizzle 마이그레이션 self-heal 은 instrumentation.ts 가 부팅 시 적용. 정식 본문: [`docs/research/decisions/ADR-021-audit-cross-cutting-fail-soft.md`](../../decisions/ADR-021-audit-cross-cutting-fail-soft.md).
+
 > ⚠️ **ADR-015 부분 대체 통지 (2026-04-25, 세션 51)**: 본 문서가 참조하는 *Capistrano-style symlink/releases* 배포 메커니즘은 [ADR-020](./01-adr-log.md) (Next.js standalone + rsync + pm2 reload, 세션 50)에 의해 부분 대체. PM2 cluster:4 / canary 서브도메인은 유효. 4 재진입 트리거(트래픽 100만+/팀 2명+/3환경/B2B) 충족 시 Capistrano 경로 재가동 가능.
 
 > Wave 4 · Tier 2 · B2 에이전트 산출물
