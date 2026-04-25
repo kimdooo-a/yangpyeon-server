@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 import { desc, sql, and, like, gte, lte } from "drizzle-orm";
 import { buffer, type AuditEntry } from "./audit-log";
+import { recordAuditOutcome } from "./audit-metrics";
 
 /** 페이지네이션 조회 옵션 */
 export interface AuditPaginatedOptions {
@@ -82,11 +83,14 @@ export function writeAuditLogDb(entry: AuditEntry): void {
  * 모든 도메인 라우트는 이 함수만 사용해야 한다.
  */
 export function safeAudit(entry: AuditEntry, context?: string): void {
+  const ctx = context ?? entry.action ?? `${entry.method} ${entry.path}`;
   try {
     writeAuditLogDb(entry);
+    recordAuditOutcome(true, ctx);
   } catch (err) {
+    recordAuditOutcome(false, ctx, err);
     console.warn("[audit] write failed", {
-      context: context ?? entry.action ?? `${entry.method} ${entry.path}`,
+      context: ctx,
       error:
         err instanceof Error
           ? { message: err.message, stack: err.stack }
