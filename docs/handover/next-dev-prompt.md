@@ -26,12 +26,13 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 
-## 필수 참조 파일 ⭐ 세션 52 종료 시점 — WSL 빌드 파이프라인 + NFT 네이티브 모듈 정합성 보장
+## 필수 참조 파일 ⭐ 세션 53 종료 시점 — S51 이월 일괄 처리 + ADR placeholder cascade 정정 + S49 코드 4건
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260425-session52-wsl-build-pipeline.md              ⭐⭐⭐ 최신 (L2 WSL 네이티브 빌드 + L1 self-heal + pack-standalone 3 버그 수정 + rsync 앵커링 함정 해결)
+docs/handover/260425-session53-priority-0-2-cascade.md            ⭐⭐⭐ 최신 (ADR placeholder cascade 5건 정정 / _CHECKPOINT §보완 / pm2-logrotate 영속 / KEK 사실상 해결 확인 / MASTER_KEY_PATH 헬퍼화 / rotateKek 4 테스트 / SecretItem @@index 제거 + 마이그레이션)
+docs/handover/260425-session52-wsl-build-pipeline.md              ⭐⭐ 직전 (L2 WSL 네이티브 빌드 + L1 self-heal + pack-standalone 3 버그 수정 + rsync 앵커링 함정 해결)
 docs/solutions/2026-04-25-nft-native-binary-platform-mismatch.md  ⭐⭐ CK +1 (36) — 빌드 환경=실행 환경 원칙 / serverExternalPackages 한계 / rsync exclude 앵커링 / --delete-excluded vs find preserve 충돌 / L2+L1 defense-in-depth
 scripts/wsl-build-deploy.sh                                       ⭐ 신규 (세션 52) — WSL 빌드 단일 명령 파이프라인 `MSYS_NO_PATHCONV=1 wsl bash -c 'bash /mnt/e/.../scripts/wsl-build-deploy.sh'`
 docs/handover/260425-session51-kdywave-eval-adr020.md             (이행도 A- 85/100 + ADR-020 신설 + ADR-015 부분 대체 + Git 태그 3건 소급 + 로드맵 §8.1.1 시나리오 A/B 병기)
@@ -223,39 +224,48 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### 우선순위 0 (S53 즉시): `~/ypserver/data/` SQLite 조사 + 브라우저 E2E 로그인 검증
+### 우선순위 0 (S54 즉시): WSL 재배포로 ELF 회복 확증 + 마이그레이션 적용
 
-**S52 후속 조사**:
-- `~/ypserver/data/` 디렉토리가 **빈 상태** (Apr 19 21:56부터 0 file) — better-sqlite3 의존성은 있는데 DB 파일이 없음. Postgres가 주 DB(DATABASE_URL)이고 SQLite는 보조 용도(rate-limit bucket, webauthn-challenge 등?) 추정이나 실제 경로 미확인. 런타임 에러는 없으나 cleanup-scheduler가 매일 03:00 "audit log write failed" 메시지 기록 중 — 연관성 조사 필요.
-- `grep -r "better-sqlite3\|Database" src/ --include "*.ts"` 로 SQLite 사용 위치 추적 → DB 파일 경로 확정 → 필요시 `data/` 선제 생성 또는 경로 정합성 확인.
+**WSL 재배포** (`scripts/wsl-build-deploy.sh`):
+- 본 세션이 추가한 `prisma/migrations/20260425000000_drop_redundant_secret_items_name_idx/`가 다음 `prisma migrate deploy`(또는 `/ypserver prod`)에서 자동 적용. 적용 시 `secret_items_name_idx` redundant index 제거.
+- 매일 03:00 KST "audit log write failed" 경고는 commit `9a37dfb`(WSL 빌드 파이프라인)에서 근본 수정. 재배포 후 다음 03:00 tick에서 메시지 사라지는지 확증.
+- ELF 에러 0건 유지 모니터링 (`pm2 logs ypserver | awk '/2026-04-25/,EOF' | grep -c "ELF"` → 0 기대).
 
-**브라우저 E2E 로그인 검증**:
-- L2 배포 후 실제 로그인 E2E는 curl 403 CSRF(핸들러 도달)까지만 확인됨. stylelucky4u.com Cloudflare Tunnel 경유 + CSRF 토큰 + Postgres User 인증 풀 플로우는 브라우저에서 직접 수행해야 엔드투엔드 확증.
+**브라우저 E2E 로그인 검증** (S52 이월):
+- curl 403 CSRF(핸들러 도달)까지만 확인됨. stylelucky4u.com Cloudflare Tunnel + CSRF 토큰 + Postgres User 인증 풀 플로우 브라우저 검증.
 - kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> 로그인 → 대시보드 도달 → PM2 페이지 정상 표시까지.
 
-### 우선순위 1 (S53+): DATABASE_URL 패스워드 rotation + S51 이월 해소
+### 우선순위 1 (S54+): _test_session drop + DATABASE_URL rotation
 
-**시큐리티 rotation**:
-- `~/ypserver/.env`의 `DATABASE_URL=postgresql://postgres:<DB_PASSWORD>@...` 평문 패스워드. WSL 로컬 한정이나 정기 교체 권장 (세션 52에서 awk 사고로 로그에 노출됨).
+**_test_session drop** (S49 이월, 사용자 승인 필요):
+- 파괴적 작업이므로 본 세션 보류. 사용자 승인 후 `psql -c "DROP TABLE IF EXISTS _test_session;"` 또는 prisma migration으로 정식 처리.
+
+**DATABASE_URL 패스워드 rotation** (S52 이월):
+- `~/ypserver/.env`의 `DATABASE_URL=postgresql://postgres:<DB_PASSWORD>@...` 평문 패스워드 정기 교체.
 - `ALTER USER postgres WITH PASSWORD '<new>';` + `.env` 갱신 + PM2 재시작.
 
-**S51 이월 사안 (그대로 S53 이월)**:
-- `/kdywave --feedback` 정식 모드 — 36 잔여 파일 ADR-020 cross-reference 일괄
-- Windows 재부팅 자동복구 실증 (S50 이슈 #2)
-- `_CHECKPOINT_KDYWAVE.md` §보완 행 추가
-- S50 이월: pm2-logrotate / postgresql systemd
-- S49 이월: KEK 퍼즐 / MASTER_KEY_PATH 통일 / rotateKek 테스트 / SecretItem @@index / `_test_session` drop / MFA biometric / SP-013·016 / KST tick
+### 우선순위 2 (이월 — 환경/생체 의존만 잔존)
 
-**대응 절차**:
-1. 사용자에게 3 파일 의도 확인 (각각 무엇을 하려 했는지)
-2. 의도 파악 후 cs 커밋에 합류 또는 별도 처리
-3. **Windows 재부팅 1회 리허설** — WSL → PM2 → cloudflared 자동 복구 체인 실증 (S50 이슈 #2)
+**환경 셋업 필요**:
+- **MFA biometric QA 8 시나리오** (`docs/guides/mfa-browser-manual-qa.md`) — 생체 디바이스 + 사용자 직접 테스트
+- **SP-013 wal2json 물리 측정** — PG superuser 권한 + 30분 DML 주입
+- **SP-016 SeaweedFS 50GB 검증** — SeaweedFS 설치 + 50GB 디스크 용량
+- **Windows 재부팅 자동 복구 실증** (S50 이슈 #2) — WSL → PM2 → cloudflared 체인
 
-### 우선순위 0-2 (S52 후속): /kdywave --feedback 정식 모드 (36 잔여 파일 일괄)
+**모니터링 (다음 세션 자동 수집)**:
+- WSL 재배포 후 `[cleanup-scheduler] audit log write failed` 메시지 사라짐 확증
+- 신규 ELF 에러 0건 유지 (재발 시 NFT 해시 디렉토리 변동 추적)
+- `secret_items_name_idx` DROP 적용 (다음 prisma migrate deploy 자동)
 
-**상태**: S51에서 5 핵심 산출물(README / 01-adr-log §2 / §0.4 / 05-operations-blueprint / 04-integration/02-cloudflare-deployment)에만 cross-reference. 36개 잔여(주로 05-roadmap의 milestones·release-plan·risk-register·cost-tco 등)는 ADR-015 단독 언급 상태.
+### ~~S51 이월: kdywave --feedback 36 잔여 파일~~ ✅ **세션 52 commit `de9c962` + 세션 53 placeholder 정정으로 완결**
 
-**실행 방법**: `/kdywave --feedback` 모드 진입 → ADR-020 신설 사실을 일괄 자동 전파. Wave 1 deep-dive 73문서와 _archived/는 역사 보존 원칙 유지(미수정).
+**최종 상태**: 24 파일 banner는 commit `de9c962`(병렬 세션 진행분)에서 일괄 처리 완료. 본 세션(53)에서 placeholder cascade 5건 정정 + `_CHECKPOINT_KDYWAVE.md §보완` 추가로 마무리. ADR-020 cross-reference 누락 0건.
+
+### ~~우선순위 1: S49 Phase 16b Capistrano 배포 자동화~~ ⚠️ **S51에서 ADR-020으로 부분 대체 — 사실상 보류**
+
+**S51 변경**: ADR-020(Next.js standalone + rsync + pm2 reload)이 ADR-015의 *Capistrano-style symlink/releases* 부분을 대체. 4 재진입 트리거(rsync 미정합 1회+/롤백 부재 30초+/사용자 2명+/canary 분기) 충족 시 재가동될 **유보 자산**으로 보존.
+
+**현재 활성 배포 경로**: `standalone/` 패키지 빌드 → `rsync --delete /mnt/e/.../standalone/ ~/ypserver/` → `pm2 reload ypserver`. ADR-020 본문 + S50 handover 참조.
 
 ### ~~우선순위 1: S49 Phase 16b Capistrano 배포 자동화~~ ⚠️ **S51에서 ADR-020으로 부분 대체 — 사실상 보류**
 
