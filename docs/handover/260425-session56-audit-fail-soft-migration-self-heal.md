@@ -200,4 +200,88 @@ try {
 5. **(선택) `wsl-build-deploy.sh` stderr `tee logs/build-*.log` 추가** — Turbopack 워닝 텍스트 캡처 선행 작업 (S54 부 항목).
 
 ---
+
+## §보완 — Audit-Failure 카운터 메트릭 (ADR-021 §amendment-1)
+
+> 본 세션 정식 마감(commit `638d764`) 직후 동일 conversation 에서 사용자 요청("지금 메트릭 작업")으로 진행. 세션 56 의 권장 후속 작업 1건 + 본 세션 ADR-021 §결과·부정 잔류 위험 완화.
+
+### 작업 요약
+
+`safeAudit` 호출 결과를 in-process 카운터로 누적 + admin endpoint 로 노출. PM2 reload 시 리셋되는 1차 가시성 도구로 한정 (외부 스크래퍼 / 알림 / 영속화는 의도 보류 — ADR-021 §amendment-1 §의도된 한계).
+
+### 변경 파일 (4건: 3 신규 + 1 수정)
+
+| 파일 | 변경 |
+|---|---|
+| `src/lib/audit-metrics.ts` (신규) | in-process 카운터 — `recordAuditOutcome` / `getAuditMetrics` / `MAX_BUCKETS=200` FIFO evict / context 첫 2 segment 정규화 / `recordAuditOutcome` 절대 throw 안 함 invariant |
+| `src/lib/audit-metrics.test.ts` (신규) | 9 단위 테스트 — 초기/카운트/정규화/정렬/비-Error throw/never-throw/0&1 경계/reset |
+| `src/app/api/admin/audit/health/route.ts` (신규) | `GET` admin endpoint, withRole 가드, no-store |
+| `src/lib/audit-log-db.ts` (수정) | safeAudit try/catch 양 분기에서 `recordAuditOutcome` 호출 + ADR-021 §amendment-1 정식화 |
+
+### 상세 변경
+
+```ts
+// safeAudit 변경 (audit-log-db.ts)
+export function safeAudit(entry: AuditEntry, context?: string): void {
+  const ctx = context ?? entry.action ?? `${entry.method} ${entry.path}`;
+  try {
+    writeAuditLogDb(entry);
+    recordAuditOutcome(true, ctx);
+  } catch (err) {
+    recordAuditOutcome(false, ctx, err);
+    console.warn("[audit] write failed", { context: ctx, error: ... });
+  }
+}
+```
+
+응답 shape:
+```json
+{
+  "success": true,
+  "data": {
+    "startedAt": "...",
+    "uptimeSeconds": 123,
+    "total": { "success": 0, "failure": 0, "failureRate": 0 },
+    "byBucket": []
+  }
+}
+```
+
+byBucket 정렬: 실패 많은 순 → 호출량 많은 순. context 정규화로 `cleanup-scheduler:SESSION_EXPIRE:abc` → `cleanup-scheduler:SESSION_EXPIRE` 버킷 (high-cardinality 차단).
+
+### 검증
+
+- `npx tsc --noEmit` — 0 errors
+- `vitest run audit-metrics.test.ts cleanup-scheduler.test.ts` — **22/22 PASS** (9 신규 + 13 회귀)
+- 운영 빌드+배포 (`wsl-build-deploy.sh`) — [6/8] migrate skip ✓ / [7/8] verify OK ✓ / [8/8] PM2 ↺=5→6 online + ELF Linux 양쪽
+- `GET /api/admin/audit/health` (no auth) → 401 UNAUTHORIZED — admin 가드 정상
+
+### 의사결정
+
+| # | 결정 | 대안 | 선택 이유 |
+|---|------|------|-----------|
+| 1 | in-process 카운터 (PM2 reload 시 리셋) | (a) audit_logs 에 별도 컬럼 (b) 별도 audit_failures 테이블 (c) 외부 prometheus | (a/b) 영속 비용 + 마이그레이션. 본 카운터 목적은 "지금 silent 한가?"의 즉시 가시성, 누적 추세는 audit_logs 테이블이 source of truth. (c) 1인 운영 인프라에 prometheus 부재. JSON endpoint 가 즉시 가치 충족, 차후 텍스트 익스포터 추가 가능. |
+| 2 | byBucket 카디널리티 캡 200 + FIFO evict | 무제한 / LRU | cleanup-scheduler 가 entry-id 를 context 에 포함 → 무제한 시 메모리 폭주. context 첫 2 segment 정규화로 카디널리티는 사실상 제한되지만 방어 깊이로 캡도 추가. FIFO 가 LRU 보다 단순하고 본 케이스에 충분. |
+| 3 | `recordAuditOutcome` 자체에 try/catch (절대 throw 안 함) | 일반 throw 허용 | safeAudit 가 fail-soft 인데 그 메트릭이 throw 하면 cross-cutting invariant 깨짐. cross-cutting 의 cross-cutting 도 fail-soft 로 — 한 측정 손실은 허용. |
+| 4 | ADR-021 §amendment-1 형태로 추가 (별도 ADR-022 신설 X) | ADR-022 로 분리 | 본 메트릭은 ADR-021 §결과·부정에서 명시한 잔류 위험 완화책 — 직접 연결됨. 별도 ADR 은 의사결정 단위가 동일하므로 amendment 가 더 자연스러움. 외부 스크래퍼 도입 같은 큰 변화 시는 ADR-022 신설. |
+
+### 이월
+
+- §amendment-1 §후속 트리거 — failureRate > 0.001/일 / PM2 reload 사이 추세 식별 곤란 / 외부 스크래퍼 도입 시 prometheus 텍스트 포맷 노출
+- 04-26 03:00 KST cleanup cron 후 첫 카운터 측정 — `curl -H 'Authorization: Bearer <ADMIN>' /api/admin/audit/health` 로 audit_logs 정상 누적 + failure 0 확인
+
+### 사용자 ADMIN 토큰 측정 가이드 (참고)
+
+```bash
+# 1. ADMIN 로그인하여 accessToken 획득
+TOKEN=$(curl -sS -X POST http://localhost:3000/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"...","password":"..."}' | jq -r '.data.accessToken')
+
+# 2. health 조회
+curl -sS http://localhost:3000/api/admin/audit/health \
+  -H "Authorization: Bearer $TOKEN" | jq .
+```
+
+---
 [← handover/_index.md](./_index.md)
