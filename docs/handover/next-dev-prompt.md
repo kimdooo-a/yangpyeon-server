@@ -26,13 +26,16 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
 
-## 필수 참조 파일 ⭐ 세션 51 종료 시점 — kdywave 이행도 평가(A- 85/100) + ADR-020 신설 + 로드맵 공수 재보정
+## 필수 참조 파일 ⭐ 세션 52 종료 시점 — WSL 빌드 파이프라인 + NFT 네이티브 모듈 정합성 보장
 
 ```
 CLAUDE.md
 docs/status/current.md
-docs/handover/260425-session51-kdywave-eval-adr020.md             ⭐⭐⭐ 최신 (이행도 A- 85/100 + ADR-020 신설 + ADR-015 부분 대체 + Git 태그 3건 소급 + 로드맵 §8.1.1 시나리오 A/B 병기)
-docs/solutions/2026-04-25-adr-numbering-and-partial-supersession.md  ⭐⭐ CK +1 (35) — 신규 ADR 등록 3 위치 검색 / Deprecated/Superseded 전체/부분 3 모드 / 보완 블록 표준 형식 / 5 핵심 산출물 선택적 전파 패턴
+docs/handover/260425-session52-wsl-build-pipeline.md              ⭐⭐⭐ 최신 (L2 WSL 네이티브 빌드 + L1 self-heal + pack-standalone 3 버그 수정 + rsync 앵커링 함정 해결)
+docs/solutions/2026-04-25-nft-native-binary-platform-mismatch.md  ⭐⭐ CK +1 (36) — 빌드 환경=실행 환경 원칙 / serverExternalPackages 한계 / rsync exclude 앵커링 / --delete-excluded vs find preserve 충돌 / L2+L1 defense-in-depth
+scripts/wsl-build-deploy.sh                                       ⭐ 신규 (세션 52) — WSL 빌드 단일 명령 파이프라인 `MSYS_NO_PATHCONV=1 wsl bash -c 'bash /mnt/e/.../scripts/wsl-build-deploy.sh'`
+docs/handover/260425-session51-kdywave-eval-adr020.md             (이행도 A- 85/100 + ADR-020 신설 + ADR-015 부분 대체 + Git 태그 3건 소급 + 로드맵 §8.1.1 시나리오 A/B 병기)
+docs/solutions/2026-04-25-adr-numbering-and-partial-supersession.md  CK (35) — 신규 ADR 등록 3 위치 검색 / Deprecated/Superseded 전체/부분 3 모드 / 보완 블록 표준 형식 / 5 핵심 산출물 선택적 전파 패턴
 docs/research/2026-04-supabase-parity/02-architecture/01-adr-log.md     ⭐ ADR-020 (Next.js standalone+rsync+pm2 reload, 활성) + ADR-015 §세션 50 보완 (Capistrano 부분 대체) — 세션 51 갱신
 docs/research/2026-04-supabase-parity/05-roadmap/00-roadmap-overview.md  ⭐ §1.2 870h→916h / §8.1.1 시나리오 A 53-54주 vs B 25주 병기 / §13 위험 신호 2건 / §14.3 거버넌스 (세션 51 갱신)
 docs/research/2026-04-supabase-parity/05-roadmap/05-rollout-strategy.md  ⭐ 헤더 부분 대체 통지 (Capistrano = 유보 자산, ADR-020 활성, 세션 51)
@@ -220,12 +223,28 @@ scripts/session39-e2e.sh + session39-helper.cjs                   ⭐ 세션 39 
 
 ## 추천 다음 작업
 
-### 우선순위 0 (S52 즉시): 사용자 진행 중 3 파일 의도 확인 + Windows 재부팅 자동복구 실증
+### 우선순위 0 (S53 즉시): `~/ypserver/data/` SQLite 조사 + 브라우저 E2E 로그인 검증
 
-**S51 cs 시점 git working tree 잔존**:
-- `M scripts/pack-standalone.sh` — 본 대화 외 사용자 추가 수정 추정
-- `M standalone/install-native-linux.sh` — S50 알려진 이슈 #1(700 패키지 인플레이션) 개선 작업 추정
-- `?? scripts/wsl-build-deploy.sh` — 신규 미추적, S50 우선순위 0 항목 진행 추정
+**S52 후속 조사**:
+- `~/ypserver/data/` 디렉토리가 **빈 상태** (Apr 19 21:56부터 0 file) — better-sqlite3 의존성은 있는데 DB 파일이 없음. Postgres가 주 DB(DATABASE_URL)이고 SQLite는 보조 용도(rate-limit bucket, webauthn-challenge 등?) 추정이나 실제 경로 미확인. 런타임 에러는 없으나 cleanup-scheduler가 매일 03:00 "audit log write failed" 메시지 기록 중 — 연관성 조사 필요.
+- `grep -r "better-sqlite3\|Database" src/ --include "*.ts"` 로 SQLite 사용 위치 추적 → DB 파일 경로 확정 → 필요시 `data/` 선제 생성 또는 경로 정합성 확인.
+
+**브라우저 E2E 로그인 검증**:
+- L2 배포 후 실제 로그인 E2E는 curl 403 CSRF(핸들러 도달)까지만 확인됨. stylelucky4u.com Cloudflare Tunnel 경유 + CSRF 토큰 + Postgres User 인증 풀 플로우는 브라우저에서 직접 수행해야 엔드투엔드 확증.
+- kimdooo@stylelucky4u.com / Knp13579!yan 로그인 → 대시보드 도달 → PM2 페이지 정상 표시까지.
+
+### 우선순위 1 (S53+): DATABASE_URL 패스워드 rotation + S51 이월 해소
+
+**시큐리티 rotation**:
+- `~/ypserver/.env`의 `DATABASE_URL=postgresql://postgres:Knp13579yan@...` 평문 패스워드. WSL 로컬 한정이나 정기 교체 권장 (세션 52에서 awk 사고로 로그에 노출됨).
+- `ALTER USER postgres WITH PASSWORD '<new>';` + `.env` 갱신 + PM2 재시작.
+
+**S51 이월 사안 (그대로 S53 이월)**:
+- `/kdywave --feedback` 정식 모드 — 36 잔여 파일 ADR-020 cross-reference 일괄
+- Windows 재부팅 자동복구 실증 (S50 이슈 #2)
+- `_CHECKPOINT_KDYWAVE.md` §보완 행 추가
+- S50 이월: pm2-logrotate / postgresql systemd
+- S49 이월: KEK 퍼즐 / MASTER_KEY_PATH 통일 / rotateKek 테스트 / SecretItem @@index / `_test_session` drop / MFA biometric / SP-013·016 / KST tick
 
 **대응 절차**:
 1. 사용자에게 3 파일 의도 확인 (각각 무엇을 하려 했는지)
