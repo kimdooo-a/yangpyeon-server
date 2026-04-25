@@ -398,6 +398,5 @@ model SecretItem {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   rotatedAt      DateTime? @map("rotated_at") @db.Timestamptz(3)
 
-  @@index([name])
   @@map("secret_items")
 }

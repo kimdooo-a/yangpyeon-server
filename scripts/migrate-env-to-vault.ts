@@ -1,4 +1,7 @@
-import { loadMasterKey } from "@/lib/vault/MasterKeyLoader";
+import {
+  loadMasterKey,
+  resolveMasterKeyPath,
+} from "@/lib/vault/MasterKeyLoader";
 import { VaultService } from "@/lib/vault/VaultService";
 import { prisma } from "@/lib/prisma";
 
@@ -27,9 +30,7 @@ const SECRETS: SecretMigration[] = [
 ];
 
 async function main(): Promise<void> {
-  const keyPath =
-    process.env.MASTER_KEY_PATH ?? "/etc/luckystyle4u/secrets.env";
-  const masterKey = loadMasterKey(keyPath);
+  const masterKey = loadMasterKey(resolveMasterKeyPath());
   const vault = new VaultService(masterKey, prisma);
 
   for (const { envVar, vaultName } of SECRETS) {

@@ -1567,8 +1567,8 @@ Phase 21 (Week 4): UX-09, UX-10, UX-11 (전역 챗 + 마감 + 테스트)
 
 ### Z.3 Phase 21 이후 후속 의사결정 (Wave 5 예상)
 
-- **ADR-019 (예상)**: AI 챗 메시지 영구 저장 — `AiThread`/`AiMessage` 도입 조건 (DQ-AI-1 재평가)
-- **ADR-020 (예상)**: AI Gateway(Vercel) 조건부 채택 — Vercel 이전 배포 결정 시
+- **ADR-021 (예상)**: AI 챗 메시지 영구 저장 — `AiThread`/`AiMessage` 도입 조건 (DQ-AI-1 재평가) — *원래 ADR-019 슬롯이었으나 세션 30 argon2id 전환에 점유, 2026-04-25 재할당*
+- **ADR-022 (예상)**: AI Gateway(Vercel) 조건부 채택 — Vercel 이전 배포 결정 시 — *원래 ADR-020 슬롯이었으나 세션 50 standalone+rsync+pm2 reload에 점유, 2026-04-25 재할당*
 - **DQ-UX-4 (신규)**: Edge Functions AI 코드 생성 자동 실행 허용 범위 — isolated-vm sandbox 내 실행 허용 여부
 - **DQ-UX-5 (신규)**: 로그 Explorer 전용 AI 분석 대시보드 분리 — Phase 22+ 신규 카테고리 가능성
 

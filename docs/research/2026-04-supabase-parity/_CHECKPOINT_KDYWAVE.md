@@ -195,3 +195,33 @@ cumulative:
 - kdygenesis 연계 준비: `07-appendix/03-genesis-handoff.md`의 `_PROJECT_GENESIS.md` 초안 활용
 - 다음 권장 액션: (1) `/kdyspike --full` 우선 스파이크 7건 (4주) → (2) Phase 15 Auth Advanced 착수
 - 역방향 피드백 모드: 향후 `/kdywave --feedback` 필요 시 재개 가능
+
+## §보완 — Wave 5 종료 후 변경 이력 (kdywave --feedback 추적)
+
+> Wave 5 완료(2026-04-18) 이후 발생한 cross-cutting 변경을 본 체크포인트의 시간 일관성 유지를 위해 부록으로 기록한다. 본문 §"역방향 피드백 0건" 사실은 Wave 5 종료 시점 기준으로 유효하며, 이하 변경은 모두 **종료 후 보강**.
+
+### B-01 (2026-04-19, 세션 50): standalone+rsync+pm2 reload 채택
+- **동기**: Phase 16b 진입 시 Capistrano-style symlink/releases가 1인 운영 환경(WSL2 단일 머신)에서 과잉 복잡도. 트래픽 100만+/팀 2명+/3환경/B2B 트리거 미충족.
+- **결과물**: `scripts/wsl-build-deploy.sh`, `standalone/install-native-linux.sh`, `scripts/pack-standalone.sh`
+- **연계**: ADR-020 신설 (2026-04-25 세션 51 등록), ADR-015 *Capistrano-style symlink/releases* 부분 부분 대체
+
+### B-02 (2026-04-25, 세션 51): kdywave 이행도 평가 + ADR-020 정식 등록
+- **평가**: 누적 185+ 문서 진행 vs 실 구현 → A-(85/100), R1 ADR-015 vs 실구현 불일치 식별
+- **시정 조치**: 5개 핵심 산출물에 cross-reference (01-adr-log §0.4/§2/§3.1/§5, README.md row 14, 05-rollout-strategy.md, 05-operations-blueprint.md, 02-cloudflare-deployment-integration.md, 00-roadmap-overview.md §1.2/§8.1.1/§13/§14.3)
+- **거버넌스**: Git 태그 v0.1.0-alpha.0 / v0.1.0-alpha.1 / v0.2.0-alpha.2 소급 부여 + 원격 push
+- **공수 재보정**: §8.1 버퍼 20→25%, §8.1.1 시나리오 A(53~54주) / B(25주) 병기
+
+### B-03 (2026-04-25, 세션 52): kdywave --feedback 정식 모드 — 36 잔여 파일 일괄 처리
+- **범위**: S51 5 핵심 외 **29개 파일**에 ADR-020 cross-reference banner 일괄 삽입 — `00-vision/` 5건, `02-architecture/` 3건, `04-integration/` 2건, `05-roadmap/` 11건, `06-prototyping/` 3건, `07-appendix/` 5건
+- **placeholder 충돌 정정**: ADR-020 placeholder를 다른 후보(Prisma 8 업그레이드, AI Gateway, AI 챗 메시지 영구 저장 등)로 사용한 4개 파일(`01-adr-log.md`, `16-ux-quality-blueprint.md`, `01-kdygenesis-handoff.md`, `02-dq-final-resolution.md`, `02-final-summary.md`)에서 placeholder를 ADR-021~024로 재할당. 다음 ADR 번호: **025부터**
+- **보존 원칙**: `01-research/14-operations/*` (Wave 1 deep-dive 73문서) 및 `_archived/`는 역사 보존 — 미수정
+- **검증**: 29개 파일 모두 ADR-020 banner 정상 삽입 확인 (`grep "ADR-015 부분 대체 통지" → 29 hits`)
+
+### 누적 변경 요약 (2026-04-19 ~ 2026-04-25)
+| 항목 | Wave 5 종료 (2026-04-18) | 현재 (2026-04-25) | 변동 |
+|------|----------------------|-----------------|------|
+| 정식 ADR 수 | 18 (ADR-001~018) | 20 (ADR-019, ADR-020 추가) | +2 |
+| ADR-015/Capistrano 단독 언급 파일 | 40 | 5 (Wave 1 deep-dive 3 + _archived 1 + _CHECKPOINT 1) | -35 |
+| ADR-020 cross-reference 파일 | 0 | 35 (S51 6건 + S52 29건) | +35 |
+| 역방향 피드백 (Wave 1-5 채택안 변경) | 0 | 0 (Capistrano는 부분 대체일뿐 채택안 자체는 유보 자산) | 변동 없음 |
+| 다음 ADR 번호 | 019 | 025 (021~024는 §5 예상 후보로 reserved) | +6 |
