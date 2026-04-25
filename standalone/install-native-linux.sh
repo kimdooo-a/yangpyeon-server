@@ -32,13 +32,51 @@ npm install --no-save --force "@node-rs/argon2-linux-x64-gnu"
 # Windows 플러그인 잔재 제거 (공간 절약 + 혼동 방지)
 rm -rf "node_modules/@node-rs/argon2-win32-x64-msvc" 2>/dev/null || true
 
-echo "[3/3] Prisma client 재생성 (Linux OpenSSL 대응)"
+echo "[3/4] Prisma client 재생성 (Linux OpenSSL 대응)"
 if [[ -f prisma/schema.prisma ]]; then
   npx -y prisma generate --schema=prisma/schema.prisma || {
     echo "[WARN] prisma generate 실패 — @prisma/client 를 재설치하여 빌트인 엔진 사용"
     npm install --no-save @prisma/client @prisma/adapter-pg
   }
 fi
+
+echo "[4/4] NFT 해시 디렉토리 .node 자가치유 (Windows 빌드 산출물 방어)"
+# 배경: Next.js 16 의 NFT(Node File Trace) 는 standalone 산출물에 packageName-<hash>/
+#       구조로 네이티브 패키지를 복사한다. Windows 에서 next build 를 수행하면
+#       이 해시 디렉토리에 Windows .node 가 들어가고, npm rebuild 는 정규
+#       node_modules/ 만 갱신하므로 NFT 해시 디렉토리는 수동 동기화가 필요.
+#
+#       이 블록은 Linux 에서 빌드한 경우(L2 권장 경로)에는 동일 바이너리 덮어쓰기로
+#       사실상 no-op, Windows 에서 빌드된 잔재가 들어온 경우(L0/L1 사고 경로)에는
+#       자가치유.
+sync_native_to_nft() {
+  local pkg="$1"
+  local rel_path="$2"   # 예: build/Release/better_sqlite3.node
+  local src="node_modules/$pkg/$rel_path"
+  if [[ ! -f "$src" ]]; then
+    echo "  ⚠️  $src 없음 — 동기화 스킵"
+    return 0
+  fi
+  local matched=0
+  for nft_dir in .next/node_modules/${pkg}-*; do
+    [[ -d "$nft_dir" ]] || continue
+    local target="$nft_dir/$rel_path"
+    # NFT 가 hardlink 로 이미 동일 inode 를 가리키는 경우(Linux 빌드 정상 경로)는
+    # cp 가 "are the same file" 로 실패하므로 사전 차단. -ef 는 inode 동등성 비교.
+    if [[ -f "$target" && "$src" -ef "$target" ]]; then
+      echo "  = $target (이미 동일 inode — 스킵)"
+    else
+      mkdir -p "$(dirname "$target")"
+      cp -f "$src" "$target"
+      echo "  ✓ $target"
+    fi
+    matched=1
+  done
+  if [[ $matched -eq 0 ]]; then
+    echo "  ℹ️  .next/node_modules/${pkg}-* 매칭 없음 (NFT 미사용 또는 패키지명 변경)"
+  fi
+}
+sync_native_to_nft "better-sqlite3" "build/Release/better_sqlite3.node"
 
 echo ""
 echo "✅ Linux native 모듈 교체 완료"

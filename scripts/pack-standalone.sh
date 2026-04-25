@@ -22,18 +22,29 @@ if [[ ! -d "$SRC" ]]; then
   exit 1
 fi
 
-echo "[1/5] 기존 standalone/ 정리"
-# 기동 헬퍼(start.sh, README, ecosystem)는 보존
-find "$DEST" -mindepth 1 -maxdepth 1 \
-  ! -name 'start.sh' \
-  ! -name 'README.md' \
-  ! -name 'ecosystem.config.cjs' \
-  ! -name '.env.production.example' \
-  ! -name 'install-native-linux.sh' \
-  -exec rm -rf {} +
+# 기동 헬퍼(start.sh / README.md / ecosystem.config.cjs / install-native-linux.sh /
+# .env.production.example)는 Git 에 커밋되어 standalone/ 안에 상존하지만,
+# 이후 rsync(--delete-excluded) 가 source(.next/standalone/) 에 없는 파일을 삭제하므로
+# 임시 디렉토리로 백업 → 패키징 후 복원한다.
+HELPERS=(start.sh README.md ecosystem.config.cjs .env.production.example install-native-linux.sh)
+TMP_HELPERS="$(mktemp -d -t standalone-helpers.XXXXXX)"
+trap 'rm -rf "$TMP_HELPERS"' EXIT
+
+echo "[1/5] 기존 standalone/ 정리 (헬퍼 백업 후 클린)"
+# 첫 빌드(WSL clone 등)에서 standalone/ 자체가 없으면 find 가 실패하므로 선제 생성.
+mkdir -p "$DEST"
+for f in "${HELPERS[@]}"; do
+  [[ -f "$DEST/$f" ]] && cp -p "$DEST/$f" "$TMP_HELPERS/"
+done
+find "$DEST" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
 
 echo "[2/5] .next/standalone/* 복사 (server.js + NFT 추적 node_modules)"
 # cp -a 대신 rsync 권장 (더 큰 프로젝트에서 빠름). rsync 없을 시 cp fallback.
+# 주의 — `/standalone/` exclude:
+#   NFT 가 프로젝트 루트의 standalone/ 디렉토리를 재귀적으로 트레이스하여
+#   `.next/standalone/standalone/` 이 생성되는 부작용이 있다. 이를 그대로 옮기면
+#   매 빌드마다 한 단계씩 깊어지는 nested 디렉토리가 누적되므로 차단한다.
+#   leading slash(`/`) 는 source root 기준 anchor 라 top-level 만 제외한다.
 if command -v rsync >/dev/null 2>&1; then
   rsync -a --delete-excluded \
     --exclude='docs/' \
@@ -45,13 +56,14 @@ if command -v rsync >/dev/null 2>&1; then
     --exclude='playwright.config.ts' \
     --exclude='vitest.config.ts' \
     --exclude='drizzle.config.ts' \
+    --exclude='/standalone/' \
     "$SRC/" "$DEST/"
 else
   cp -a "$SRC/." "$DEST/"
   # rsync 없을 때 수동 제거 (실패해도 무시)
-  rm -rf "$DEST/docs" "$DEST/spikes" "$DEST/.playwright-mcp" "$DEST/tsconfig.tsbuildinfo" || true
+  rm -rf "$DEST/docs" "$DEST/spikes" "$DEST/.playwright-mcp" "$DEST/tsconfig.tsbuildinfo" "$DEST/standalone" || true
   find "$DEST" -maxdepth 1 -name '*.png' -delete || true
-  find "$DEST" -maxdepth 1 -name '*.md' ! -name 'README.md' -delete || true
+  find "$DEST" -maxdepth 1 -name '*.md' -delete || true
 fi
 
 # 런타임에 불필요한 dev/test/lock 파일 제거 (rsync 제외가 누락된 경우 방어)
@@ -90,6 +102,14 @@ else
   rm -rf "$DEST/public"
   cp -a "$ROOT/public" "$DEST/public"
 fi
+
+# 헬퍼 복원 — 정적/공개 자산 복사 전 시점이라면 어디든 OK
+echo "  ↳ 기동 헬퍼 복원 ($DEST)"
+for f in "${HELPERS[@]}"; do
+  if [[ -f "$TMP_HELPERS/$f" ]]; then
+    cp -p "$TMP_HELPERS/$f" "$DEST/$f"
+  fi
+done
 
 echo "[5/5] prisma 마이그레이션 복사 (운영 시 마이그레이션 실행용)"
 if [[ -d "$ROOT/prisma/migrations" ]]; then
