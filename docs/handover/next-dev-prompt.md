@@ -1,11 +1,11 @@
-# 다음 세션 프롬프트 (세션 60)
+# 다음 세션 프롬프트 (세션 61)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 58 정체성 변경, 세션 59 Phase 0/1.1 완료)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 60: G1b 4 agent 병렬 발사 완료)
 
 - **프로젝트명**: 양평 부엌 서버 — **1인 운영자의 멀티테넌트 백엔드 플랫폼** (stylelucky4u.com)
 - **정체성**: closed multi-tenant BaaS (본인 소유 10~20개 프로젝트 공유 백엔드, 외부 가입 없음)
@@ -29,79 +29,151 @@ npm run dev
 
 ---
 
-## ⭐ 세션 60 우선 작업 P0: Phase 1 G1b 병렬 발사 (T1.1 완료 후)
+## ⭐ 세션 61 우선 작업 — Phase 1 통합 부채 정리 (~5h) → T1.4 진입 가능
 
-**Phase 0 전체 ✅ 완료** (M1 게이트 통과, 8 commits ea4d89c → d65cfce):
-- T0.1 spike-baas-002 fix 3건 ✅ 619a952
-- T0.2 모노레포 변환 (pnpm-workspace + turbo + packages/core 골격) ✅ d24ea37
-- T0.3 Tenant 모델 + 18 모델 tenantId nullable Stage 1 ✅ 89ea7e4
-- T0.4 audit_logs/metrics_history/ip_whitelist tenant_id Stage 1 + ADR-021 §amendment-2 ✅ 5a06c96
-- T0.5 Almanac 마이그레이션 계획 노트 ✅ 66dd62e
-- M1 fix: tsconfig docs/assets/** exclude ✅ d65cfce
+### P0 — 통합 부채 3건 (~5h)
 
-**Phase 1.1 ✅ 완료** (commit 992a191, 2026-04-26 세션 59):
-- T1.1 TenantContext (AsyncLocalStorage) — packages/core/src/tenant/context.ts
-  · TenantContext { tenantId, bypassRls? } / getCurrentTenant (fail-loud) / getCurrentTenantOrNull / runWithTenant
-  · 8 신규 vitest (누계 285/285 PASS), npm run build PASS, packages/core tsc 0 errors
+**1. TenantMembership 모델 추가 + wiring (3-4h)**
 
-**Phase 1.2~1.7 G1b 병렬 발사 (T1.1 완료, 모두 가동 가능)**:
-- T1.2 withTenant() 가드 + catch-all router `/api/v1/t/[tenant]/[...path]` (16h, 크리티컬)
-- T1.3 ApiKey K3 매칭 (prefix + FK, 12h)
-- T1.5 TenantWorkerPool (worker_threads, 30h, spike-baas-002 §6 sketch 활용 시 -8h)
-- T1.7 audit-metrics tenant 차원 (bucketName + per-tenant audit-failure, 6h)
+`src/lib/tenant-router/membership.ts`이 현재 fail-closed (항상 null) → cookie 인증 경로 항상 403. 운영자 본인이 cookie로 컨슈머 라우트 접근 시 차단됨. 다음 단계로 즉시 보강:
 
-**호출**: `/kdyswarm --tasks T1.2,T1.3,T1.5,T1.7 --strategy parallel`
-- T1.4 RLS 정책 (18h)는 별도 — DBA 작업이라 수동 검증 필요. T1.2 완료 후 단독 진행.
-- T1.6 Almanac backfill (10h)는 컨슈머 작업이라 spec/aggregator-fixes 머지 후.
+```prisma
+// prisma/schema.prisma 추가
+model TenantMembership {
+  id        String     @id @default(uuid())
+  tenantId  String     @map("tenant_id") @db.Uuid
+  userId    String     @map("user_id")
+  role      TenantRole @default(MEMBER)
+  createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
 
-**M3 게이트** (Phase 2 종료, 약 3개월 후): 2번째 컨슈머가 코드 0줄 추가로 가동 → closed multi-tenant BaaS 정체성 입증.
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
----
+  @@unique([tenantId, userId])
+  @@index([userId])
+  @@map("tenant_memberships")
+}
 
-## 우선 작업 P1: spike-baas-002 부수 발견 즉시 fix (3건)
+enum TenantRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
 
-ADR-028 결정과 무관하게 즉시 fix 가능. spike-baas-002 §3.X 참조.
-
-```bash
-# 영향 파일 (절대 다른 터미널과 충돌 주의):
-# src/lib/cron/runner.ts:21    DEFAULT_ALLOWED_FETCH 정책화 (ADR-024 의존이라 후순위)
-# src/lib/cron/runner.ts:72    WEBHOOK fetch AbortController + 60s timeout
-# src/lib/cron/registry.ts:135 runJob catch에 structured log (CK-38 패턴)
+  @@map("tenant_role")
+}
 ```
 
-**충돌 회피**: spec/aggregator-fixes 브랜치가 cron 관련 코드를 수정 중일 가능성 → 머지 후 또는 별도 브랜치에서 진행.
+```typescript
+// src/lib/tenant-router/membership.ts 본문 교체
+import { prisma } from "@/lib/prisma";
+import type { TenantRole } from "./roles";
 
----
-
-## 우선 작업 P2 (S57 이월): Almanac spec 적용 진행 상태 점검
-
-세션 57에서 spec/aggregator-fixes 브랜치가 v1.1 정합화 완료. 현재 상태:
-- spec 18 파일 일괄 정합화 → tsc 셋업 외 0 에러 검증
-- 사용자 결정 시 spec 적용 (npm install 3종 + shadcn 9종 + Prisma migration + 코드 cp)
-
-**ADR-022~029 결정 영향**: Almanac v1.0 그대로 출시 → 출시 후 packages/tenant-almanac/로 마이그레이션 (~5~7일).
-
-```bash
-# 현재 브랜치 확인
-git branch --show-current  # spec/aggregator-fixes 또는 main
-git log --oneline -10
+export async function findTenantMembership(
+  input: FindMembershipInput,
+): Promise<TenantMembershipRow | null> {
+  return prisma.tenantMembership.findUnique({
+    where: { tenantId_userId: { tenantId: input.tenantId, userId: input.userId } },
+    select: { role: true },
+  });
+}
 ```
 
+**주의**: T1.2의 `src/lib/tenant-router/roles.ts`는 TS union으로 정의됨 — prisma enum과 정합 필요. 생성된 Prisma `$Enums.TenantRole`을 `roles.ts`에서 export 또는 동기화.
+
+migration: `prisma/migrations/20260427T_add_tenant_membership/migration.sql` (additive). 운영자 본인 회원 row 1건 INSERT (default tenant 가입).
+
+**2. keys-tenant.ts 단일 query 통합 (30분)**
+
+T1.5가 ApiKey ↔ Tenant relation 추가 완료. T1.3의 2-query 우회를 단일 query로 합치기:
+
+```typescript
+// src/lib/auth/keys-tenant.ts §5 단계 통합
+const dbKey = await prisma.apiKey.findUnique({
+  where: { prefix: dbPrefix },
+  include: { tenant: true },
+});
+if (!dbKey) return { ok: false, reason: "NOT_FOUND" };
+// ... bcrypt + revoked + cross-validation 1: dbKey.tenant?.slug === prefixSlug
+// ... cross-validation 2: dbKey.tenant?.slug === pathTenant.slug
+```
+
+기존 두 번째 query (`prisma.tenant.findUnique`)와 관련 분기 + `// NOTE(T1.5)` 주석 제거. 13개 vitest 모두 그대로 PASS 예상.
+
+**3. with-request-context.ts.resolveTenantId() wiring (1h)**
+
+stub → T1.2 path 추출 + Tenant 조회로 교체:
+
+```typescript
+// src/lib/with-request-context.ts
+import { resolveTenantFromSlug } from "@/lib/tenant-router/manifest";
+
+async function resolveTenantId(req: Request): Promise<string | undefined> {
+  const url = new URL(req.url);
+  const m = url.pathname.match(/^\/api\/v1\/t\/([^/]+)/);
+  if (!m) return undefined;
+  const tenant = await resolveTenantFromSlug(m[1].toLowerCase());
+  return tenant?.id;
+}
+```
+
+→ observability traceId + tenantId 양쪽 모두 자동 주입. ADR-029 §2.3.2 완성.
+
+### P1 — Phase 1 마무리 (~28h)
+
+**4. T1.4 RLS 정책 단일 'default' tenant (18h)** — ADR-023 옵션 B + e2e 5건
+
+위 P0 3건 완료 후 진입 가능. 18 비즈니스 모델에 RLS 정책 SQL + Prisma client extension(`withRls()` 미들웨어 — `getCurrentTenant().tenantId`로 SET LOCAL) + e2e 5건 (cross-tenant SELECT 차단, INSERT auto-fill, UPDATE tenantId 변경 차단, DELETE 다른 tenant 0 영향, JOIN 격리). 잘못 적용 시 데이터 유출 위험 → 사용자 확인 필수.
+
+**5. T1.6 Almanac backfill (10h)** — T1.4 후
+
+content_* 테이블 tenant_id='almanac' migration + alias `/api/v1/almanac/*` → `/api/v1/t/almanac/*` (6개월 grace).
+
+### P2 — M2 게이트 → Phase 2 진입
+
+**M2 게이트 검증** (Phase 1 완료 신호):
+```bash
+curl -sf http://localhost:3000/api/v1/t/almanac/health  # → 200
+sqlite3 data/audit.db "SELECT COUNT(*) FROM audit_logs WHERE tenant_id IS NULL"  # → 0
+pm2 logs ypserver | grep "worker.dispatch"  # → tenantId 라벨 포함
+pnpm test tests/e2e/rls/  # → 5/5 PASS
+```
+
+**Phase 2 진입** — T2.1 TenantManifestSchema (14h, ADR-026)
+
 ---
 
-## 우선 작업 P3 (S56 이월): 2026-04-26 03:00 KST cleanup cron 결과 확인
+## 이월 사항
 
+### 4 worktree 정리 (선택)
+세션 60 cs 시점에 4 agent worktree(`worktree-agent-{a7efb1f9486158c38, aaa5a0e0691548048, aaf0f7f3c88814b34, aedadd4b9cd736e4e}`)가 lock 상태로 잔존. 시스템 자동 정리 또는 수동:
+```bash
+git worktree list  # 확인
+git worktree remove --force .claude/worktrees/agent-<id>  # 4건
+git branch -D worktree-agent-<id>  # 4건
+```
+
+### S57 이월: Almanac spec 적용
+spec/aggregator-fixes 브랜치 v1.1 정합화 완료(81→0 에러). 사용자 결정 시 spec 적용:
+1. `npm install rss-parser cheerio @google/genai`
+2. `npx shadcn@latest add tabs table badge input select textarea checkbox switch label`
+3. CronKind enum에 AGGREGATOR 추가 (수동) + schema-additions.prisma append
+4. src/lib/aggregator/ + src/app/api/v1/almanac/ + src/app/admin/aggregator/ + api-guard-publishable.ts cp
+5. cron/runner.ts + data-api/allowlist.ts + types/supabase-clone.ts 머지
+6. `npx prisma generate` + `npx tsc --noEmit` (0 에러 기대)
+7. (사용자 승인 후) prisma migrate dev / pm2 reload
+
+**ADR-022~029 결정 적용 후 처리**: Almanac은 spec v1.0 그대로 출시, 출시 후 `packages/tenant-almanac/`로 마이그레이션.
+
+### S56 이월: 03:00 KST cleanup cron 결과 확인
 ```bash
 wsl -- bash -lic 'pm2 logs ypserver --lines 80 --nostream | grep -A2 "audit log write failed"'
 # → 5일 연속 발생하던 audit log write failed 가 사라져야 함
-# 동시에:
 curl -H 'Authorization: Bearer <ADMIN>' http://localhost:3000/api/admin/audit/health
 # → §보완 1 카운터 (ok: true / failed: 0)
 ```
 
----
-
-## 우선 작업 P4 (S56 이월): ADR-021 placeholder 충돌 6 위치 cascade 정정
+### S56 이월: ADR-021 placeholder 충돌 6 위치 cascade 정정
 
 세션 56 §보완 2 §D 표 참조:
 - 02-architecture/01-adr-log.md §1029 (Realtime 백프레셔)
@@ -111,34 +183,43 @@ curl -H 'Authorization: Bearer <ADMIN>' http://localhost:3000/api/admin/audit/he
 - 07-appendix/02-final-summary.md §4 (동일)
 - 07-appendix/02-dq-final-resolution.md §591-592 (Next.js 17 + 마이그레이션 롤백 5초)
 
+### S55·54·53 잔존 6항
+- 다른 글로벌 스킬 drift 점검 (`kdyship`/`kdydeploy`/`kdycicd`)
+- `_test_session` drop / DATABASE_URL rotation / MFA biometric / SP-013·016 / Windows 재부팅 실증
+
 ---
 
-## 필수 참조 파일 ⭐ 세션 58 종료 시점 — kdywave 압축형 4 sub-wave 완료
+## 필수 참조 파일 ⭐ 세션 60 종료 시점
 
 ```
-CLAUDE.md (4개 섹션 갱신: 프로젝트 정보, 문서 체계, 핵심 원칙 7원칙, 운영 규칙) ⭐⭐⭐
-docs/status/current.md (정체성/스택 갱신, 세션 58 행 추가)
-docs/handover/260426-session58-baas-foundation.md ⭐⭐⭐ 직전 세션 인수인계
-docs/research/baas-foundation/README.md ⭐⭐⭐ 진입점 (31 파일 16,826줄)
+CLAUDE.md (4개 섹션 갱신: 프로젝트 정보, 문서 체계, 7원칙, 운영 규칙) ⭐⭐⭐
+docs/status/current.md (세션 60 행 추가)
+docs/handover/260426-session60-g1b-parallel-merge.md ⭐⭐⭐ 직전 세션 인수인계
+docs/handover/260426-session59-phase0-foundation.md (Phase 0 결정)
+docs/handover/260426-session58-baas-foundation.md (정체성 재정의)
 
-# Phase 0 진입 시 직접 사용
-docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/00-roadmap-overview.md ⭐⭐⭐ Phase 0~4 sprint plan
-docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/01-task-dag.md ⭐⭐ 크리티컬 패스 178h + kdyswarm 9 그룹
-docs/research/baas-foundation/04-architecture-wave/03-migration/00-migration-strategy.md ⭐⭐ 5 Stage 마이그레이션
-docs/research/baas-foundation/04-architecture-wave/01-architecture/00-system-overview-5-plane.md ⭐⭐⭐ 5-Plane + 4 불변 인터페이스
-docs/research/baas-foundation/04-architecture-wave/01-architecture/02-adr-023-impl-spec.md (RLS 구현, 1005줄)
-docs/research/baas-foundation/04-architecture-wave/01-architecture/03-adr-024-impl-spec.md (모노레포 변환 5단계, 618줄)
-docs/research/baas-foundation/04-architecture-wave/01-architecture/07-adr-028-impl-spec.md (cron worker pool + spike 부수 fix 3건, 1053줄)
+# Phase 1 마무리 진입 시 참조
+docs/research/baas-foundation/04-architecture-wave/01-architecture/
+  02-adr-023-impl-spec.md (RLS 구현, 1005줄) ⭐ T1.4 진입 시
+  03-adr-024-impl-spec.md (모노레포 변환 5단계, 618줄)
+  06-adr-027-impl-spec.md (router + K3, 745줄) ✅ T1.2/T1.3 적용 완료
+  07-adr-028-impl-spec.md (cron worker pool, 1053줄) ✅ T1.5 적용 완료
+  08-adr-029-impl-spec.md (observability M1+L1+T3, 733줄) ✅ T1.7 적용 완료
+docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/00-roadmap-overview.md
+docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/01-task-dag.md
+docs/research/baas-foundation/04-architecture-wave/03-migration/00-migration-strategy.md
 
-# 결정 근거 (필요 시)
-docs/research/baas-foundation/01-adrs/ (8 ADR ACCEPTED 2026-04-26)
-docs/research/baas-foundation/03-spikes/spike-baas-001 (Prisma — 옵션 B 권고 변경 근거)
-docs/research/baas-foundation/03-spikes/spike-baas-002 (worker pool — 옵션 D 권고 강화 + 부수 fix 3건)
-docs/solutions/2026-04-26-compressed-kdywave-on-existing-wave.md (CK 42 — 본 세션 패턴)
-
-docs/handover/260425-session57-aggregator-spec-rewrite.md (Almanac spec 정합화)
-docs/handover/260425-session56-* (audit cleanup cron 진단)
-docs/handover/260425-session55-ypserver-skill-v2-deploy.md (ypserver 스킬 v2)
+# 본 세션 산출물
+prisma/schema.prisma (T1.5 적용 — TenantCronPolicy + relations + circuit breaker cols)
+prisma/migrations/20260427100000_phase1_5_tenant_cron_isolation/migration.sql
+src/lib/cron/{policy,lock,circuit-breaker,worker-pool,worker-script}.ts (T1.5)
+packages/core/src/cron/{lock-key,circuit-breaker-state,index}.ts (T1.5 pure)
+src/lib/auth/{keys-tenant,keys-tenant-issue}.ts (T1.3)
+src/lib/api-guard-tenant.ts + src/app/api/v1/t/[tenant]/[...path]/route.ts (T1.2)
+src/lib/tenant-router/{types,manifest,dispatch,membership,roles}.ts (T1.2)
+src/lib/audit/safe.ts (T1.2 어댑터)
+src/lib/{request-context,with-request-context,cardinality-guard}.ts (T1.7)
+src/lib/db/migrations/{0002_tenant_metrics,0003_audit_trace}.sql (T1.7)
 ```
 
 ---
@@ -159,36 +240,39 @@ docs/handover/260425-session55-ypserver-skill-v2-deploy.md (ypserver 스킬 v2)
 
 ## 직전 세션들 요약
 
-- **세션 59** (2026-04-26): Phase 0 Foundation 7 task 완료 + M1 게이트 통과 + Phase 1.1 TenantContext (현재)
+- **세션 60** (2026-04-26): G1b 4 agent 병렬 발사 + DAG 통합 — T1.2/T1.3/T1.5/T1.7 일괄 완료, 285→355 tests (+24%) (현재)
+- **세션 59** (2026-04-26): Phase 0 Foundation 7 task 완료 + M1 게이트 통과 + Phase 1.1 TenantContext
 - **세션 58** (2026-04-26): BaaS Foundation 설계 — ADR-022~029 ACCEPTED + spike 2건 + CLAUDE.md 정체성 재정의
 - **세션 57** (2026-04-26): Almanac aggregator spec v1.0 → v1.1 정합화 (81→0 에러)
 - **세션 56** (2026-04-25): cleanup cron audit silent failure 진단 + ADR-021
 - **세션 55** (2026-04-25): ypserver 글로벌 스킬 v1→v2 전면 리팩터
-- **세션 54** (2026-04-25): cleanup-scheduler.ts catch 진단 패치 + CK-38
-- **세션 53** (2026-04-25): ADR placeholder cascade 5건 정정 + KEK 해결
 - **세션 50** (2026-04-19): Next.js standalone 재도입 + ADR-020
 
 ---
 
-## 세션 59 시작 시 추천 첫 액션
+## 세션 61 시작 시 추천 첫 액션
 
-1. **CLAUDE.md, current.md, 본 next-dev-prompt 읽기** (변경된 정체성 파악)
-2. **docs/handover/260426-session58-baas-foundation.md 읽기** (직전 세션 결정 흡수)
-3. **docs/research/baas-foundation/README.md + 8 ADR + 2 spike 빠른 훑기** (~30분)
-4. **/kdywave Skill 호출** 또는 Phase 1 직접 진입
-5. spike-baas-002 부수 fix 3건은 별도 PR 또는 Phase 1 첫 작업
+1. **CLAUDE.md, current.md, 본 next-dev-prompt 읽기** (변경 영역 파악)
+2. **docs/handover/260426-session60-g1b-parallel-merge.md 읽기** (직전 세션 결정 흡수)
+3. **`git worktree list`로 잔존 worktree 확인 후 정리** (4건, 선택)
+4. **P0 통합 부채 3건 처리** (TenantMembership → keys-tenant 단일 query → resolveTenantId wiring) → 약 5h
+5. **T1.4 RLS 정책 진입 검토** — ADR-023 impl-spec §2 + e2e 5건 (18h, 사용자 확인 필요)
 
 ---
 
-## 다른 작업 컨텍스트 (세션 57 종료 시점 인수)
+## 본 세션 산출물 (세션 60)
 
-P0 spec 적용 (사용자 결정 시):
-1. npm install rss-parser cheerio @google/genai
-2. npx shadcn@latest add tabs table badge input select textarea checkbox switch label
-3. CronKind enum에 AGGREGATOR 추가 (수동) + schema-additions.prisma append
-4. src/lib/aggregator/ + src/app/api/v1/almanac/ + src/app/admin/aggregator/ + api-guard-publishable.ts cp
-5. cron/runner.ts + data-api/allowlist.ts + types/supabase-clone.ts 머지
-6. npx prisma generate + npx tsc --noEmit (0 에러 기대)
-7. (사용자 승인 후) prisma migrate dev / pm2 reload
+**9 commits**:
+```
+6c9f631 chore(integrate): G1b 통합 — stub 제거 + import 교체 + standalone tsc exclude
+46d43f9 merge(T1.2): withTenant 가드 + catch-all router 통합
+416c10f merge(T1.3): ApiKey K3 매칭 통합
+0487e45 merge(T1.7): audit-metrics byTenant + request-context + cardinality 통합
+7cdd5c3 merge(T1.5): TenantWorkerPool + circuit breaker + TenantCronPolicy 통합
+2bc35da feat(cron): T1.5 (Agent A3, 1351줄)
+3714073 feat(observability): T1.7 (Agent A4)
+cb7e298 feat(router): T1.2 (Agent A1, 895줄)
+6645f28 feat(auth): T1.3 (Agent A2, 614줄)
+```
 
-**ADR-022~029 결정 적용 후 처리**: Almanac은 spec v1.0 그대로 출시, 출시 후 packages/tenant-almanac/로 마이그레이션.
+**검증 게이트**: tsc 0 / packages/core tsc 0 / vitest **355/355** / npm run build PASS / prisma validate PASS / ADR-021 invariant 11 콜사이트 변경 0 검증.
