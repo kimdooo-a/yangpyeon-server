@@ -27,8 +27,7 @@ import { findTenantMembership } from "@/lib/tenant-router/membership";
 import type { TenantRole } from "@/lib/tenant-router/roles";
 import type { ResolvedTenant } from "@/lib/tenant-router/types";
 import { auditLogSafe } from "@/lib/audit/safe";
-// TODO(T1.3 통합): "@/lib/auth/keys-tenant" 로 교체.
-import { verifyApiKeyForTenant } from "@/lib/auth/keys-tenant.stub";
+import { verifyApiKeyForTenant } from "@/lib/auth/keys-tenant";
 // TenantContext 주입 — packages/core 의 AsyncLocalStorage (T1.1).
 // pnpm workspace 가 npm 빌드와 공존하는 동안은 상대 경로 사용.
 import { runWithTenant } from "../../packages/core/src/tenant/context";
