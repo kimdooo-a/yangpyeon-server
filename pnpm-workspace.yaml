@@ -1,0 +1,20 @@
+# pnpm workspace 설정 — Phase 0.2 (T0.2) 신설.
+# ADR-024 옵션 D (hybrid plugin) 채택에 따라 monorepo 구조 도입.
+#
+# 현재 (Phase 0):
+#   - 루트 = yangpyeong-dashboard (기존 Next.js 16 앱, 변경 없음)
+#   - packages/core = 플랫폼 코어 골격 (실제 코드 추출은 Phase 1.x)
+#
+# 향후 (Phase 1+):
+#   - apps/web = 루트의 Next.js 앱을 이전 (별도 PR)
+#   - packages/tenant-almanac = Almanac 패키지 (Phase 2.5)
+#   - packages/tenant-<id> = 추가 컨슈머 (Phase 2~4)
+#
+# 호환성 메모:
+#   - 현재 npm(package-lock.json) 빌드는 그대로 유지 — 즉시 회귀 0
+#   - pnpm install 은 별도 lockfile(pnpm-lock.yaml) 생성 — 점진 전환 가능
+#   - scripts/pack-standalone.sh 는 현 루트 구조 가정 — 이전은 src 이동 PR 에서
+
+packages:
+  - "apps/*"
+  - "packages/*"
