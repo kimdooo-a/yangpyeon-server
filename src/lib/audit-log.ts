@@ -10,6 +10,11 @@ export interface AuditEntry {
   action?: string;
   userAgent?: string;
   detail?: string;
+  // Phase 1.7 (T1.7) ADR-029 §2.2.3 — per-tenant Observability 차원.
+  // 선택적 — safeAudit 가 request-context AsyncLocalStorage 에서 자동 주입 (호출자 명시 시 우선).
+  // 11 콜사이트는 시그니처 무수정 (ADR-021 §amendment-2).
+  tenantId?: string;
+  traceId?: string;
 }
 
 // 인메모리 버퍼 (미들웨어에서 기록, API Route에서 flush)

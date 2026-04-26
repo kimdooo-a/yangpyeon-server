@@ -9,7 +9,19 @@ const fs = require("node:fs");
 const path = require("node:path");
 const Database = require("better-sqlite3");
 
-const REQUIRED_TABLES = ["audit_logs", "ip_whitelist", "metrics_history"];
+// Phase 1.7 (T1.7) ADR-029 — tenant_metrics_history 추가 + audit_logs.trace_id 컬럼 검증.
+const REQUIRED_TABLES = [
+  "audit_logs",
+  "ip_whitelist",
+  "metrics_history",
+  "tenant_metrics_history",
+];
+
+// Phase 1.7 추가: 컬럼 존재 검증 (테이블별 필수 컬럼 화이트리스트).
+const REQUIRED_COLUMNS = {
+  audit_logs: ["tenant_id", "trace_id"],
+  metrics_history: ["tenant_id"],
+};
 
 function resolveDbPath() {
   return process.env.SQLITE_DB_PATH || path.join(process.cwd(), "data", "dashboard.db");
@@ -32,7 +44,24 @@ function main() {
       console.error(`[verify-schema] present tables: ${[...present].sort().join(", ") || "(none)"}`);
       process.exit(1);
     }
-    console.log(`[verify-schema] OK — required tables present: ${REQUIRED_TABLES.join(", ")}`);
+
+    // Phase 1.7 — 컬럼 검증.
+    const missingCols = [];
+    for (const [tbl, cols] of Object.entries(REQUIRED_COLUMNS)) {
+      const colRows = sqlite.prepare(`PRAGMA table_info(${tbl})`).all();
+      const colNames = new Set(colRows.map((r) => r.name));
+      for (const col of cols) {
+        if (!colNames.has(col)) missingCols.push(`${tbl}.${col}`);
+      }
+    }
+    if (missingCols.length > 0) {
+      console.error(`[verify-schema] FAIL: missing columns: ${missingCols.join(", ")}`);
+      process.exit(1);
+    }
+
+    console.log(
+      `[verify-schema] OK — required tables: ${REQUIRED_TABLES.join(", ")}; required columns verified.`,
+    );
   } finally {
     sqlite.close();
   }
