@@ -9,7 +9,7 @@ import type { CronKindPayload } from "@/lib/types/supabase-clone";
  *
  * - SQL: 읽기 전용 풀에서 실행 (app_readonly 롤 + statement_timeout)
  * - FUNCTION: EdgeFunction 코드 로드 → node:vm 격리 실행
- * - WEBHOOK: Webhook 레코드 로드 → POST 호출
+ * - WEBHOOK: Webhook 레코드 로드 → POST 호출 (AbortController + timeout)
  */
 
 export interface CronRunResult {
@@ -18,7 +18,27 @@ export interface CronRunResult {
   message?: string;
 }
 
-const DEFAULT_ALLOWED_FETCH = ["api.github.com", "stylelucky4u.com"];
+// TODO(Phase 1.6, ADR-024 옵션 D + ADR-026): tenant manifest의 allowedFetchHosts로 이전.
+// 멀티테넌트 전환 시 컨슈머별 manifest.ts 의 allowedFetchHosts[]가 우선, 본 fallback 은 글로벌 cron 전용.
+function loadAllowedFetchHosts(): string[] {
+  const env = process.env.CRON_ALLOWED_FETCH_HOSTS;
+  if (env && env.trim()) {
+    return env
+      .split(",")
+      .map((host) => host.trim())
+      .filter(Boolean);
+  }
+  return ["api.github.com", "stylelucky4u.com"];
+}
+
+const DEFAULT_ALLOWED_FETCH = loadAllowedFetchHosts();
+
+// WEBHOOK fetch 호출 timeout — spike-baas-002 §3.X 부수 발견.
+// 60초+ hang 위험 방지. 환경변수 override 가능.
+const WEBHOOK_FETCH_TIMEOUT_MS =
+  Number(process.env.CRON_WEBHOOK_FETCH_TIMEOUT_MS) > 0
+    ? Number(process.env.CRON_WEBHOOK_FETCH_TIMEOUT_MS)
+    : 30_000;
 
 export async function dispatchCron(job: {
   id: string;
@@ -69,16 +89,32 @@ export async function dispatchCron(job: {
           if (typeof v === "string") headers[k] = v;
         }
       }
-      const res = await fetch(hook.url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ cron: job.name, event: hook.event, at: new Date().toISOString() }),
-      });
-      return {
-        status: res.ok ? "SUCCESS" : "FAILURE",
-        durationMs: Date.now() - started,
-        message: `HTTP ${res.status}`,
-      };
+      const controller = new AbortController();
+      const timeoutHandle = setTimeout(() => controller.abort(), WEBHOOK_FETCH_TIMEOUT_MS);
+      try {
+        const res = await fetch(hook.url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ cron: job.name, event: hook.event, at: new Date().toISOString() }),
+          signal: controller.signal,
+        });
+        return {
+          status: res.ok ? "SUCCESS" : "FAILURE",
+          durationMs: Date.now() - started,
+          message: `HTTP ${res.status}`,
+        };
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return {
+            status: "TIMEOUT",
+            durationMs: Date.now() - started,
+            message: `webhook fetch timeout (${WEBHOOK_FETCH_TIMEOUT_MS}ms)`,
+          };
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutHandle);
+      }
     }
 
     return failure(started, `지원하지 않는 kind: ${job.kind}`);
