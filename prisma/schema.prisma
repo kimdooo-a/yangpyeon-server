@@ -851,3 +851,255 @@ model StickyNote {
   @@index([tenantId, visibility, updatedAt(sort: Desc)])
   @@map("sticky_notes")
 }
+
+// ─────────────────────────────────────────────────────────────
+// 세션 64 (2026-04-26) — Messenger Phase 1 (M1 W1)
+// ADR-030 (Messenger Domain & Phasing) ACCEPTED 2026-04-26.
+// 패턴: ADR-022 §1 (tenant_id 첫 컬럼) + ADR-029 (RLS) + ADR-024 (코어 임베디드 P1, plugin P2).
+// 산출물: docs/research/messenger/data-model.md §2.1-2.9 정확 복사.
+// ─────────────────────────────────────────────────────────────
+
+/// 대화 종류
+/// - DIRECT: 1:1 (정확히 2 멤버, 페어 멱등 — application layer)
+/// - GROUP: 다중 멤버 (≤100 P1, Q5 결정 시 ≤500 P2)
+/// - CHANNEL: 1:N broadcast (write owner-only, P2+)
+enum ConversationKind {
+  DIRECT
+  GROUP
+  CHANNEL
+}
+
+/// 멤버 역할 — 권한 매트릭스는 personas-scenarios.md §권한 참조.
+enum ConversationMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+/// 메시지 종류 — body 해석 분기 + UI rendering 분기.
+enum MessageKind {
+  TEXT
+  IMAGE
+  FILE
+  VOICE
+  STICKER
+  SYSTEM
+}
+
+/// 첨부 종류 — message_attachments.kind. files.id 와 별개로 메신저 측 분기 힌트.
+enum AttachmentKind {
+  IMAGE
+  FILE
+  VOICE
+}
+
+/// 신고 처리 상태 — 운영 콘솔 큐 필터에 사용.
+enum AbuseReportStatus {
+  OPEN
+  RESOLVED
+  DISMISSED
+}
+
+/// 신고 대상 종류 — message 또는 user.
+enum AbuseReportTargetKind {
+  MESSAGE
+  USER
+}
+
+/// 대화 — 1:1 / 그룹 / 채널 통합 모델.
+/// tenant_id 첫 컬럼 (ADR-022 §1). RLS 정책은 마이그 #6 일괄.
+model Conversation {
+  id            String           @id @default(uuid()) @db.Uuid
+  tenantId      String           @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  kind          ConversationKind
+  /// GROUP/CHANNEL 만 사용. DIRECT 는 NULL.
+  title         String?
+  createdById   String           @map("created_by_id")
+  /// 대화목록 정렬 키. 새 메시지 INSERT 시 application layer 가 갱신.
+  lastMessageAt DateTime?        @map("last_message_at") @db.Timestamptz(3)
+  /// soft delete (NULL = 활성).
+  archivedAt    DateTime?        @map("archived_at") @db.Timestamptz(3)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  createdBy User                 @relation("ConversationCreatedBy", fields: [createdById], references: [id])
+  members   ConversationMember[]
+  messages  Message[]
+  receipts  MessageReceipt[]
+
+  @@index([tenantId, lastMessageAt(sort: Desc)])
+  @@index([tenantId, kind])
+  @@index([tenantId, archivedAt])
+  @@map("conversations")
+}
+
+/// 대화 멤버 — TenantMembership 검증은 application layer.
+/// leftAt IS NOT NULL → 채팅방 나간 상태 (메시지 수신 X, 읽기 가능).
+model ConversationMember {
+  id                String                 @id @default(uuid()) @db.Uuid
+  tenantId          String                 @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  conversationId    String                 @map("conversation_id") @db.Uuid
+  userId            String                 @map("user_id")
+  role              ConversationMemberRole @default(MEMBER)
+  joinedAt          DateTime               @default(now()) @map("joined_at") @db.Timestamptz(3)
+  /// 채팅창 진입 시 application layer 가 갱신. MessageReceipt 와 중복 보이나 update 빈번성 격리 목적.
+  lastReadMessageId String?                @map("last_read_message_id") @db.Uuid
+  pinnedAt          DateTime?              @map("pinned_at") @db.Timestamptz(3)
+  /// mutedUntil < now() → 자동 unmute (lazy).
+  mutedUntil        DateTime?              @map("muted_until") @db.Timestamptz(3)
+  leftAt            DateTime?              @map("left_at") @db.Timestamptz(3)
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User         @relation("ConversationMembership", fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage Message?     @relation("LastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, userId])
+  @@index([tenantId, userId, leftAt])
+  @@index([tenantId, conversationId, leftAt])
+  @@map("conversation_members")
+}
+
+/// 메시지 — 편집/회수는 deletedAt + body=NULL 패턴. clientGeneratedId 멱등.
+/// partial index (deleted_at IS NULL) + GIN trgm 은 마이그 #5 raw SQL.
+model Message {
+  id                String      @id @default(uuid()) @db.Uuid
+  tenantId          String      @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  conversationId    String      @map("conversation_id") @db.Uuid
+  /// SYSTEM 메시지 (입장/퇴장/제목변경 등) 는 NULL.
+  senderId          String?     @map("sender_id")
+  kind              MessageKind @default(TEXT)
+  /// 회수 시 NULL. 편집 시 body 갱신 + editedAt SET + editCount++.
+  body              String?     @db.Text
+  replyToId         String?     @map("reply_to_id") @db.Uuid
+  /// 라인식 LocalMessageId — 오프라인 멱등 보장. UNIQUE (tenantId, conversationId, clientGeneratedId).
+  clientGeneratedId String      @map("client_generated_id")
+  editedAt          DateTime?   @map("edited_at") @db.Timestamptz(3)
+  editCount         Int         @default(0) @map("edit_count")
+  deletedAt         DateTime?   @map("deleted_at") @db.Timestamptz(3)
+  /// 'self' | 'admin' (운영자 강제 회수). audit_logs 와 별개로 회수 주체 추적.
+  deletedBy         String?     @map("deleted_by")
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  conversation Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?                @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
+  replyTo      Message?             @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      Message[]            @relation("MessageReply")
+  attachments  MessageAttachment[]
+  mentions     MessageMention[]
+  receiptsTo   ConversationMember[] @relation("LastReadMessage")
+
+  @@unique([tenantId, conversationId, clientGeneratedId])
+  @@index([tenantId, conversationId, createdAt(sort: Desc)])
+  @@index([tenantId, senderId, createdAt(sort: Desc)])
+  @@map("messages")
+}
+
+/// 첨부 — files (filebox) 단방향 FK. 30일 cron 이 dereference cleanup.
+model MessageAttachment {
+  id           String         @id @default(uuid()) @db.Uuid
+  tenantId     String         @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  messageId    String         @map("message_id") @db.Uuid
+  /// File.id 단방향 FK. ON DELETE RESTRICT — files 직접 삭제 차단, cleanup cron 우회.
+  fileId       String         @map("file_id")
+  kind         AttachmentKind
+  /// 5장 이미지 묶음 표시 순서.
+  displayOrder Int            @default(0) @map("display_order")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, messageId, displayOrder])
+  @@index([tenantId, fileId])
+  @@map("message_attachments")
+}
+
+/// 멘션 — 차단된 사용자 멘션은 application layer 가 알림 push 차단.
+model MessageMention {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  messageId       String   @map("message_id") @db.Uuid
+  mentionedUserId String   @map("mentioned_user_id")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  message       Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  mentionedUser User    @relation("UserMentioned", fields: [mentionedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, mentionedUserId])
+  @@index([tenantId, mentionedUserId, createdAt(sort: Desc)])
+  @@map("message_mentions")
+}
+
+/// 읽음 영수증 — ConversationMember.lastReadMessageId 와 중복이지만 update 빈번성 격리.
+/// PK = (conversationId, userId). 향후 read history 추적 확장 여지.
+model MessageReceipt {
+  tenantId          String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  conversationId    String   @map("conversation_id") @db.Uuid
+  userId            String   @map("user_id")
+  lastReadMessageId String   @map("last_read_message_id") @db.Uuid
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([tenantId, userId, updatedAt])
+  @@map("message_receipts")
+}
+
+/// 사용자 차단 — 양방향 적용 (A↔B 송수신/멘션 모두 차단).
+model UserBlock {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  blocker User @relation("UserBlocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("UserBlocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([tenantId, blockedId])
+  @@map("user_blocks")
+}
+
+/// 신고 — UNIQUE (reporter, targetKind, targetId) 로 중복 신고 차단.
+/// targetId 는 messageId 또는 userId (FK 비참조 — targetKind 분기).
+model AbuseReport {
+  id             String                @id @default(uuid()) @db.Uuid
+  tenantId       String                @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  reporterId     String                @map("reporter_id")
+  targetKind     AbuseReportTargetKind
+  targetId       String                @map("target_id")
+  reason         String                @db.Text
+  status         AbuseReportStatus     @default(OPEN)
+  resolvedById   String?               @map("resolved_by_id")
+  resolvedAt     DateTime?             @map("resolved_at") @db.Timestamptz(3)
+  resolutionNote String?               @map("resolution_note") @db.Text
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  reporter   User  @relation("AbuseReportReporter", fields: [reporterId], references: [id])
+  resolvedBy User? @relation("AbuseReportResolver", fields: [resolvedById], references: [id])
+
+  @@unique([reporterId, targetKind, targetId])
+  @@index([tenantId, status, createdAt(sort: Desc)])
+  @@map("abuse_reports")
+}
+
+/// 알림 환경설정 — User 1:1 (tenant 단위 PK).
+/// userId 글로벌 @unique 유지 (User 가 이미 tenant-scoped 이므로 cross-tenant 충돌 0, 1:1 관계 요건).
+/// 복합 PK (tenantId, userId) 는 query locality + RLS planner 효율 목적.
+model NotificationPreference {
+  tenantId     String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  userId       String   @unique @map("user_id")
+  mentionsOnly Boolean  @default(false) @map("mentions_only")
+  /// "HH:MM" 형식 (예: "22:00"). DND 시작.
+  dndStart     String?  @map("dnd_start")
+  /// "HH:MM" 형식. DND 종료. start > end 인 경우 자정 넘는 구간 (UI 분기).
+  dndEnd       String?  @map("dnd_end")
+  pushEnabled  Boolean  @default(true) @map("push_enabled")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation("UserNotifPref", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, userId])
+  @@map("notification_preferences")
+}

@@ -23,3 +23,4 @@
 | 2026-04-19 | SP-017 Vault AES-256-GCM envelope | SPIKE | Tech | Go | spikes/sp-017-vault-crypto/ | Phase 16a (16a Vault) |
 | 2026-04-19 | SP-018 symlink atomic swap + PM2 reload | SPIKE | Tech | Go (16b) / 16c cluster 정당화 | spikes/sp-018-symlink-swap/ | Phase 16b, 16c |
 | 2026-04-19 | SP-019 PM2 cluster:4 + better-sqlite3 + v6 delete | SPIKE | Tech | Conditional Go (scheduler fork 분리 필수) | spikes/sp-019-pm2-cluster/ | Phase 16c |
+| 2026-04-26 | SP-006 PG LISTEN/NOTIFY + SSE 정합성 (메신저 Phase 2 백본) | MICRO | Tech | Conditional Go (Phase 1 in-memory 유지, Phase 2 진입 시 POC 5건 측정 후 ADR-031) | docs/research/spikes/spike-006-pg-notify-sse.md | ADR-030 (입력 자료) / ADR-031 (Phase 2 작성 예정) |
