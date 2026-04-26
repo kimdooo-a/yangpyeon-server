@@ -17,6 +17,8 @@
  */
 
 import { createRequire } from "node:module";
+// T1.4 sweep: @typescript-eslint/parser 추가 — TS 구문 파싱 지원.
+import tsParser from "@typescript-eslint/parser";
 const require = createRequire(import.meta.url);
 const tenantRule = require("./eslint-rules/no-raw-prisma-without-tenant.cjs");
 
@@ -24,6 +26,13 @@ export default [
   {
     name: "tenant-rls/baseline",
     files: ["src/**/*.ts", "src/**/*.tsx"],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+      },
+    },
     plugins: {
       tenant: {
         rules: {
@@ -32,14 +41,21 @@ export default [
       },
     },
     rules: {
-      // TODO(Phase 1.4 sweep): 'warn' → 'error' 로 승격 후 신규 위반 PR 차단.
-      "tenant/no-raw-prisma-without-tenant": "warn",
+      // T1.4 sweep 완료: 호출 사이트 일괄 전환 후 'warn' → 'error' 승격. 신규 위반 PR 차단.
+      "tenant/no-raw-prisma-without-tenant": "error",
     },
   },
   // packages/core 는 plugin 분리 정합 검사용 — Tenant 도메인 강제는 동일.
   {
     name: "tenant-rls/packages",
     files: ["packages/**/*.ts"],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+      },
+    },
     plugins: {
       tenant: {
         rules: {
@@ -48,7 +64,8 @@ export default [
       },
     },
     rules: {
-      "tenant/no-raw-prisma-without-tenant": "warn",
+      // T1.4 sweep 완료: 'warn' → 'error' 승격.
+      "tenant/no-raw-prisma-without-tenant": "error",
     },
   },
   // generated / artifact 디렉토리는 ignore.
