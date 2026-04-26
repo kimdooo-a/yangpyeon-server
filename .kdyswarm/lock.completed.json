@@ -1,0 +1,19 @@
+{
+  "session_id": "2026-04-26T-session61-t1.4-p0-membership",
+  "started_at": "2026-04-26T11:00:00+09:00",
+  "tasks": ["T1.4", "P0-membership"],
+  "strategy": "sequential",
+  "targets": [
+    "prisma/schema.prisma",
+    "prisma/migrations/",
+    "src/lib/db/",
+    "src/lib/tenant-router/membership.ts",
+    "packages/core/src/tenant/",
+    "eslint.config.mjs",
+    "tests/rls/"
+  ],
+  "agents": 1,
+  "engine": "agent",
+  "dry_run": false,
+  "phase": "Phase 4 — sequential dispatch (T1.4 first)"
+}
