@@ -1,11 +1,11 @@
-# 다음 세션 프롬프트 (세션 59)
+# 다음 세션 프롬프트 (세션 60)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 정체성 변경됨 (2026-04-26 세션 58)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 58 정체성 변경, 세션 59 Phase 0/1.1 완료)
 
 - **프로젝트명**: 양평 부엌 서버 — **1인 운영자의 멀티테넌트 백엔드 플랫폼** (stylelucky4u.com)
 - **정체성**: closed multi-tenant BaaS (본인 소유 10~20개 프로젝트 공유 백엔드, 외부 가입 없음)
@@ -159,7 +159,8 @@ docs/handover/260425-session55-ypserver-skill-v2-deploy.md (ypserver 스킬 v2)
 
 ## 직전 세션들 요약
 
-- **세션 58** (2026-04-26): BaaS Foundation 설계 — ADR-022~029 ACCEPTED + spike 2건 + CLAUDE.md 정체성 재정의 (현재)
+- **세션 59** (2026-04-26): Phase 0 Foundation 7 task 완료 + M1 게이트 통과 + Phase 1.1 TenantContext (현재)
+- **세션 58** (2026-04-26): BaaS Foundation 설계 — ADR-022~029 ACCEPTED + spike 2건 + CLAUDE.md 정체성 재정의
 - **세션 57** (2026-04-26): Almanac aggregator spec v1.0 → v1.1 정합화 (81→0 에러)
 - **세션 56** (2026-04-25): cleanup cron audit silent failure 진단 + ADR-021
 - **세션 55** (2026-04-25): ypserver 글로벌 스킬 v1→v2 전면 리팩터
