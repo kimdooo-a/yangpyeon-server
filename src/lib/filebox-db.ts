@@ -31,7 +31,9 @@ const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
   "text/plain", "text/csv",
+  "text/markdown", "text/x-markdown",  // .md (운영 문서/handover 업로드 — 세션 62 추가)
   "application/json",
+  "application/x-yaml", "text/yaml", "text/x-yaml",  // .yml, .yaml
   "application/zip", "application/x-zip-compressed",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
