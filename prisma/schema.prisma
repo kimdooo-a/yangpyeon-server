@@ -69,10 +69,9 @@ model TenantMembership {
 
 model User {
   id             String                  @id @default(uuid())
-  // Phase 1.4 Stage 3 deviation: 글로벌 email @unique 유지 (호출 사이트 호환 — login/register/users
-  //   라우트가 findUnique({ where: { email } }) 사용). 추가로 (tenantId, email) 합성 unique 등록.
-  //   Phase 1.4 후속 PR에서 호출 사이트를 (tenantId, email) findUnique 로 일괄 전환 후 글로벌 unique 제거 검토.
-  email          String                  @unique
+  // T1.4 sweep (Phase 1.4 후속 PR): 호출 사이트 일괄 전환 완료 → 글로벌 @unique 제거.
+  // (tenantId, email) composite unique 가 유일성 보장. cross-tenant 동일 email 허용.
+  email          String
   passwordHash   String                  @map("password_hash")
   name           String?
   phone          String?
@@ -347,10 +346,9 @@ model SqlQuery {
 /// Edge Functions (lite) — 사용자가 등록한 코드 스니펫
 model EdgeFunction {
   id          String            @id @default(uuid())
-  // Phase 1.4 Stage 3 deviation — 글로벌 @unique 유지 + (tenantId, name) 합성 unique 추가.
-  // 호출 사이트가 prisma.edgeFunction.findUnique({ where: { name } }) 형태를 사용할 가능성 보존.
-  // 후속 PR 에서 호출 사이트 일괄 전환 후 글로벌 unique 제거 검토 (spec §2.3.6).
-  name        String            @unique
+  // T1.4 sweep (Phase 1.4 후속 PR): name 기반 findUnique 호출 사이트 없음 확인 + 글로벌 @unique 제거.
+  // (tenantId, name) composite unique 가 유일성 보장 (spec §2.3.6).
+  name        String
   description String?
   code        String
   runtime     FunctionRuntime   @default(NODE_VM)
@@ -412,9 +410,9 @@ model Webhook {
 /// 추가 컬럼: consecutiveFailures, circuitState, circuitOpenedAt, lastSuccessAt — 07-adr-028-impl-spec §7.1.
 model CronJob {
   id                  String    @id @default(uuid())
-  // Phase 1.4 Stage 3 deviation — 글로벌 @unique 유지 + (tenantId, name) 합성 unique 추가.
-  // 호출 사이트 호환 보존 (spec §2.3.7). 후속 PR 에서 글로벌 unique 제거 검토.
-  name                String    @unique
+  // T1.4 sweep (Phase 1.4 후속 PR): name 기반 findUnique 호출 사이트 없음 확인 + 글로벌 @unique 제거.
+  // (tenantId, name) composite unique 가 유일성 보장 (spec §2.3.7).
+  name                String
   schedule            String
   kind                CronKind
   payload             Json      @default("{}")
