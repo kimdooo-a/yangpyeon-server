@@ -7,10 +7,35 @@
 - 정체성: 본인 소유 10~20개 프로젝트의 공유 백엔드 (closed multi-tenant BaaS, 외부 가입 없음)
 - 스택: Next.js 16 + TypeScript + PostgreSQL (Prisma 7) + SQLite (Drizzle) + Tailwind CSS 4
 - 시작일: 2026-04-06 (단일 사용자 도구) → 2026-04-26 (멀티테넌트 BaaS 전환 결정, ADR-022 ACCEPTED 세션 58)
-- 배포 환경: WSL2 Ubuntu (PM2) + Cloudflare Tunnel + 단일 PostgreSQL
+- 배포 환경: **이 컴퓨터(Windows)의 WSL2 Ubuntu에서 운영 중** — Next.js standalone 모드 빌드를 WSL ext4 (`~/dev/ypserver-build/`) 에서 수행 후 `pack-standalone.sh` + `wsl-build-deploy.sh` 가 `~/ypserver/` 로 rsync, PM2 가 `~/ypserver/server.js` 실행 (세션 52, 2026-04-25 결정 — NFT cross-platform 함정 회피). Windows 측 `standalone/` 디렉토리는 `pack-standalone.sh` 의 5개 부속(ecosystem.config.cjs/install-native-linux.sh/start.sh 등) 보존용 + Git tracked 영역. 옛 빌드 산출물(`.next/`, `node_modules/`)은 `~/ypserver/` 로 이전됨.
 - 도메인: stylelucky4u.com (본인 사용자 운영 콘솔) + /api/v1/t/<tenant>/* (각 컨슈머 백엔드)
 - 포트: 3000 (localhost)
 - 첫 컨슈머: Almanac (almanac-flame.vercel.app) — spec/aggregator-fixes 브랜치 진행 중, v1.0 출시 후 plugin 마이그레이션
+
+## 운영 환경 및 마이그레이션 정책 (Claude 직접 적용)
+
+이 프로젝트의 서버는 **이 컴퓨터의 WSL2 Ubuntu** 에서 운영된다. 별도 원격/CI 인프라 없이 Claude Code 가 곧 운영자다.
+
+**위치 (세션 52, 2026-04-25 NFT 회피 결정 반영):**
+- Windows 측 소스: `E:\00_develop\260406_luckystyle4u_server`
+- WSL 빌드 워크트리 (ext4 네이티브): `~/dev/ypserver-build/` — `wsl-build-deploy.sh` 가 매 배포 시 rsync + `npm ci` + `next build` (standalone 모드)
+- WSL 운영 위치: `~/ypserver/` — `pack-standalone.sh` 산출물 + `~/dev/ypserver-build/.next/standalone/` 을 rsync, **PM2 가 `~/ypserver/server.js` 를 실행**
+- Windows 측 `standalone/` 디렉토리: Git tracked 5 부속 파일(ecosystem.config.cjs/install-native-linux.sh/start.sh/README.md/.env.production.example) 보존 — `pack-standalone.sh` 가 패키징 시 사용. **빌드 산출물 자체는 `~/ypserver/` 로 이전됨, Windows 측 `standalone/.next/`·`node_modules/` 는 4-19 이후 leftover (.gitignore).**
+- DB: WSL 내 PostgreSQL 16 단일 인스턴스 (DATABASE_URL 은 `~/ypserver/.env`)
+
+**마이그레이션 정책 (강제):**
+- **모든 DB 마이그레이션은 Claude Code 가 직접 실행/적용한다.** "운영자가 나중에 적용해 주세요" 같은 위임 금지.
+- 신규 마이그레이션을 작성한 즉시:
+  1. `npx prisma migrate deploy` 또는 동등한 명령을 실제 DB 에 실행한다.
+  2. 적용 결과(성공/실패 + 영향받은 row 수)를 사용자에게 보고한다.
+  3. 실패 시 rollback SQL 까지 실행하고 원인 분석한다.
+- WSL 경유가 필요한 경우 `wsl -d Ubuntu -- bash -lc '...'` 또는 `wsl -- ...` 형태로 직접 호출한다.
+- 마이그레이션 적용 없이 코드(Prisma client 호출)만 머지하면 운영 서버가 즉시 깨진다 — **마이그레이션 작성 = 즉시 적용** 으로 묶어 처리한다.
+- 예외: 사용자가 명시적으로 "지금은 적용하지 마"라고 지시한 경우만 보류.
+
+**연관 메모리:**
+- `memory/project_standalone_reversal.md` — standalone 모드 재도입 (2026-04-19 세션 3)
+- `memory/feedback_migration_apply_directly.md` — Claude 직접 마이그레이션 적용 정책
 
 ## 문서 체계 (풀뿌리 트리)
 
