@@ -47,6 +47,8 @@ export class VaultService {
   }
 
   async decrypt(name: string): Promise<string> {
+    // T1.4 sweep: SecretItem 은 spec §2.4 Tenant-bypass 모델 (환경 전역 시크릿).
+    // name @unique 글로벌 유지 — composite 전환 대상 아님.
     const row = await this.prisma.secretItem.findUnique({ where: { name } });
     if (!row) throw new Error(`Secret not found: ${name}`);
 

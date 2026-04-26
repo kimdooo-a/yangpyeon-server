@@ -1,3 +1,5 @@
+// T1.4 sweep: /api/settings/users 는 운영자 콘솔 전용 라우트 → 'default' sentinel (패턴 c).
+// 글로벌 @unique 의존을 (tenantId, email) composite unique 로 교체.
 import type { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
@@ -5,6 +7,8 @@ import { hashPassword } from "@/lib/password";
 import { z } from "zod";
 import type { Role } from "@/generated/prisma/client";
 import { requireRoleApi } from "@/lib/auth-guard";
+
+const ADMIN_TENANT_ID = "default";
 
 /** 사용자 생성 요청 스키마 */
 const createUserSchema = z.object({
@@ -87,8 +91,10 @@ export async function POST(request: NextRequest) {
 
   const { email, name, password, role } = parsed.data;
 
-  // 이메일 중복 확인
-  const existing = await prisma.user.findUnique({ where: { email } });
+  // T1.4 sweep: (tenantId, email) composite unique 로 전환. 글로벌 @unique 의존 제거.
+  const existing = await prisma.user.findUnique({
+    where: { tenantId_email: { tenantId: ADMIN_TENANT_ID, email } },
+  });
   if (existing) {
     return errorResponse("DUPLICATE_EMAIL", "이미 등록된 이메일입니다", 409);
   }
