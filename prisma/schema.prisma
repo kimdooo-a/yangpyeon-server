@@ -101,6 +101,16 @@ model User {
   authenticators    WebAuthnAuthenticator[] @relation("UserAuthenticators")
   // Phase 1.4+P0 (S61) — 사용자가 속한 tenant 들의 멤버십 목록.
   tenantMemberships TenantMembership[]      @relation("UserTenantMemberships")
+  // 세션 64 (2026-04-26) — Messenger Phase 1 backrefs (M1 W1, ADR-030).
+  conversationsCreated    Conversation[]          @relation("ConversationCreatedBy")
+  conversationMemberships ConversationMember[]    @relation("ConversationMembership")
+  messagesSent            Message[]               @relation("MessageSender")
+  mentionsReceived        MessageMention[]        @relation("UserMentioned")
+  blockedByMe             UserBlock[]             @relation("UserBlocker")
+  blockedMe               UserBlock[]             @relation("UserBlocked")
+  abuseReportsFiled       AbuseReport[]           @relation("AbuseReportReporter")
+  abuseReportsResolved    AbuseReport[]           @relation("AbuseReportResolver")
+  notificationPreference  NotificationPreference? @relation("UserNotifPref")
 
   // Phase 1.4 Stage 3 — tenant-scoped composite unique + index.
   @@unique([tenantId, email], map: "users_tenant_id_email_key")
@@ -803,4 +813,41 @@ model SecretItem {
   tenantId       String?   @map("tenant_id") @db.Uuid
 
   @@map("secret_items")
+}
+
+// ─────────────────────────────────────────────────────────────
+// 세션 63 — Sticky Notes (Windows 스티커 메모 스타일)
+// ADR-022 §1: tenantId 첫 컬럼 강제 + RLS 적용.
+// 운영 콘솔 패턴 (sql_queries 동일) — DEFAULT_TENANT('default') + bypassRls.
+// ─────────────────────────────────────────────────────────────
+
+/// 메모 가시성 — PRIVATE: 본인만, SHARED: 같은 tenant 의 모든 사용자에게 노출
+enum StickyNoteVisibility {
+  PRIVATE
+  SHARED
+}
+
+/// Sticky Note — 대시보드에 띄우는 포스트잇 메모
+/// 위치(posX/posY)와 색(color)은 클라이언트가 자유 편집.
+/// scope=SHARED 면 같은 tenant 내 다른 사용자도 읽기 가능 (수정/삭제는 owner 만).
+model StickyNote {
+  id         String               @id @default(uuid())
+  // ADR-022 §1 — tenant 1급 시민. dbgenerated default = current_setting('app.tenant_id').
+  tenantId   String               @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  ownerId    String               @map("owner_id")
+  content    String               @default("") @db.Text
+  /// HEX color (예: "#fde68a"). 검증은 Zod 스키마에서.
+  color      String               @default("#fde68a")
+  posX       Int                  @default(40) @map("pos_x")
+  posY       Int                  @default(40) @map("pos_y")
+  width      Int                  @default(220)
+  height     Int                  @default(220)
+  visibility StickyNoteVisibility @default(PRIVATE)
+  pinned     Boolean              @default(false)
+  createdAt  DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([tenantId, ownerId])
+  @@index([tenantId, visibility, updatedAt(sort: Desc)])
+  @@map("sticky_notes")
 }

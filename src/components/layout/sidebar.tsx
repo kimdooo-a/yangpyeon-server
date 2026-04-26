@@ -35,6 +35,7 @@ import {
   Table2,
   Lock,
   Trash2,
+  StickyNote,
 } from "lucide-react";
 
 type NavItem = {
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
 
   // 콘텐츠
   { href: "/filebox", label: "파일박스", icon: <IconFilebox size={18} />, group: "콘텐츠" },
+  { href: "/notes", label: "메모", icon: <StickyNote size={18} />, group: "콘텐츠" },
   { href: "/members", label: "회원 관리", icon: <IconMembers size={18} />, group: "콘텐츠" },
 
   // 데이터베이스 (신규 — 세션 14)
