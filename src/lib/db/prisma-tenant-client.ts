@@ -67,43 +67,56 @@ type AllOperationsParams = {
   operation: string;
 };
 
-export const prismaWithTenant = (basePrisma as PrismaClient).$extends({
-  name: "tenant-rls",
-  query: {
-    $allOperations: async (params: AllOperationsParams) => {
-      const { args, query } = params;
-      const ctx = getCurrentTenantOrNull();
-      if (!ctx) {
-        throw new Error(
-          "Tenant context missing. " +
-            "All prismaWithTenant.* calls must be inside withTenant() / withTenantTx() / runWithTenant().",
-        );
-      }
-
-      // Extension 자체가 transaction 을 감싸지 않으면 SET LOCAL 이 다음 query 까지 살지 못한다.
-      // basePrisma.$transaction 으로 감싸 GUC 가 query 시점에 유효하게 한다.
-      // tx 는 Omit<PrismaClient, ITXClientDenyList> — generated client 의 @ts-nocheck 영향으로
-      // 타입 surface 가 부정확. 다른 호출 사이트와 동일하게 any 로 캐스트.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (basePrisma as PrismaClient).$transaction(async (tx: any) => {
-          const txAny = tx;
-          if (ctx.bypassRls) {
-            // 운영 콘솔 BYPASS_RLS — SET LOCAL ROLE app_admin (BYPASSRLS).
-            // app_runtime → app_admin 은 GRANT app_admin TO app_runtime 에 의해 가능.
-            await txAny.$executeRawUnsafe(`SET LOCAL ROLE app_admin`);
-          } else {
-            const safeUuid = assertValidUuid(ctx.tenantId);
-            // PG 의 SET 은 prepared statement 에서 parameterized 가 안 되므로 inline.
-            // assertValidUuid 가 SQL injection 1차 방어. defense-in-depth.
-            await txAny.$executeRawUnsafe(
-              `SET LOCAL app.tenant_id = '${safeUuid}'`,
+// Lazy 초기화: $extends 는 첫 property 접근 시점에 호출.
+// basePrisma 는 src/lib/prisma.ts 의 lazy Proxy — module-load 시점에 .$extends 를 직접
+// 호출하면 vi.mock("@/lib/prisma") 가 적용된 테스트에서 부분 mock 객체에 $extends 가 없어
+// "is not a function" 으로 실패한다. 본 Proxy 가 $extends 호출을 첫 .file/.user 등 접근까지 미룬다.
+let _extendedClient: ReturnType<PrismaClient["$extends"]> | null = null;
+function getExtendedClient() {
+  if (!_extendedClient) {
+    _extendedClient = (basePrisma as PrismaClient).$extends({
+      name: "tenant-rls",
+      query: {
+        $allOperations: async (params: AllOperationsParams) => {
+          const { args, query } = params;
+          const ctx = getCurrentTenantOrNull();
+          if (!ctx) {
+            throw new Error(
+              "Tenant context missing. " +
+                "All prismaWithTenant.* calls must be inside withTenant() / withTenantTx() / runWithTenant().",
             );
           }
-          // Prisma Client Extension 의 query(args) 는 동일 Extension 재진입 회피 (Prisma 6+).
-          return query(args);
+
+          // Extension 자체가 transaction 을 감싸지 않으면 SET LOCAL 이 다음 query 까지 살지 못한다.
+          // basePrisma.$transaction 으로 감싸 GUC 가 query 시점에 유효하게 한다.
+          // tx 는 Omit<PrismaClient, ITXClientDenyList> — generated client 의 @ts-nocheck 영향으로
+          // 타입 surface 가 부정확. 다른 호출 사이트와 동일하게 any 로 캐스트.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (basePrisma as PrismaClient).$transaction(async (tx: any) => {
+            const txAny = tx;
+            if (ctx.bypassRls) {
+              await txAny.$executeRawUnsafe(`SET LOCAL ROLE app_admin`);
+            } else {
+              const safeUuid = assertValidUuid(ctx.tenantId);
+              await txAny.$executeRawUnsafe(
+                `SET LOCAL app.tenant_id = '${safeUuid}'`,
+              );
+            }
+            return query(args);
+          });
         },
-      );
-    },
+      },
+    });
+  }
+  return _extendedClient;
+}
+
+// 타입 surface 는 기본 PrismaClient 와 동일하게 노출 — Extension 의 query hook 은 호출자에게 투명.
+// generated client 가 @ts-nocheck 인 점, 다른 호출 사이트가 any 캐스트를 쓰는 점과 일관.
+export const prismaWithTenant = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return Reflect.get(getExtendedClient() as any, prop);
   },
 });
 
