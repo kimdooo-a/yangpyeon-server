@@ -1,11 +1,15 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
-import { prisma } from "@/lib/prisma";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
+
+// 글로벌 운영자 콘솔 — default tenant UUID 사용 (ADR-023 §5)
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
 
 const LOG_DRAIN_DATE_FIELDS = [
   "created_at",
@@ -41,8 +45,10 @@ const createSchema = z.object({
 });
 
 export const GET = withRole(["ADMIN"], async () => {
-  const drains = await prisma.logDrain.findMany({
-    orderBy: { createdAt: "desc" },
+  const drains = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+    return prismaWithTenant.logDrain.findMany({
+      orderBy: { createdAt: "desc" },
+    });
   });
   return successResponse(await attachLogDrainDates(drains));
 });
@@ -63,15 +69,17 @@ export const POST = withRole(["ADMIN"], async (request: NextRequest, user) => {
     );
   }
 
-  const created = await prisma.logDrain.create({
-    data: {
-      name: parsed.data.name,
-      type: parsed.data.type,
-      url: parsed.data.url,
-      authHeader: parsed.data.authHeader ?? null,
-      filters: parsed.data.filters as Prisma.InputJsonValue,
-      enabled: parsed.data.enabled,
-    },
+  const created = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+    return prismaWithTenant.logDrain.create({
+      data: {
+        name: parsed.data.name,
+        type: parsed.data.type,
+        url: parsed.data.url,
+        authHeader: parsed.data.authHeader ?? null,
+        filters: parsed.data.filters as Prisma.InputJsonValue,
+        enabled: parsed.data.enabled,
+      },
+    });
   });
 
   writeAuditLog({

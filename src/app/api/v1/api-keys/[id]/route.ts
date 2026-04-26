@@ -1,23 +1,34 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
+/** API 키 관리 — operator console, 기본 테넌트(default) UUID */
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+
 type RouteContext = { params: Promise<{ id: string }> };
 
 export const DELETE = withRole(["ADMIN"], async (request: NextRequest, user, context) => {
   const { id } = await (context as RouteContext).params;
-  const existing = await prisma.apiKey.findUnique({ where: { id } });
+  const existing = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () => prismaWithTenant.apiKey.findUnique({ where: { id } }),
+  );
   if (!existing) return errorResponse("NOT_FOUND", "API 키를 찾을 수 없습니다", 404);
   if (existing.revokedAt) return errorResponse("ALREADY_REVOKED", "이미 폐기된 키입니다", 400);
 
-  const updated = await prisma.apiKey.update({
-    where: { id },
-    data: { revokedAt: new Date() },
-    select: { id: true, name: true, prefix: true, revokedAt: true },
-  });
+  const updated = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () =>
+      prismaWithTenant.apiKey.update({
+        where: { id },
+        data: { revokedAt: new Date() },
+        select: { id: true, name: true, prefix: true, revokedAt: true },
+      }),
+  );
 
   // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
   const dateMap = await fetchDateFieldsText("api_keys", [updated.id], ["revoked_at"]);

@@ -4,9 +4,6 @@ import { hashPassword } from "@/lib/password";
 import { registerSchema } from "@/lib/schemas/auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
-// T1.4 sweep: /api/v1/auth/register 는 글로벌 등록 엔드포인트. 운영자 콘솔 전용 → 'default' sentinel (패턴 c).
-const ADMIN_TENANT_ID = "default";
-
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -23,9 +20,13 @@ export async function POST(request: NextRequest) {
 
   const { email, password, name, phone } = parsed.data;
 
-  // T1.4 sweep: (tenantId, email) composite unique 로 전환. 글로벌 @unique 의존 제거.
+  // closed BaaS: 모든 사용자는 default tenant 소속 (ADR-022).
+  const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+
+  // 이메일 중복 확인
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 회원가입 중복 이메일 확인, tenant 결정 전 단계
   const existing = await prisma.user.findUnique({
-    where: { tenantId_email: { tenantId: ADMIN_TENANT_ID, email } },
+    where: { tenantId_email: { tenantId: DEFAULT_TENANT_UUID, email } },
   });
   if (existing) {
     return errorResponse("EMAIL_EXISTS", "이미 사용 중인 이메일입니다", 409);
@@ -33,8 +34,9 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = await hashPassword(password);
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 신규 사용자 생성, tenant 결정 전 단계 (closed BaaS — 운영자 초대 전 가입)
   const user = await prisma.user.create({
-    data: { email, passwordHash, name, phone },
+    data: { tenantId: DEFAULT_TENANT_UUID, email, passwordHash, name, phone },
     select: { id: true, email: true, name: true, role: true, createdAt: true },
   });
 

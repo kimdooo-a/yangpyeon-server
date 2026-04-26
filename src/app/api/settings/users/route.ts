@@ -1,14 +1,25 @@
-// T1.4 sweep: /api/settings/users 는 운영자 콘솔 전용 라우트 → 'default' sentinel (패턴 c).
-// 글로벌 @unique 의존을 (tenantId, email) composite unique 로 교체.
 import type { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { prisma } from "@/lib/prisma";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 import { hashPassword } from "@/lib/password";
 import { z } from "zod";
 import type { Role } from "@/generated/prisma/client";
 import { requireRoleApi } from "@/lib/auth-guard";
 
-const ADMIN_TENANT_ID = "default";
+/** 관리자 운영 콘솔 — 기본 테넌트(default) UUID */
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+
+/** 사용자 raw SELECT row (Date ::text 캐스팅 결과) */
+type UserRow = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  is_active: boolean;
+  last_login_at_text: string | null;
+  created_at_text: string;
+};
 
 /** 사용자 생성 요청 스키마 */
 const createUserSchema = z.object({
@@ -38,24 +49,18 @@ export async function GET(request: NextRequest) {
 
   // 세션 43: Date 필드는 raw SELECT + ::text 로 정확 읽기 (parsing-side 시프트 회피).
   // ORDER BY created_at DESC 서버측 수행.
-  const rows = await prisma.$queryRaw<
-    Array<{
-      id: string;
-      email: string;
-      name: string | null;
-      role: string;
-      is_active: boolean;
-      last_login_at_text: string | null;
-      created_at_text: string;
-    }>
-  >`
-    SELECT id, email, name, role, is_active,
-      (last_login_at::text) AS last_login_at_text,
-      (created_at::text)    AS created_at_text
-    FROM users
-    ORDER BY created_at DESC
-  `;
-  const users = rows.map((r) => ({
+  const rows = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    (): Promise<UserRow[]> =>
+      prismaWithTenant.$queryRaw<UserRow[]>`
+        SELECT id, email, name, role, is_active,
+          (last_login_at::text) AS last_login_at_text,
+          (created_at::text)    AS created_at_text
+        FROM users
+        ORDER BY created_at DESC
+      `,
+  );
+  const users = (rows as UserRow[]).map((r) => ({
     id: r.id,
     email: r.email,
     name: r.name,
@@ -91,33 +96,45 @@ export async function POST(request: NextRequest) {
 
   const { email, name, password, role } = parsed.data;
 
-  // T1.4 sweep: (tenantId, email) composite unique 로 전환. 글로벌 @unique 의존 제거.
-  const existing = await prisma.user.findUnique({
-    where: { tenantId_email: { tenantId: ADMIN_TENANT_ID, email } },
-  });
+  // 이메일 중복 확인
+  const existing = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () =>
+      prismaWithTenant.user.findUnique({
+        where: { tenantId_email: { tenantId: DEFAULT_TENANT_UUID, email } },
+      }),
+  );
   if (existing) {
     return errorResponse("DUPLICATE_EMAIL", "이미 등록된 이메일입니다", 409);
   }
 
   const passwordHash = await hashPassword(password);
 
-  const created = await prisma.user.create({
-    data: {
-      email,
-      name: name ?? null,
-      passwordHash,
-      role: role as Role,
-    },
-    select: { id: true, email: true, name: true, role: true, isActive: true },
-  });
+  const created = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () =>
+      prismaWithTenant.user.create({
+        data: {
+          email,
+          name: name ?? null,
+          passwordHash,
+          role: role as Role,
+        },
+        select: { id: true, email: true, name: true, role: true, isActive: true },
+      }),
+  );
 
   // 세션 43: create 직후 createdAt 은 raw SELECT ::text 로 재조회.
-  const rows = await prisma.$queryRaw<Array<{ created_at_text: string }>>`
-    SELECT (created_at::text) AS created_at_text
-    FROM users
-    WHERE id = ${created.id}
-    LIMIT 1
-  `;
+  const rows = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () =>
+      prismaWithTenant.$queryRaw<Array<{ created_at_text: string }>>`
+        SELECT (created_at::text) AS created_at_text
+        FROM users
+        WHERE id = ${created.id}
+        LIMIT 1
+      `,
+  );
   const createdAt = rows[0] ? new Date(rows[0].created_at_text).toISOString() : null;
 
   return successResponse({ ...created, createdAt }, 201);
@@ -147,7 +164,10 @@ export async function PATCH(request: NextRequest) {
   const { userId, role, isActive } = parsed.data;
 
   // 대상 사용자 존재 확인
-  const target = await prisma.user.findUnique({ where: { id: userId } });
+  const target = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () => prismaWithTenant.user.findUnique({ where: { id: userId } }),
+  );
   if (!target) {
     return errorResponse("NOT_FOUND", "사용자를 찾을 수 없습니다", 404);
   }
@@ -156,30 +176,28 @@ export async function PATCH(request: NextRequest) {
   if (role !== undefined) updateData.role = role;
   if (isActive !== undefined) updateData.isActive = isActive;
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: updateData,
-  });
+  await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () =>
+      prismaWithTenant.user.update({
+        where: { id: userId },
+        data: updateData,
+      }),
+  );
 
   // 세션 43: update 직후 Date 필드는 raw SELECT ::text 로 재조회.
-  const rows = await prisma.$queryRaw<
-    Array<{
-      id: string;
-      email: string;
-      name: string | null;
-      role: string;
-      is_active: boolean;
-      last_login_at_text: string | null;
-      created_at_text: string;
-    }>
-  >`
-    SELECT id, email, name, role, is_active,
-      (last_login_at::text) AS last_login_at_text,
-      (created_at::text)    AS created_at_text
-    FROM users
-    WHERE id = ${userId}
-    LIMIT 1
-  `;
+  const rows = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    (): Promise<UserRow[]> =>
+      prismaWithTenant.$queryRaw<UserRow[]>`
+        SELECT id, email, name, role, is_active,
+          (last_login_at::text) AS last_login_at_text,
+          (created_at::text)    AS created_at_text
+        FROM users
+        WHERE id = ${userId}
+        LIMIT 1
+      `,
+  );
   const row = rows[0]!;
   return successResponse({
     id: row.id,

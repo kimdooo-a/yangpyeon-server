@@ -21,6 +21,7 @@ export const DELETE = withAuth(
       return errorResponse("VALIDATION_ERROR", "세션 id 가 필요합니다", 400);
     }
 
+    // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 사용자 자신의 세션 revoke — userId 소유권 확인 목적, 글로벌 auth 라우트
     const row = await prisma.session.findUnique({
       where: { id: sessionId },
       select: { id: true, userId: true, revokedAt: true },

@@ -17,6 +17,7 @@ export const POST = withAuth(async (_request: NextRequest, user) => {
     return errorResponse("LEGACY_SESSION", "실제 사용자로 로그인 후 설정하세요", 401);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: TOTP 1차 설정 흐름에서 enrollment 중복 확인, 글로벌 auth 라우트
   const existing = await prisma.mfaEnrollment.findUnique({ where: { userId: user.sub } });
   if (existing?.confirmedAt) {
     return errorResponse("ALREADY_ENROLLED", "이미 MFA 가 활성화되어 있습니다", 400);
@@ -25,6 +26,7 @@ export const POST = withAuth(async (_request: NextRequest, user) => {
   const secret = generateTotpSecret();
   const secretCiphertext = await encryptSecret(secret);
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: TOTP secret upsert (enrollment 초기화), 글로벌 auth 라우트
   await prisma.mfaEnrollment.upsert({
     where: { userId: user.sub },
     update: { secretCiphertext, confirmedAt: null, failedAttempts: 0, lockedUntil: null },

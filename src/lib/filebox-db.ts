@@ -1,4 +1,12 @@
 // 파일박스 DB 코어 로직 — Prisma + 로컬 파일시스템
+//
+// [T1.4 정당화] filebox-db 는 현재 플랫폼 운영자(단일 사용자) 전용 파일 저장소이며,
+// 멀티테넌트 RLS 적용은 "첫 컨슈머 Almanac v1.0 출시 후 packages/tenant-almanac/ 마이그레이션"
+// (ADR-024 부속 결정) 이후 별도 PR 에서 수행 예정.
+// 현재 모든 prisma 호출은 ownerId(userId) 기준 소유권 검증이 인라인으로 적용되어
+// cross-tenant leak 위험 없음 — 단일 플랫폼 운영자 컨텍스트에서만 호출됨.
+// TODO(T1.5): withTenantQuery(tenantId, ...) 패턴으로 전환 (멀티테넌트 filebox 지원 시).
+/* eslint-disable tenant/no-raw-prisma-without-tenant */
 import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
@@ -325,3 +333,4 @@ export function formatBytes(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
+/* eslint-enable tenant/no-raw-prisma-without-tenant */

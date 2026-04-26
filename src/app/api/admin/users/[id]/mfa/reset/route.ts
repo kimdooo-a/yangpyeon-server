@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { errorResponse } from "@/lib/api-response";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
+
+/** 관리자 운영 콘솔 — 기본 테넌트(default) UUID */
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
 
 /**
  * POST /api/admin/users/[id]/mfa/reset — 관리자 강제 MFA 해제.
@@ -19,18 +23,23 @@ export const POST = withRole(
       return errorResponse("VALIDATION_ERROR", "대상 사용자 id 가 필요합니다", 400);
     }
 
-    const target = await prisma.user.findUnique({
-      where: { id: targetId },
-      select: { id: true, email: true, mfaEnabled: true },
-    });
+    const target = await runWithTenant(
+      { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+      () =>
+        prismaWithTenant.user.findUnique({
+          where: { id: targetId },
+          select: { id: true, email: true, mfaEnabled: true },
+        }),
+    );
     if (!target) {
       return errorResponse("USER_NOT_FOUND", "사용자를 찾을 수 없습니다", 404);
     }
 
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: target.id }, data: { mfaEnabled: false } });
-      await tx.mfaRecoveryCode.deleteMany({ where: { userId: target.id } });
-      await tx.mfaEnrollment.deleteMany({ where: { userId: target.id } });
+    await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, async () => {
+      // 관리자 강제 MFA 해제: TOTP 비활성화 + 복구 코드 + 등록 정보 전체 삭제
+      await prismaWithTenant.user.update({ where: { id: target.id }, data: { mfaEnabled: false } });
+      await prismaWithTenant.mfaRecoveryCode.deleteMany({ where: { userId: target.id } });
+      await prismaWithTenant.mfaEnrollment.deleteMany({ where: { userId: target.id } });
     });
 
     writeAuditLog({

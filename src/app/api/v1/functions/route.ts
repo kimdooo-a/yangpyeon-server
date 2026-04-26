@@ -2,10 +2,14 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { prisma } from "@/lib/prisma";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 export const runtime = "nodejs";
+
+// 글로벌 운영자 콘솔 — default tenant UUID 사용 (ADR-023 §5)
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
 
 const MAX_CODE_SIZE = 256 * 1024;
 
@@ -21,16 +25,18 @@ const createSchema = z.object({
 export const GET = withRole(
   ["ADMIN"],
   async (_request: NextRequest, user) => {
-    const rows = await prisma.edgeFunction.findMany({
-      where: { ownerId: user.sub },
-      orderBy: { updatedAt: "desc" },
-      include: {
-        runs: {
-          orderBy: { startedAt: "desc" },
-          take: 1,
-          select: { id: true, startedAt: true, status: true },
+    const rows = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+      return prismaWithTenant.edgeFunction.findMany({
+        where: { ownerId: user.sub },
+        orderBy: { updatedAt: "desc" },
+        include: {
+          runs: {
+            orderBy: { startedAt: "desc" },
+            take: 1,
+            select: { id: true, startedAt: true, status: true },
+          },
         },
-      },
+      });
     });
     // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
     const fnDateMap = await fetchDateFieldsText(
@@ -80,15 +86,17 @@ export const POST = withRole(
       return errorResponse("VALIDATION_ERROR", msg, 400);
     }
     try {
-      const fn = await prisma.edgeFunction.create({
-        data: {
-          name: parsed.data.name,
-          description: parsed.data.description,
-          code: parsed.data.code,
-          runtime: parsed.data.runtime,
-          enabled: parsed.data.enabled,
-          ownerId: user.sub,
-        },
+      const fn = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+        return prismaWithTenant.edgeFunction.create({
+          data: {
+            name: parsed.data.name,
+            description: parsed.data.description,
+            code: parsed.data.code,
+            runtime: parsed.data.runtime,
+            enabled: parsed.data.enabled,
+            ownerId: user.sub,
+          },
+        });
       });
       return successResponse({ id: fn.id, name: fn.name }, 201);
     } catch (err) {

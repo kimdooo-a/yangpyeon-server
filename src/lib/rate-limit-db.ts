@@ -52,6 +52,7 @@ export async function checkRateLimitDb(
   // 세션 40에서 컬럼이 TIMESTAMPTZ(3) 으로 마이그레이션되어 9h 시프트는 해소되었으나,
   // PG 측 EXTRACT(EPOCH FROM (windowStart + windowMs - NOW())) 패턴은 race-safe (UPSERT 한 번에
   // 카운터 + 잔여시간 동시 결정) 이라 유지. 클라이언트 측 Date.now() 분리 호출은 race window 발생.
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 글로벌 rate limit: rate_limit_buckets 는 테넌트 간 공유 카운터 (IP/email 기준 집계). tenant_id 컬럼 없음 — cross-tenant 개념 비해당
   const rows = await prisma.$queryRaw<
     { hits: number; reset_ms: string }[]
   >`
@@ -95,6 +96,7 @@ export async function checkRateLimitDb(
  * @returns 삭제된 행 수
  */
 export async function cleanupExpiredRateLimitBuckets(): Promise<number> {
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 글로벌 rate limit 정리 cron: rate_limit_buckets 는 테넌트 공유 테이블 — cross-tenant 개념 비해당
   const result = await prisma.$executeRaw`
     DELETE FROM rate_limit_buckets
     WHERE window_start < NOW() - INTERVAL '1 day'

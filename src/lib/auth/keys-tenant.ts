@@ -107,6 +107,7 @@ export async function verifyApiKeyForTenant(
   const dbPrefix = `${scope}_${prefixSlug}_${random.slice(0, 8)}`;
 
   // ─── 2. DB lookup (prefix unique) — T1.5 relation 활용 — 단일 query 통합 ───
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- ApiKey K3 매칭 자체가 tenant 결정 단계 — self-referential, base prisma 정당 (membership.ts 동일 패턴)
   const dbKey = await prisma.apiKey.findUnique({
     where: { prefix: dbPrefix },
     include: { tenant: true },
@@ -152,6 +153,7 @@ export async function verifyApiKeyForTenant(
 
   // ─── 7. lastUsedAt fire-and-forget 갱신 ───
   // 실패해도 검증 결과에는 영향 없음 — Promise rejection 은 swallow.
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- ApiKey K3 매칭 단계의 부수적 lastUsedAt 갱신, self-referential 컨텍스트
   prisma.apiKey
     .update({ where: { id: dbKey.id }, data: { lastUsedAt: new Date() } })
     .catch(() => {});

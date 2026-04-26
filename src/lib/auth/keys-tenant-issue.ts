@@ -61,6 +61,7 @@ export async function issueTenantApiKey(
   const prefix = `${input.scope}_${input.tenantSlug}_${random.slice(0, 8)}`;
   const keyHash = await bcrypt.hash(plaintext, BCRYPT_ROUNDS);
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- tenant ApiKey 발급은 운영자 콘솔 로직 + tenantId 명시 bind, RLS 우회 정당 (membership.ts 동일 패턴)
   const created = await prisma.apiKey.create({
     data: {
       name: input.name,

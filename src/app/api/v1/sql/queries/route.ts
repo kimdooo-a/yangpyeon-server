@@ -2,10 +2,15 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { prisma } from "@/lib/prisma";
-import type { QueryScope } from "@/generated/prisma/client";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 
 export const runtime = "nodejs";
+
+// 운영 콘솔 — default tenant 로 RLS bypass (ADR-023 §5 운영자 BYPASS_RLS)
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+
+type QueryScope = "PRIVATE" | "SHARED" | "FAVORITE";
 
 const listQuerySchema = z.object({
   scope: z.enum(["PRIVATE", "SHARED", "FAVORITE"]).optional(),
@@ -36,20 +41,22 @@ export const GET = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, u
     where.OR = [{ ownerId: user.sub }, { scope: "SHARED" as QueryScope }];
   }
 
-  const rows = await prisma.sqlQuery.findMany({
-    where,
-    orderBy: { updatedAt: "desc" },
-    select: {
-      id: true,
-      name: true,
-      sql: true,
-      scope: true,
-      ownerId: true,
-      lastRunAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  const rows = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
+    prismaWithTenant.sqlQuery.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        name: true,
+        sql: true,
+        scope: true,
+        ownerId: true,
+        lastRunAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+  );
 
   return successResponse(rows);
 });
@@ -69,23 +76,25 @@ export const POST = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, 
     return errorResponse("VALIDATION_ERROR", message, 400);
   }
 
-  const created = await prisma.sqlQuery.create({
-    data: {
-      name: parsed.data.name,
-      sql: parsed.data.sql,
-      scope: parsed.data.scope as QueryScope,
-      ownerId: user.sub,
-    },
-    select: {
-      id: true,
-      name: true,
-      sql: true,
-      scope: true,
-      ownerId: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-  });
+  const created = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
+    prismaWithTenant.sqlQuery.create({
+      data: {
+        name: parsed.data.name,
+        sql: parsed.data.sql,
+        scope: parsed.data.scope as QueryScope,
+        ownerId: user.sub,
+      },
+      select: {
+        id: true,
+        name: true,
+        sql: true,
+        scope: true,
+        ownerId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+  );
 
   return successResponse(created, 201);
 });

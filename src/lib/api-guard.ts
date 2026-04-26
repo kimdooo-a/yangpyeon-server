@@ -39,6 +39,7 @@ async function resolveCookieSession(): Promise<AccessTokenPayload | null> {
   }
 
   // DB에서 실제 사용자 검증 (비활성화된 계정 차단)
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 사용자 신원 확인은 tenant context 결정 전 단계 — base prisma 사용 정당 (membership.ts 동일 패턴)
   const user = await prisma.user.findUnique({
     where: { id: session.sub },
     select: { id: true, email: true, role: true, isActive: true },

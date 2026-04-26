@@ -2,10 +2,14 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { prisma } from "@/lib/prisma";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 export const runtime = "nodejs";
+
+// 글로벌 운영자 콘솔 — default tenant UUID 사용 (ADR-023 §5)
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
 
 async function withFunctionDates<T extends { id: string }>(row: T) {
   // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
@@ -36,7 +40,9 @@ async function getId(context: unknown): Promise<string> {
 }
 
 async function ensureOwner(id: string, userId: string) {
-  const fn = await prisma.edgeFunction.findUnique({ where: { id } });
+  const fn = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+    return prismaWithTenant.edgeFunction.findUnique({ where: { id } });
+  });
   if (!fn) return null;
   if (fn.ownerId !== userId) return "forbidden" as const;
   return fn;
@@ -66,9 +72,11 @@ export const PATCH = withRole(["ADMIN"], async (request: NextRequest, user, cont
   if (!parsed.success) {
     return errorResponse("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "검증 실패", 400);
   }
-  const updated = await prisma.edgeFunction.update({
-    where: { id },
-    data: parsed.data,
+  const updated = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+    return prismaWithTenant.edgeFunction.update({
+      where: { id },
+      data: parsed.data,
+    });
   });
   // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
   const dateMap = await fetchDateFieldsText("edge_functions", [updated.id], ["updated_at"]);
@@ -81,6 +89,8 @@ export const DELETE = withRole(["ADMIN"], async (_req, user, context) => {
   const fn = await ensureOwner(id, user.sub);
   if (fn === null) return errorResponse("NOT_FOUND", "함수를 찾을 수 없습니다", 404);
   if (fn === "forbidden") return errorResponse("FORBIDDEN", "소유자만 삭제할 수 있습니다", 403);
-  await prisma.edgeFunction.delete({ where: { id } });
+  await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+    return prismaWithTenant.edgeFunction.delete({ where: { id } });
+  });
   return successResponse({ deleted: true });
 });

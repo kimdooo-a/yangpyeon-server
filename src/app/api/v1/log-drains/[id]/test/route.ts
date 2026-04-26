@@ -1,16 +1,22 @@
 import { NextRequest } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { deliver } from "@/lib/drains";
 import { writeAuditLog } from "@/lib/audit-log";
 import type { LogDrainEntry } from "@/lib/types/supabase-clone";
 
+// 글로벌 운영자 콘솔 — default tenant UUID 사용 (ADR-023 §5)
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+
 type RouteContext = { params: Promise<{ id: string }> };
 
 export const POST = withRole(["ADMIN"], async (request: NextRequest, user, context) => {
   const { id } = await (context as RouteContext).params;
-  const drain = await prisma.logDrain.findUnique({ where: { id } });
+  const drain = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+    return prismaWithTenant.logDrain.findUnique({ where: { id } });
+  });
   if (!drain) return errorResponse("NOT_FOUND", "로그 드레인을 찾을 수 없습니다", 404);
 
   const sample: LogDrainEntry = {
@@ -23,12 +29,14 @@ export const POST = withRole(["ADMIN"], async (request: NextRequest, user, conte
 
   const result = await deliver(drain, [sample]);
 
-  await prisma.logDrain.update({
-    where: { id },
-    data: {
-      lastDeliveredAt: new Date(),
-      failureCount: result.failed > 0 ? drain.failureCount + 1 : 0,
-    },
+  await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
+    return prismaWithTenant.logDrain.update({
+      where: { id },
+      data: {
+        lastDeliveredAt: new Date(),
+        failureCount: result.failed > 0 ? drain.failureCount + 1 : 0,
+      },
+    });
   });
 
   writeAuditLog({
