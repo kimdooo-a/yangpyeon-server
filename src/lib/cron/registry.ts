@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { safeAudit } from "@/lib/audit-log-db";
 import { dispatchCron } from "./runner";
 
 /**
@@ -131,8 +132,26 @@ async function runJob(job: ScheduledJob): Promise<void> {
       where: { id: job.id },
       data: { lastRunAt: new Date(), lastStatus: `${result.status}${result.message ? `: ${result.message}` : ""}` },
     });
-  } catch {
-    // 무시 — 루프 지속
+  } catch (err) {
+    // CK-38 패턴 (ADR-021 cross-cutting fail-soft): 루프는 지속하되 실패는 추적 가능해야 한다.
+    // spike-baas-002 §3.X 부수 발견 — 기존 `// 무시` 는 silent failure 로 audit 누락의 원흉.
+    console.warn("[cron] runJob failed (loop continues)", {
+      jobId: job.id,
+      name: job.name,
+      kind: job.kind,
+      error: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+    });
+    safeAudit(
+      {
+        timestamp: new Date().toISOString(),
+        method: "CRON",
+        path: `/cron/${job.name}`,
+        ip: "system",
+        action: "cron.runjob.failure",
+        detail: err instanceof Error ? err.message : String(err),
+      },
+      "cron.runJob",
+    );
   } finally {
     s.running.delete(job.id);
   }
