@@ -69,6 +69,16 @@
 | 13 | Auth + UX | DB 인증 + 다중 사용자 + Cmd+K | 2 | Phase 11 |
 | 14 | 데이터 플랫폼 | Table Editor + SQL Editor | 3-4 | Phase 13 |
 | 15 | 자율 운영 | 파일 매니저 + 알림 + shadcn 전환 | 2-3 | Phase 12+14 |
+| 16~17 | Phase 15 Auth Advanced + Phase 16 Vault | MFA + WebAuthn + JWKS + Vault | 4-5 | Phase 13 |
+| 18~19 | Multi-tenant BaaS 전환 (ADR-022~029) | Tenant + RLS + Plugin 분리 + Almanac | 6-8 | Phase 16 |
+| **20** | **Messenger Phase 1** (코어 임베디드, ADR-030 ACCEPTED 2026-04-26) | **Conversation/Message/Attachment 11모델 + 19 API + SSE fan-out + UI 보드 + 신고/차단 + 운영자 패널** | **6-8 (M1~M6 + M0 사전)** | **Multi-tenant BaaS 완료** |
+| 21 | Messenger Phase 2 (Plugin 분리 + 풍부 표현) | `packages/tenant-messenger/` + 이모지 반응 + 스티커 + 음성 메모 + 채널 + QR + PG NOTIFY 백본 | 4-6 | DAU≥30 또는 컨슈머 요구 |
+| 22+ | Messenger Phase 3 (고급) | WebRTC 통화 + E2E + 다중 디바이스 sync + 챗봇 SDK + FTS | 8-12 | WAU 1000+ |
+
+> **Phase 20 (Messenger Phase 1) 단일 진실 소스**: `docs/research/messenger/` (8 산출물)
+> - PRD: `docs/research/messenger/PRD-v1.md`
+> - 마일스톤 상세: `docs/research/messenger/milestones.md`
+> - ADR: `docs/research/baas-foundation/01-adrs/ADR-030-messenger-domain-and-phasing.md`
 
 ---
 
