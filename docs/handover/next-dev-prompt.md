@@ -1,17 +1,18 @@
-# 다음 세션 프롬프트 (세션 67)
+# 다음 세션 프롬프트 (세션 68)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 66 완료)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 67 완료)
 
 - **프로젝트명**: 양평 부엌 서버 — **1인 운영자의 멀티테넌트 백엔드 플랫폼** (stylelucky4u.com)
 - **정체성**: closed multi-tenant BaaS (본인 소유 10~20개 프로젝트 공유 백엔드, 외부 가입 없음)
 - **스택**: Next.js 16 + TypeScript + Tailwind CSS 4 + PostgreSQL 16 (Prisma 7) + SQLite (Drizzle)
-- **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — Phase 2 / T2.5 aggregator 비즈니스 로직 진행 중
-- **세션 66 핵심**: Almanac 측 Phase 2 인수인계서(`docs/assets/260427-yangpyeon-phase2-aggregator-handover.md`) 수신 → Day 1 시동. spec 패키지 42파일 워크트리 → 메인 복원, 시드 적용(37 카테고리 + 60 소스 inactive), 첫 명시 라우트 `/api/v1/t/[tenant]/categories/route.ts` 신설, WSL 빌드+배포(restart #4), 401 매칭 검증.
+- **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — Phase 2 / T2.5 aggregator Day 1 시동(S66) → 잔여 4 endpoint + API 키 발급 + 비즈니스 로직 이식이 다음 작업
+- **두 번째 도메인 트랙**: 메신저 Phase 1 M1(W1) 완성(S67) — 11 모델 + 6 enum + 6 마이그 + RLS 테스트 + spike-006(Conditional Go) commit
+- **세션 67 핵심**: 미커밋 상태로 누적된 **두 세션 산출물 동시 정리** — (1) aggregator Day 1(S66) 시드+route+handover commit (2) 메신저 M1(S67) 검증+commit (3) 종료 절차 일괄. 본 세션 commit 3건: `2048378` + `2682321` + 본 commit.
 
 ## 서버 실행 / 접속 정보
 
@@ -38,23 +39,24 @@ npm run dev
 
 ---
 
-## 운영 상태 (세션 66 종료 시점)
+## 운영 상태 (세션 67 종료 시점)
 
 - **PM2**: ypserver online (~/ypserver/server.js, **restart #4**, pid 81099) + cloudflared online (23h+ uptime) + pm2-logrotate
-- **PostgreSQL 16**: 22 테이블 RLS enabled + tenant_id 첫 컬럼 + dbgenerated default (COALESCE fallback)
+- **PostgreSQL 16**: **38 테이블** RLS enabled + tenant_id 첫 컬럼 + dbgenerated COALESCE fallback (메신저 9 테이블 신규 추가 — S67)
 - **Tenants**: 'default' (00000000-0000-0000-0000-000000000000) + 'almanac' (00000000-0000-0000-0000-000000000001)
-- **Almanac 콘텐츠 데이터** (NEW S66): 37 카테고리 (build 7 / 5 트랙 6) + 60 소스 (RSS 46 / HTML 3 / API 7 / FIRECRAWL 4) — **모두 active=FALSE**. 점진 활성화 절차는 `docs/handover/260426-session66-aggregator-day1.md` §5.5
-- **Almanac 명시 라우트** (NEW S66): `/api/v1/t/almanac/categories` (1개). 잔여 4개는 세션 67 작업.
-- **API 키** (NEW S66): srv_almanac_* / pub_almanac_* — **미발급**. 인프라만 가동. 세션 67 첫 작업.
+- **Almanac 콘텐츠 데이터** (S66): 37 카테고리 (build 7 / 5 트랙 6) + 60 소스 (RSS 46 / HTML 3 / API 7 / FIRECRAWL 4) — **모두 active=FALSE**. 점진 활성화 절차는 `docs/handover/260426-session66-aggregator-day1.md` §5.5
+- **Almanac 명시 라우트** (S66): `/api/v1/t/almanac/categories` (1개). 잔여 4개는 세션 68 작업.
+- **API 키**: srv_almanac_* / pub_almanac_* — **미발급**. 인프라만 가동. 세션 68 첫 작업.
+- **메신저 데이터 모델** (NEW S67): 9 테이블 (conversations/conversation_members/messages/message_attachments/message_mentions/message_receipts/user_blocks/abuse_reports/notification_preferences) + 6 enum + RLS 9 정책. 마이그 6건 (20260501000000~050000) 적용 완료. **데이터 0행** — Phase 1 M2(REST API) 진입 전.
 - **Roles**: app_migration / app_runtime / app_admin 생성 (32바이트 랜덤 패스워드, **현재 미사용** — DATABASE_URL은 postgres superuser. role 분리는 N>1 시)
-- **마이그레이션**: 모두 적용 완료 (`prisma migrate status` = up to date)
-- **ESLint**: 0 violations / TSC: 0 errors / Vitest: 364 pass (세션 66에서 추가 변경 없음)
+- **마이그레이션**: 28 마이그 모두 적용 완료 (`prisma migrate status` = up to date)
+- **TSC**: 0 errors / **tenant/no-raw-prisma-without-tenant**: 0 violations / **vitest tests/messenger**: 13 skip(env-gated, 정상)
 
 ---
 
-## ⭐ 세션 67 우선 작업 P0: 잔여 4 endpoint + API 키 발급 + Almanac 가시화
+## ⭐ 세션 68 우선 작업 P0: 잔여 4 endpoint + API 키 발급 + Almanac 가시화
 
-세션 66에서 `/categories` 1개만 신설. 나머지 4개와 키 발급을 마치면 Almanac /explore 에 카드가 표시되기 시작합니다.
+세션 66에서 `/categories` 1개 신설(commit `2682321`). 나머지 4개와 키 발급을 마치면 Almanac /explore 에 카드가 표시되기 시작합니다.
 
 플로우 (각 endpoint 30~60분):
 1. **`/api/v1/t/[tenant]/contents/route.ts`** — cursor 페이지네이션 + track/category/q/source 필터 + ContentItem JOIN. spec 참조: `docs/assets/yangpyeon-aggregator-spec/code/src/app/api/v1/almanac/contents/route.ts`. 변환 패턴 = `/categories` 와 동일 (`withTenant` + `prismaWithTenant`).
@@ -83,14 +85,14 @@ npm run dev
 
 ---
 
-## P0-2: 메신저 도메인 Phase 1 진입 (별도 트랙)
+## P0-2: 메신저 도메인 Phase 1 M2 진입 (별도 트랙)
 
-세션 64에서 ADR-030 ACCEPTED + PRD 18섹션 + 7 산출물 신설. 이월 작업:
-- **kdyspike #1** (PG NOTIFY+SSE 정합성, 30분)
-- **Phase 1 M1**: 데이터 모델 시작 (메신저 마이그레이션 6건)
-- **결정 대기**: Q1 / Q4 / Q6
+S67에서 M1(W1) 데이터 모델 + spike-006 commit 완료(`2048378`). 다음 단계:
+- **M2 (W2~3)**: REST API 11 endpoint — conv 5(GET/POST conversations / GET/PATCH/DELETE id) + msg 5(GET/POST messages / PATCH/DELETE id / POST recall) + safety 1(POST blocks)
+- **M3 (W4)**: SSE 단일 conv 실시간 + 30초 keepalive (spike-006 §3 결정)
+- **결정 대기**: Q1 (DM 폐기 정책) / Q4 (group 인원) / Q6 (mention 알림 우선순위)
 
-근거: `docs/research/messenger/_index.md`
+근거: `docs/research/messenger/milestones.md` M2~M3 / `docs/research/spikes/spike-006-pg-notify-sse.md` §3
 
 ---
 
