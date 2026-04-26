@@ -1,0 +1,21 @@
+{
+  "session_id": "2026-04-26T13:00:00+09:00-s62",
+  "started_at": "2026-04-26T13:00:00+09:00",
+  "targets": [
+    "src/lib/with-request-context.ts",
+    "src/lib/auth/keys-tenant.ts",
+    "src/lib/auth/keys-tenant.test.ts",
+    "src/lib/vault/VaultService.ts",
+    "src/app/api/settings/users/route.ts",
+    "src/app/api/v1/auth/login/route.ts",
+    "src/app/api/v1/auth/register/route.ts",
+    "prisma/schema.prisma",
+    "eslint.config.mjs"
+  ],
+  "agents": 3,
+  "engine": "agent",
+  "pid": 0,
+  "dry_run": false,
+  "tasks": ["T1.4-sweep", "P1-keys-tenant-include", "P1-resolve-tenant"],
+  "strategy": "parallel"
+}
