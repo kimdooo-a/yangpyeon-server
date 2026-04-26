@@ -5,6 +5,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
+      // Phase 1.5: app-side 가 packages/core 의 pure 모듈 (lock-key, circuit-breaker-state) 을 사용.
+      // npm install 은 미완 — vitest 는 path alias 로 직접 src/ 해석.
+      "@yangpyeon/core": resolve(__dirname, "./packages/core/src/index.ts"),
     },
   },
   test: {

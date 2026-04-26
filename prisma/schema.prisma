@@ -24,6 +24,11 @@ model Tenant {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  // Phase 1.5 (T1.5) backrefs — TenantWorkerPool + TenantCronPolicy + ApiKey K3 매칭.
+  cronJobs   CronJob[]         @relation("TenantCronJobs")
+  apiKeys    ApiKey[]          @relation("TenantApiKeys")
+  cronPolicy TenantCronPolicy?
+
   @@map("tenants")
 }
 
@@ -338,21 +343,63 @@ model Webhook {
 }
 
 /// Cron Job — 주기 실행 작업
+/// Phase 1.5 (T1.5): TenantWorkerPool + circuit breaker 도입.
+/// 추가 컬럼: consecutiveFailures, circuitState, circuitOpenedAt, lastSuccessAt — 07-adr-028-impl-spec §7.1.
 model CronJob {
-  id         String    @id @default(uuid())
-  name       String    @unique
-  schedule   String
-  kind       CronKind
-  payload    Json      @default("{}")
-  enabled    Boolean   @default(true)
-  lastRunAt  DateTime? @map("last_run_at") @db.Timestamptz(3)
-  lastStatus String?   @map("last_status")
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                  String    @id @default(uuid())
+  name                String    @unique
+  schedule            String
+  kind                CronKind
+  payload             Json      @default("{}")
+  enabled             Boolean   @default(true)
+  lastRunAt           DateTime? @map("last_run_at") @db.Timestamptz(3)
+  lastStatus          String?   @map("last_status")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   // Phase 0.3 Stage 1 additive — Phase 1.5 TenantWorkerPool 도입 시 본 컬럼이 dispatch 결정의 핵심.
-  tenantId   String?   @map("tenant_id") @db.Uuid
+  tenantId            String?   @map("tenant_id") @db.Uuid
+  // Phase 1.5 circuit breaker — 07-adr-028-impl-spec §7.1.
+  // consecutiveFailures: recordResult 가 실패마다 +1, 성공 시 0 으로 리셋.
+  // circuitState: CLOSED | OPEN | HALF_OPEN. shouldDispatch 가 본 컬럼으로 게이트.
+  // circuitOpenedAt: OPEN 진입 시각. cooldown 경과 판정에 사용.
+  // lastSuccessAt: 마지막 성공 시각 (운영 콘솔 표시용).
+  consecutiveFailures Int       @default(0) @map("consecutive_failures")
+  circuitState        String    @default("CLOSED") @map("circuit_state")
+  circuitOpenedAt     DateTime? @map("circuit_opened_at") @db.Timestamptz(3)
+  lastSuccessAt       DateTime? @map("last_success_at") @db.Timestamptz(3)
 
+  // Phase 1.5: Stage 1 nullable FK + onDelete: SetNull (tenantId nullable 호환).
+  tenant Tenant? @relation("TenantCronJobs", fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, enabled])
+  @@index([circuitState, circuitOpenedAt])
   @@map("cron_jobs")
+}
+
+/// Phase 1.5 (T1.5) — TenantCronPolicy
+/// 07-adr-028-impl-spec §7.1 — cron 실행 정책의 단일 진실 소스 (per-tenant override).
+/// row 부재 시 DEFAULT_POLICY (코드 상수) fallback.
+/// 운영 콘솔에서 컨슈머별 토글 (concurrency cap, timeout, memory limit, allowed hosts).
+model TenantCronPolicy {
+  tenantId                    String   @id @map("tenant_id") @db.Uuid
+  /// per-tenant 동시 실행 cron 개수 캡 (main thread 게이트)
+  maxConcurrentJobs           Int      @default(3) @map("max_concurrent_jobs")
+  /// per-job timeout (worker.terminate 트리거)
+  jobTimeoutMs                Int      @default(30000) @map("job_timeout_ms")
+  /// resourceLimits.maxOldGenerationSizeMb — 약한 heap cap
+  jobMemoryLimitMb            Int      @default(128) @map("job_memory_limit_mb")
+  /// circuit breaker OPEN 진입 임계값 (default 5)
+  consecutiveFailureThreshold Int      @default(5) @map("consecutive_failure_threshold")
+  /// 분당 tick 한도 (운영 모니터링 — 실 정책에 직접 사용 X, 대시보드 안내치)
+  ticksPerDay                 Int      @default(1440) @map("ticks_per_day")
+  /// 컨슈머별 fetch 화이트리스트 (FUNCTION/WEBHOOK 격리)
+  allowedFetchHosts           String[] @default([]) @map("allowed_fetch_hosts")
+  /// WEBHOOK fetch 타임아웃
+  webhookTimeoutMs            Int      @default(60000) @map("webhook_timeout_ms")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_cron_policies")
 }
 
 /// API Keys — publishable/secret 이중화. keyHash만 저장, 평문은 발급 시 1회 노출.
@@ -372,6 +419,11 @@ model ApiKey {
   // Phase 0.3 Stage 1 additive — ADR-027 K3 매칭의 FK. Stage 3 NOT NULL 전환 + 검증 강제.
   tenantId   String?    @map("tenant_id") @db.Uuid
 
+  // Phase 1.5: T1.3 의 `include: { tenant: true }` 워크어라운드 정합 — Stage 1 nullable FK.
+  tenant Tenant? @relation("TenantApiKeys", fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, prefix])
+  @@index([tenantId, revokedAt])
   @@map("api_keys")
 }
 
