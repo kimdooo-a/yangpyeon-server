@@ -6,6 +6,7 @@ import { auditLogs } from "@/lib/db/schema";
 import { desc, sql, and, like, gte, lte } from "drizzle-orm";
 import { buffer, type AuditEntry } from "./audit-log";
 import { recordAuditOutcome } from "./audit-metrics";
+import { getRequestContext } from "./request-context";
 
 /** 페이지네이션 조회 옵션 */
 export interface AuditPaginatedOptions {
@@ -46,6 +47,9 @@ export function flushBufferToDb(): number {
     statusCode: e.status ?? null,
     userAgent: e.userAgent ?? null,
     detail: e.detail ?? null,
+    // Phase 1.7 (T1.7) — 버퍼 entry 에 tenantId/traceId 가 있으면 보존, 없으면 default/null.
+    tenantId: e.tenantId ?? "default",
+    traceId: e.traceId ?? null,
   }));
 
   db.insert(auditLogs).values(rows).run();
@@ -57,6 +61,8 @@ export function flushBufferToDb(): number {
  *
  * 도메인 라우트에서는 `safeAudit` 을 사용하라. audit 쓰기 실패가 도메인 응답을
  * 깨뜨리면 안 된다는 invariant 는 ADR-021 에 정식화되어 있다.
+ *
+ * Phase 1.7: tenantId/traceId 컬럼 매핑 추가 (entry 에 명시되지 않으면 default/null).
  * @internal
  */
 export function writeAuditLogDb(entry: AuditEntry): void {
@@ -70,6 +76,9 @@ export function writeAuditLogDb(entry: AuditEntry): void {
     statusCode: entry.status ?? null,
     userAgent: entry.userAgent ?? null,
     detail: entry.detail ?? null,
+    // Phase 1.7 (T1.7) ADR-029 §2.2.3 — per-tenant 차원 + T3 trace correlation.
+    tenantId: entry.tenantId ?? "default",
+    traceId: entry.traceId ?? null,
   }).run();
 }
 
@@ -81,16 +90,30 @@ export function writeAuditLogDb(entry: AuditEntry): void {
  * 호출자에게는 throw 하지 않는다 (세션 54 진단 패턴 + ADR-021 일반화).
  *
  * 모든 도메인 라우트는 이 함수만 사용해야 한다.
+ *
+ * Phase 1.7 (T1.7) ADR-029 §2.2.3 — request-context AsyncLocalStorage 자동 주입:
+ *   - 호출자가 entry.tenantId / entry.traceId 를 명시하면 그대로 사용.
+ *   - 미지정 시 getRequestContext() 에서 자동 추출 (인증/router 경유 시).
+ *   - 미인증/시스템 cron 호출 시 'default' sentinel + traceId undefined 로 fail-soft.
+ *   - 11 도메인 콜사이트 시그니처 무수정 (ADR-021 §amendment-2 invariant).
  */
 export function safeAudit(entry: AuditEntry, context?: string): void {
   const ctx = context ?? entry.action ?? `${entry.method} ${entry.path}`;
+  const reqCtx = getRequestContext();
+  const enriched: AuditEntry = {
+    ...entry,
+    tenantId: entry.tenantId ?? reqCtx?.tenantId ?? "default",
+    traceId: entry.traceId ?? reqCtx?.traceId,
+  };
   try {
-    writeAuditLogDb(entry);
-    recordAuditOutcome(true, ctx);
+    writeAuditLogDb(enriched);
+    recordAuditOutcome(true, ctx, undefined, enriched.tenantId);
   } catch (err) {
-    recordAuditOutcome(false, ctx, err);
+    recordAuditOutcome(false, ctx, err, enriched.tenantId);
     console.warn("[audit] write failed", {
       context: ctx,
+      tenantId: enriched.tenantId,
+      traceId: enriched.traceId,
       error:
         err instanceof Error
           ? { message: err.message, stack: err.stack }
@@ -123,6 +146,8 @@ export function getAuditLogs(limit = 100): AuditEntry[] {
     action: r.action,
     userAgent: r.userAgent ?? undefined,
     detail: r.detail ?? undefined,
+    tenantId: r.tenantId ?? undefined,
+    traceId: r.traceId ?? undefined,
   }));
 }
 
@@ -178,6 +203,8 @@ export function getAuditLogsPaginated(options: AuditPaginatedOptions): AuditPagi
     action: r.action,
     userAgent: r.userAgent ?? undefined,
     detail: r.detail ?? undefined,
+    tenantId: r.tenantId ?? undefined,
+    traceId: r.traceId ?? undefined,
   }));
 
   return {
