@@ -15,7 +15,13 @@ export interface MigrationResult {
   tables: string[];
 }
 
-const REQUIRED_TABLES = ["audit_logs", "ip_whitelist", "metrics_history"] as const;
+const REQUIRED_TABLES = [
+  "audit_logs",
+  "ip_whitelist",
+  "metrics_history",
+  // Phase 1.7 (T1.7) ADR-029 §2.1 — per-tenant Metrics 테이블.
+  "tenant_metrics_history",
+] as const;
 
 function resolveMigrationsFolder(): string {
   if (process.env.DRIZZLE_MIGRATIONS_DIR) return process.env.DRIZZLE_MIGRATIONS_DIR;
