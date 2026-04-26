@@ -11,6 +11,9 @@
 /.next/
 /out/
 
+# packages/core 빌드 산출 (tsc composite) — Phase 1.5
+packages/*/dist/
+
 # production
 /build
 

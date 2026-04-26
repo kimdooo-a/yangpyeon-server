@@ -25,6 +25,12 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@yangpyeon/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@yangpyeon/core/*": [
+        "./packages/core/src/*"
       ]
     }
   },
