@@ -7,6 +7,26 @@ datasource db {
   provider = "postgresql"
 }
 
+/// 멀티테넌트 BaaS 1급 시민 — ADR-022/023/026 ACCEPTED 2026-04-26.
+/// Phase 0.3 (T0.3) Stage 1 additive: 본 모델 신설 + 'default' tenant 시드.
+/// Phase 1.4 (T1.4) Stage 3 enforce: 모든 비즈니스 모델의 tenantId NOT NULL + RLS 정책 활성화.
+///
+/// id: UUID. 모든 비즈니스 모델의 tenant_id FK 가 본 컬럼을 참조 (Stage 3 부터).
+/// slug: URL path 식별자 (예: "default", "almanac", "<2nd-consumer>"). /api/v1/t/<slug>/ 에 사용 (ADR-027).
+/// status: active | suspended | archived. 운영 콘솔에서 토글 (ADR-026 §3 운영 토글).
+/// runtimeOverrides: TS manifest 의 일부 필드 hot-override (Phase 2 Manifest loader 도입).
+model Tenant {
+  id               String   @id @default(uuid()) @db.Uuid
+  slug             String   @unique
+  displayName      String   @map("display_name")
+  status           String   @default("active")
+  runtimeOverrides Json?    @map("runtime_overrides")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("tenants")
+}
+
 model User {
   id             String                  @id @default(uuid())
   email          String                  @unique
@@ -19,6 +39,8 @@ model User {
   lastLoginAt    DateTime?               @map("last_login_at") @db.Timestamptz(3)
   createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive — nullable, Phase 1 backfill + Stage 3 NOT NULL 전환 예정.
+  tenantId       String?                 @map("tenant_id") @db.Uuid
   folders        Folder[]                @relation("UserFolders")
   files          File[]                  @relation("UserFiles")
   sqlQueries     SqlQuery[]              @relation("UserSqlQueries")
@@ -54,6 +76,8 @@ model WebAuthnAuthenticator {
   friendlyName String?   @map("friendly_name")
   lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz(3)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId     String?   @map("tenant_id") @db.Uuid
 
   @@index([userId])
   @@map("webauthn_authenticators")
@@ -68,6 +92,8 @@ model WebAuthnChallenge {
   purpose   String // "registration" | "authentication"
   expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId  String?  @map("tenant_id") @db.Uuid
 
   @@index([expiresAt])
   @@map("webauthn_challenges")
@@ -89,6 +115,8 @@ model MfaEnrollment {
   lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(3)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId         String?   @map("tenant_id") @db.Uuid
 
   @@map("mfa_enrollments")
 }
@@ -103,6 +131,8 @@ model MfaRecoveryCode {
   codeHash  String    @map("code_hash")
   usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId  String?   @map("tenant_id") @db.Uuid
 
   @@unique([userId, codeHash])
   @@index([userId, usedAt])
@@ -128,6 +158,8 @@ model JwksKey {
   createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   rotatedAt  DateTime?  @map("rotated_at") @db.Timestamptz(3)
   retireAt   DateTime?  @map("retire_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive — JWKS 가 per-tenant 가 될지(Phase 3 ADR-029 결정)는 Stage 4 에서 정함.
+  tenantId   String?    @map("tenant_id") @db.Uuid
 
   @@index([status])
   @@index([retireAt])
@@ -150,6 +182,8 @@ model RateLimitBucket {
   hits        Int      @default(1)
   windowStart DateTime @default(now()) @map("window_start") @db.Timestamptz(3)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive — Phase 1 buildBucketKey() 에 tenantId prefix 추가 (마이그레이션 전략 §1.1)
+  tenantId    String?  @map("tenant_id") @db.Uuid
 
   @@index([windowStart])
   @@map("rate_limit_buckets")
@@ -173,6 +207,8 @@ model Session {
   revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(3)
   // 세션 37 — revoke 사유 추적. "rotation" 만 reuse 의심 대상, 나머지(self/logout/reuse/admin)는 조용히 401.
   revokedReason String?   @map("revoked_reason")
+  // Phase 0.3 Stage 1 additive
+  tenantId      String?   @map("tenant_id") @db.Uuid
 
   @@index([userId, revokedAt, expiresAt])
   @@map("sessions")
@@ -190,6 +226,8 @@ model Folder {
   isRoot    Boolean  @default(false) @map("is_root")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId  String?  @map("tenant_id") @db.Uuid
 
   @@unique([parentId, name, ownerId])
   @@map("folders")
@@ -207,6 +245,8 @@ model File {
   owner        User     @relation("UserFiles", fields: [ownerId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId     String?  @map("tenant_id") @db.Uuid
 
   @@map("files")
 }
@@ -233,6 +273,8 @@ model SqlQuery {
   lastRunAt DateTime?  @map("last_run_at") @db.Timestamptz(3)
   createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId  String?    @map("tenant_id") @db.Uuid
 
   @@index([ownerId, scope])
   @@map("sql_queries")
@@ -251,6 +293,8 @@ model EdgeFunction {
   runs        EdgeFunctionRun[]
   createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId    String?           @map("tenant_id") @db.Uuid
 
   @@map("edge_functions")
 }
@@ -266,6 +310,8 @@ model EdgeFunctionRun {
   stderr     String?
   startedAt  DateTime     @default(now()) @map("started_at") @db.Timestamptz(3)
   finishedAt DateTime?    @map("finished_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId   String?      @map("tenant_id") @db.Uuid
 
   @@index([functionId, startedAt])
   @@map("edge_function_runs")
@@ -285,6 +331,8 @@ model Webhook {
   failureCount    Int          @default(0) @map("failure_count")
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId        String?      @map("tenant_id") @db.Uuid
 
   @@map("webhooks")
 }
@@ -301,6 +349,8 @@ model CronJob {
   lastStatus String?   @map("last_status")
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive — Phase 1.5 TenantWorkerPool 도입 시 본 컬럼이 dispatch 결정의 핵심.
+  tenantId   String?   @map("tenant_id") @db.Uuid
 
   @@map("cron_jobs")
 }
@@ -319,6 +369,8 @@ model ApiKey {
   revokedAt  DateTime?  @map("revoked_at") @db.Timestamptz(3)
   createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive — ADR-027 K3 매칭의 FK. Stage 3 NOT NULL 전환 + 검증 강제.
+  tenantId   String?    @map("tenant_id") @db.Uuid
 
   @@map("api_keys")
 }
@@ -336,6 +388,8 @@ model LogDrain {
   failureCount    Int       @default(0) @map("failure_count")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive
+  tenantId        String?   @map("tenant_id") @db.Uuid
 
   @@map("log_drains")
 }
@@ -397,6 +451,8 @@ model SecretItem {
   kekVersion     Int       @default(1) @map("kek_version")
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   rotatedAt      DateTime? @map("rotated_at") @db.Timestamptz(3)
+  // Phase 0.3 Stage 1 additive — Vault 가 per-tenant 가 될지(KEK 격리)는 Stage 4 결정.
+  tenantId       String?   @map("tenant_id") @db.Uuid
 
   @@map("secret_items")
 }
