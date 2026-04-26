@@ -28,8 +28,43 @@ model Tenant {
   cronJobs   CronJob[]         @relation("TenantCronJobs")
   apiKeys    ApiKey[]          @relation("TenantApiKeys")
   cronPolicy TenantCronPolicy?
+  // Phase 1.4+P0 (S61) — TenantMembership backref: cookie 인증 경로의 (tenantId, userId) 멤버십 조회.
+  memberships TenantMembership[] @relation("TenantMemberships")
 
   @@map("tenants")
+}
+
+/// TenantMembership — cookie 인증 경로(/api/v1/t/<tenant>/*)의 (tenantId, userId) 멤버십 검증.
+///
+/// ADR-027 §4.3 + ADR-026 §멤버십. T1.2 router 가 fail-closed stub
+/// (membership.ts) 으로 도입했고, 본 모델이 그 stub 의 빈자리(P0-membership)를 메운다.
+///
+/// **Tenant-bypass 모델** (spec §2.4 Tenant/JwksKey/SecretItem 카테고리):
+///   - 멤버십 조회는 tenant context 가 *결정되기 전* 단계에서 일어남 (사용자가 어느 tenant 에 속하는지
+///     판정하는 것이 본 query 의 목적) — RLS USING 절이 app.tenant_id 를 요구하면 self-defeating.
+///   - 따라서 RLS 미적용. (tenantId, userId) 합성 unique + 명시 필터로 cross-tenant 안전성 보장.
+///
+/// role:
+///   - "OWNER": tenant 의 단일 운영자 (주로 본인). admin 콘솔 로그인 가능.
+///   - "ADMIN": OWNER 위임. (Phase 2 multi-admin 도입 시 사용)
+///   - "MEMBER": 일반 컨슈머 사용자. (Almanac 등의 public 도메인 사용자)
+///   - "VIEWER": read-only.
+///
+/// FK: ON DELETE CASCADE (Tenant 또는 User 삭제 시 자동 정리).
+model TenantMembership {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id")
+  role      String   @default("MEMBER")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenant Tenant @relation("TenantMemberships", fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation("UserTenantMemberships", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId], map: "tenant_memberships_tenant_id_user_id_key")
+  @@index([userId])
+  @@map("tenant_memberships")
 }
 
 model User {
@@ -59,6 +94,8 @@ model User {
   mfaEnrollment  MfaEnrollment?          @relation("UserMfaEnrollment")
   recoveryCodes  MfaRecoveryCode[]       @relation("UserMfaRecoveryCodes")
   authenticators WebAuthnAuthenticator[] @relation("UserAuthenticators")
+  // Phase 1.4+P0 (S61) — 사용자가 속한 tenant 들의 멤버십 목록.
+  tenantMemberships TenantMembership[]   @relation("UserTenantMemberships")
 
   // Phase 1.4 Stage 3 — tenant-scoped composite unique + index.
   @@unique([tenantId, email], map: "users_tenant_id_email_key")
