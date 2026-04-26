@@ -154,6 +154,7 @@ describe("verifyApiKeyForTenant — 시나리오 2: NOT_FOUND", () => {
     if (!result.ok) expect(result.reason).toBe("NOT_FOUND");
     expect(mockApiKeyFindUnique).toHaveBeenCalledWith({
       where: { prefix: VALID_PREFIX_DB },
+      include: { tenant: true },
     });
     // bcrypt.compare 는 호출되지 않아야 한다 (lookup 단계에서 cut).
     expect(mockBcryptCompare).not.toHaveBeenCalled();
@@ -210,10 +211,10 @@ describe("verifyApiKeyForTenant — 시나리오 4: REVOKED", () => {
 // ────────────────────────────────────────────────────────────────────────
 describe("verifyApiKeyForTenant — 시나리오 5: TENANT_MISMATCH_INTERNAL", () => {
   it("DB row tenant.slug 가 prefix slug 와 다름 (위변조 의심 — high severity)", async () => {
-    mockApiKeyFindUnique.mockResolvedValueOnce(HEALTHY_KEY);
-    mockBcryptCompare.mockResolvedValueOnce(true);
     // FK 가 가리키는 tenant 는 recipe 인데 prefix 는 almanac → DB tampering.
-    mockTenantFindUnique.mockResolvedValueOnce(RECIPE_TENANT);
+    // T1.5: include: { tenant: true } 로 단일 query — tenant 를 직접 embed.
+    mockApiKeyFindUnique.mockResolvedValueOnce({ ...HEALTHY_KEY, tenant: RECIPE_TENANT });
+    mockBcryptCompare.mockResolvedValueOnce(true);
 
     const result = await verifyApiKeyForTenant(VALID_PLAINTEXT, ALMANAC_TENANT);
 
@@ -225,10 +226,13 @@ describe("verifyApiKeyForTenant — 시나리오 5: TENANT_MISMATCH_INTERNAL", (
         expect(result.keyTenantSlug).toBe("recipe");
       }
     }
+    // T1.5 단일 query — tenant.findUnique 는 더 이상 호출되지 않아야 한다.
+    expect(mockTenantFindUnique).not.toHaveBeenCalled();
   });
 
-  it("ApiKey.tenantId 가 NULL 인 경우(레거시 키)도 동일 reason 으로 차단", async () => {
-    const orphanKey = { ...HEALTHY_KEY, tenantId: null };
+  it("ApiKey.tenant relation 이 null 인 경우(레거시/고아 키)도 동일 reason 으로 차단", async () => {
+    // T1.5: include: { tenant: true } 결과에서 tenant 가 null → defense in depth.
+    const orphanKey = { ...HEALTHY_KEY, tenant: null };
     mockApiKeyFindUnique.mockResolvedValueOnce(orphanKey);
     mockBcryptCompare.mockResolvedValueOnce(true);
 
@@ -241,7 +245,7 @@ describe("verifyApiKeyForTenant — 시나리오 5: TENANT_MISMATCH_INTERNAL", (
         expect(result.keyId).toBe(HEALTHY_KEY.id);
       }
     }
-    // tenantId NULL 이면 tenant query 자체가 일어나지 않아야 한다.
+    // T1.5 단일 query — tenant.findUnique 는 더 이상 호출되지 않아야 한다.
     expect(mockTenantFindUnique).not.toHaveBeenCalled();
   });
 });
@@ -251,9 +255,9 @@ describe("verifyApiKeyForTenant — 시나리오 5: TENANT_MISMATCH_INTERNAL", (
 // ────────────────────────────────────────────────────────────────────────
 describe("verifyApiKeyForTenant — 시나리오 6: CROSS_TENANT_FORBIDDEN", () => {
   it("almanac 키로 recipe 라우트 호출 (path tenant ≠ DB tenant)", async () => {
-    mockApiKeyFindUnique.mockResolvedValueOnce(HEALTHY_KEY);
+    // T1.5: include: { tenant: true } 로 단일 query — tenant embed.
+    mockApiKeyFindUnique.mockResolvedValueOnce({ ...HEALTHY_KEY, tenant: ALMANAC_TENANT });
     mockBcryptCompare.mockResolvedValueOnce(true);
-    mockTenantFindUnique.mockResolvedValueOnce(ALMANAC_TENANT);
 
     // path tenant 만 recipe 로 다르다.
     const result = await verifyApiKeyForTenant(VALID_PLAINTEXT, RECIPE_TENANT);
@@ -274,9 +278,9 @@ describe("verifyApiKeyForTenant — 시나리오 6: CROSS_TENANT_FORBIDDEN", () 
 // ────────────────────────────────────────────────────────────────────────
 describe("verifyApiKeyForTenant — 시나리오 7: SUCCESS", () => {
   it("정상 키 + 일치 path → ok=true, scope='pub', lastUsedAt 갱신 발생", async () => {
-    mockApiKeyFindUnique.mockResolvedValueOnce(HEALTHY_KEY);
+    // T1.5: include: { tenant: true } 로 단일 query — tenant embed.
+    mockApiKeyFindUnique.mockResolvedValueOnce({ ...HEALTHY_KEY, tenant: ALMANAC_TENANT });
     mockBcryptCompare.mockResolvedValueOnce(true);
-    mockTenantFindUnique.mockResolvedValueOnce(ALMANAC_TENANT);
 
     const result = await verifyApiKeyForTenant(VALID_PLAINTEXT, ALMANAC_TENANT);
 
@@ -296,10 +300,10 @@ describe("verifyApiKeyForTenant — 시나리오 7: SUCCESS", () => {
   it("srv scope 도 동일하게 통과", async () => {
     const srvPlaintext = `srv_almanac_${VALID_RANDOM}`;
     const srvDbPrefix = `srv_almanac_${VALID_RANDOM.slice(0, 8)}`;
-    const srvKey = { ...HEALTHY_KEY, prefix: srvDbPrefix, type: "SECRET" as const };
+    // T1.5: include: { tenant: true } 로 단일 query — tenant embed.
+    const srvKey = { ...HEALTHY_KEY, prefix: srvDbPrefix, type: "SECRET" as const, tenant: ALMANAC_TENANT };
     mockApiKeyFindUnique.mockResolvedValueOnce(srvKey);
     mockBcryptCompare.mockResolvedValueOnce(true);
-    mockTenantFindUnique.mockResolvedValueOnce(ALMANAC_TENANT);
 
     const result = await verifyApiKeyForTenant(srvPlaintext, ALMANAC_TENANT);
 

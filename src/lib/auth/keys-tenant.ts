@@ -87,10 +87,8 @@ export type VerifyResult =
  *
  * 6단계 순차 실행:
  *   1. KEY_RE 정규식으로 prefix 파싱 (scope, prefixSlug, random)
- *   2. DB prefix unique lookup (`<scope>_<prefixSlug>_<random.slice(0,8)>`)
- *      ※ 현재 ApiKey 모델은 `tenant Tenant?` relation 미정의 (T1.5 schema 통합 예정).
- *        해소 시 까지는 두 번째 query 로 Tenant 를 별도 조회하여 검증을 수행한다.
- *        TODO(T1.5): relation 도입 후 `include: { tenant: true }` 단일 query 로 통합.
+ *   2. DB prefix unique lookup — T1.5 relation 활용 — 단일 query 통합
+ *      (`include: { tenant: true }` 으로 ApiKey + Tenant 를 한 번에 조회)
  *   3. bcrypt.compare(rawKey, key.keyHash) — random 부분 위조 차단 (시나리오 3)
  *   4. revokedAt 검사 — 폐기 키 차단
  *   5. cross-validation 1: dbTenant.slug === prefixSlug — DB 위조 차단 (시나리오 4)
@@ -108,11 +106,11 @@ export async function verifyApiKeyForTenant(
   const scope = scopeStr as "pub" | "srv";
   const dbPrefix = `${scope}_${prefixSlug}_${random.slice(0, 8)}`;
 
-  // ─── 2. DB lookup (prefix unique) ───
-  // NOTE(T1.5): T1.5 가 ApiKey ↔ Tenant relation 을 schema 에 추가하기 전까지
-  // 두 번의 query 로 분리 수행. relation 도입 시 단일 `include: { tenant: true }`
-  // query 로 합치고, 본 두 번째 query 와 관련 분기를 제거할 것.
-  const dbKey = await prisma.apiKey.findUnique({ where: { prefix: dbPrefix } });
+  // ─── 2. DB lookup (prefix unique) — T1.5 relation 활용 — 단일 query 통합 ───
+  const dbKey = await prisma.apiKey.findUnique({
+    where: { prefix: dbPrefix },
+    include: { tenant: true },
+  });
   if (!dbKey) return { ok: false, reason: "NOT_FOUND" };
 
   // ─── 3. Hash 검증 (시나리오 3 차단) ───
@@ -130,18 +128,9 @@ export async function verifyApiKeyForTenant(
   }
 
   // ─── 5. Cross-validation 1: DB tenant 무결성 ───
-  // tenantId 가 NULL 이거나 DB tenant.slug 가 prefix slug 와 다르면 위변조 의심.
-  // (현재 schema 는 tenantId nullable — Stage 1 additive. T1.5 에서 NOT NULL 전환.)
-  if (!dbKey.tenantId) {
-    return {
-      ok: false,
-      reason: "TENANT_MISMATCH_INTERNAL",
-      keyId: dbKey.id,
-    };
-  }
-  const dbTenant = await prisma.tenant.findUnique({
-    where: { id: dbKey.tenantId },
-  });
+  // relation 미존재(FK violation 방어) 또는 slug 불일치 시 위변조 의심.
+  // T1.5 schema 에서 tenantId NOT NULL + FK Cascade 로 전환됐으나 defense in depth.
+  const dbTenant = dbKey.tenant;
   if (!dbTenant || dbTenant.slug !== prefixSlug) {
     return {
       ok: false,
