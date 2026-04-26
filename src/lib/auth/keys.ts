@@ -40,6 +40,7 @@ export async function issueApiKey(input: IssueApiKeyInput): Promise<IssueApiKeyR
   const plaintext = `${prefix}_${tokenBody}`;
   const keyHash = await bcrypt.hash(plaintext, BCRYPT_ROUNDS);
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- API 키 발급은 인증 인프라 — tenant context 결정 전 단계, 운영자 전용 작업. base prisma 사용 정당
   const created = await prisma.apiKey.create({
     data: {
       name: input.name,
@@ -78,6 +79,7 @@ export async function verifyApiKey(plaintext: string): Promise<ApiKey | null> {
     return null;
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- API 키 검증은 인증 인프라 — prefix 단독 lookup, cross-tenant 위험 없음. base prisma 사용 정당
   const key = await prisma.apiKey.findUnique({ where: { prefix } });
   if (!key) return null;
   if (key.revokedAt) return null;
@@ -86,6 +88,7 @@ export async function verifyApiKey(plaintext: string): Promise<ApiKey | null> {
   if (!ok) return null;
 
   // lastUsedAt 갱신 (best-effort, 실패 무시)
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- API 키 lastUsedAt 갱신 — 인증 인프라 best-effort 업데이트, tenant context 불필요
   prisma.apiKey
     .update({ where: { id: key.id }, data: { lastUsedAt: new Date() } })
     .catch(() => {});

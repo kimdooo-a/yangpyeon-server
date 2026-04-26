@@ -7,6 +7,7 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 export const GET = withAuth(async (_request, user) => {
   // 세션 43: Date 필드는 raw SELECT + ::text 로 정확 읽기
   // (Prisma 7 adapter-pg parsing-side +9h KST 시프트 회피, CK orm-date-filter-audit-sweep 패턴 B).
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 인증된 사용자 자신의 프로필 조회, 글로벌 auth 라우트 (tenant-bypass 정당화)
   const rows = await prisma.$queryRaw<
     Array<{
       id: string;
@@ -59,12 +60,14 @@ export const PUT = withAuth(async (request: NextRequest, user) => {
     return errorResponse("VALIDATION_ERROR", message, 400);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 인증된 사용자 자신의 프로필 업데이트, 글로벌 auth 라우트 (tenant-bypass 정당화)
   await prisma.user.update({
     where: { id: user.sub },
     data: parsed.data,
   });
 
   // 세션 43: update 직후 Date 필드는 raw SELECT ::text 로 재조회.
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 인증된 사용자 자신의 프로필 재조회 (KST 시프트 회피 목적), 글로벌 auth 라우트
   const rows = await prisma.$queryRaw<
     Array<{
       id: string;

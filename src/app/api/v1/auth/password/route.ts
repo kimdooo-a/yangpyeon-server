@@ -19,6 +19,7 @@ export const PUT = withAuth(async (request: NextRequest, user) => {
     return errorResponse("VALIDATION_ERROR", message, 400);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 비밀번호 변경 전 재인증 목적 사용자 lookup, 글로벌 auth 라우트
   const dbUser = await prisma.user.findUnique({ where: { id: user.sub } });
   if (!dbUser) {
     return errorResponse("NOT_FOUND", "사용자를 찾을 수 없습니다", 404);
@@ -33,6 +34,7 @@ export const PUT = withAuth(async (request: NextRequest, user) => {
   }
 
   const newHash = await hashPassword(parsed.data.newPassword);
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 비밀번호 해시 갱신, 글로벌 auth 라우트
   await prisma.user.update({
     where: { id: user.sub },
     data: { passwordHash: newHash },

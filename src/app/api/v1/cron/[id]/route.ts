@@ -1,11 +1,15 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { prisma } from "@/lib/prisma";
 import { ensureStarted, updateJob, removeJob } from "@/lib/cron/registry";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
+
+/** Cron 관리 — operator console, 기본 테넌트(default) UUID */
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
 
 export const runtime = "nodejs";
 
@@ -39,14 +43,20 @@ async function getId(context: unknown): Promise<string> {
 
 export const GET = withRole(["ADMIN", "MANAGER"], async (_req, _user, context) => {
   const id = await getId(context);
-  const row = await prisma.cronJob.findUnique({ where: { id } });
+  const row = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () => prismaWithTenant.cronJob.findUnique({ where: { id } }),
+  );
   if (!row) return errorResponse("NOT_FOUND", "Cron Job을 찾을 수 없습니다", 404);
   return successResponse(await withCronDates(row));
 });
 
 export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, user, context) => {
   const id = await getId(context);
-  const existing = await prisma.cronJob.findUnique({ where: { id } });
+  const existing = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () => prismaWithTenant.cronJob.findUnique({ where: { id } }),
+  );
   if (!existing) return errorResponse("NOT_FOUND", "Cron Job을 찾을 수 없습니다", 404);
 
   let body: unknown;
@@ -66,16 +76,20 @@ export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest,
     return errorResponse("FORBIDDEN", "enable/disable은 ADMIN만 가능합니다", 403);
   }
 
-  const updated = await prisma.cronJob.update({
-    where: { id },
-    data: {
-      ...(parsed.data.name !== undefined && { name: parsed.data.name }),
-      ...(parsed.data.schedule !== undefined && { schedule: parsed.data.schedule }),
-      ...(parsed.data.kind !== undefined && { kind: parsed.data.kind }),
-      ...(parsed.data.payload !== undefined && { payload: parsed.data.payload as object }),
-      ...(parsed.data.enabled !== undefined && { enabled: parsed.data.enabled }),
-    },
-  });
+  const updated = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () =>
+      prismaWithTenant.cronJob.update({
+        where: { id },
+        data: {
+          ...(parsed.data.name !== undefined && { name: parsed.data.name }),
+          ...(parsed.data.schedule !== undefined && { schedule: parsed.data.schedule }),
+          ...(parsed.data.kind !== undefined && { kind: parsed.data.kind }),
+          ...(parsed.data.payload !== undefined && { payload: parsed.data.payload as object }),
+          ...(parsed.data.enabled !== undefined && { enabled: parsed.data.enabled }),
+        },
+      }),
+  );
 
   ensureStarted();
   await updateJob(id);
@@ -97,9 +111,15 @@ export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest,
 
 export const DELETE = withRole(["ADMIN", "MANAGER"], async (_req, _user, context) => {
   const id = await getId(context);
-  const row = await prisma.cronJob.findUnique({ where: { id } });
+  const row = await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () => prismaWithTenant.cronJob.findUnique({ where: { id } }),
+  );
   if (!row) return errorResponse("NOT_FOUND", "Cron Job을 찾을 수 없습니다", 404);
-  await prisma.cronJob.delete({ where: { id } });
+  await runWithTenant(
+    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
+    () => prismaWithTenant.cronJob.delete({ where: { id } }),
+  );
   removeJob(id);
   return successResponse({ deleted: true });
 });

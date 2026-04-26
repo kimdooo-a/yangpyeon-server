@@ -30,6 +30,7 @@ export const DELETE = withAuth(async (request: NextRequest, sessionUser) => {
     return errorResponse("VALIDATION_ERROR", message, 400);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: MFA 해제 전 재인증(password 검증) 목적 사용자 lookup, 글로벌 auth 라우트
   const user = await prisma.user.findUnique({ where: { id: sessionUser.sub } });
   if (!user) return errorResponse("INVALID_CREDENTIALS", "사용자 없음", 401);
 
@@ -41,6 +42,7 @@ export const DELETE = withAuth(async (request: NextRequest, sessionUser) => {
     return errorResponse("INVALID_CODE", "TOTP 코드가 올바르지 않습니다", 401);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: MFA 해제 트랜잭션 (user/recovery code/enrollment 삭제), 글로벌 auth 라우트
   await prisma.$transaction(async (tx) => {
     await tx.user.update({ where: { id: user.id }, data: { mfaEnabled: false } });
     await tx.mfaRecoveryCode.deleteMany({ where: { userId: user.id } });

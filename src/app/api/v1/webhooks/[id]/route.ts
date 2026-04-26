@@ -1,13 +1,32 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { validateWebhookUrl } from "@/lib/webhooks/deliver";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+
+// 운영 콘솔 — default tenant 로 RLS bypass (ADR-023 §5 운영자 BYPASS_RLS)
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+type WebhookRow = {
+  id: string;
+  name: string;
+  sourceTable: string;
+  event: string;
+  url: string;
+  headers: Record<string, string>;
+  secret: string | null;
+  enabled: boolean;
+  failureCount: number;
+  lastTriggeredAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 async function withWebhookDates<T extends { id: string }>(row: T) {
   // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
@@ -36,7 +55,9 @@ const patchSchema = z.object({
 
 export const GET = withRole(["ADMIN", "MANAGER"], async (_req, _user, context) => {
   const { id } = await (context as RouteContext).params;
-  const wh = await prisma.webhook.findUnique({ where: { id } });
+  const wh = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
+    prismaWithTenant.webhook.findUnique({ where: { id } })
+  )) as WebhookRow | null;
   if (!wh) return errorResponse("NOT_FOUND", "웹훅을 찾을 수 없습니다", 404);
   return successResponse(await withWebhookDates(wh));
 });
@@ -57,13 +78,18 @@ export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest,
     const v = validateWebhookUrl(parsed.data.url);
     if (!v.ok) return errorResponse("INVALID_URL", v.error, 400);
   }
-  const existing = await prisma.webhook.findUnique({ where: { id } });
-  if (!existing) return errorResponse("NOT_FOUND", "웹훅을 찾을 수 없습니다", 404);
 
-  const updated = await prisma.webhook.update({
-    where: { id },
-    data: parsed.data,
-  });
+  const updated = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, async () => {
+    const existing = (await prismaWithTenant.webhook.findUnique({ where: { id } })) as WebhookRow | null;
+    if (!existing) return null;
+
+    return prismaWithTenant.webhook.update({
+      where: { id },
+      data: parsed.data,
+    });
+  })) as WebhookRow | null;
+
+  if (!updated) return errorResponse("NOT_FOUND", "웹훅을 찾을 수 없습니다", 404);
 
   writeAuditLog({
     timestamp: new Date().toISOString(),
@@ -79,9 +105,15 @@ export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest,
 
 export const DELETE = withRole(["ADMIN", "MANAGER"], async (request, user, context) => {
   const { id } = await (context as RouteContext).params;
-  const existing = await prisma.webhook.findUnique({ where: { id } });
+
+  const existing = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, async () => {
+    const wh = (await prismaWithTenant.webhook.findUnique({ where: { id } })) as WebhookRow | null;
+    if (!wh) return null;
+    await prismaWithTenant.webhook.delete({ where: { id } });
+    return wh;
+  })) as WebhookRow | null;
+
   if (!existing) return errorResponse("NOT_FOUND", "웹훅을 찾을 수 없습니다", 404);
-  await prisma.webhook.delete({ where: { id } });
 
   writeAuditLog({
     timestamp: new Date().toISOString(),

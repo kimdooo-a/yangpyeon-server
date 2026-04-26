@@ -36,6 +36,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     return errorResponse("VALIDATION_ERROR", message, 400);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: TOTP 1차 확인 흐름에서 enrollment 조회, 글로벌 auth 라우트 (tenant-bypass 정당화)
   const enrollment = await prisma.mfaEnrollment.findUnique({
     where: { userId: user.sub },
   });
@@ -52,6 +53,7 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   const codes = generateRecoveryCodes();
   const hashes = codes.map((c) => normalizeAndHashRecoveryCode(c));
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: MFA 확인 트랜잭션 (enrollment/user/recovery code 갱신), 글로벌 auth 라우트
   await prisma.$transaction(async (tx) => {
     await tx.mfaEnrollment.update({
       where: { userId: user.sub },

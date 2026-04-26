@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+
+// closed BaaS: 모든 사용자는 default tenant 소속 (ADR-022).
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
 import { verifyPasswordHash, needsRehash, hashPassword } from "@/lib/password";
 import { loginSchema } from "@/lib/schemas/auth";
 import { errorResponse } from "@/lib/api-response";
 import { issueMfaChallenge, CHALLENGE_MAX_AGE } from "@/lib/mfa/challenge";
 import { applyRateLimit } from "@/lib/rate-limit-guard";
 import { finalizeLoginResponse } from "@/lib/sessions/login-finalizer";
-
-// T1.4 sweep: /api/v1/auth/login 은 URL에 tenant slug 가 없는 글로벌 인증 엔드포인트.
-// 운영자 콘솔(admin context) → 'default' sentinel 사용 (패턴 c).
-const ADMIN_TENANT_ID = "default";
 
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -37,9 +36,9 @@ export async function POST(request: NextRequest) {
   });
   if (blocked) return blocked;
 
-  // T1.4 sweep: (tenantId, email) composite unique 로 전환. 글로벌 @unique 의존 제거.
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: email→userId 결정 단계로 tenant context 이전 실행 (login flow)
   const user = await prisma.user.findUnique({
-    where: { tenantId_email: { tenantId: ADMIN_TENANT_ID, email } },
+    where: { tenantId_email: { tenantId: DEFAULT_TENANT_UUID, email } },
   });
   if (!user || !user.isActive) {
     return errorResponse("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다", 401);
@@ -57,6 +56,7 @@ export async function POST(request: NextRequest) {
   if (needsRehash(user.passwordHash)) {
     updateData.passwordHash = await hashPassword(password);
   }
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 로그인 완료 직후 lastLoginAt/passwordHash 갱신, tenant context 결정 전 단계
   await prisma.user.update({
     where: { id: user.id },
     data: updateData,
@@ -65,10 +65,12 @@ export async function POST(request: NextRequest) {
   // 2차 인증 확장 판단: TOTP 활성 또는 Passkey 등록 중 하나라도 있으면 MFA 필요.
   // Phase 15 Step 4/5 / FR-6.1, FR-6.2.
   const [enrollment, passkeyCount] = await Promise.all([
+    // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: MFA enrollment 확인은 세션 발급 전 단계 (tenant context 결정 이전)
     prisma.mfaEnrollment.findUnique({
       where: { userId: user.id },
       select: { confirmedAt: true },
     }),
+    // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: Passkey 카운트 확인은 세션 발급 전 단계 (tenant context 결정 이전)
     prisma.webAuthnAuthenticator.count({ where: { userId: user.id } }),
   ]);
   const hasTotp = user.mfaEnabled && Boolean(enrollment?.confirmedAt);

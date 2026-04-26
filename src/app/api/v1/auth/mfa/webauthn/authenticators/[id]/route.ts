@@ -18,6 +18,7 @@ export const DELETE = withAuth(async (_request: NextRequest, user, context) => {
 
   const { id } = await (context as RouteContext).params;
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 인증된 사용자 자신의 Passkey 소유권 확인, 글로벌 auth 라우트
   const existing = await prisma.webAuthnAuthenticator.findUnique({
     where: { id },
     select: { userId: true },
@@ -26,6 +27,7 @@ export const DELETE = withAuth(async (_request: NextRequest, user, context) => {
     return errorResponse("NOT_FOUND", "Passkey 가 존재하지 않거나 권한이 없습니다", 404);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 소유권 확인 후 Passkey 삭제, 글로벌 auth 라우트
   await prisma.webAuthnAuthenticator.delete({ where: { id } });
 
   return NextResponse.json({ success: true });

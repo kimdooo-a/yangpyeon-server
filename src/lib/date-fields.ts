@@ -58,6 +58,7 @@ export async function fetchDateFieldsText<F extends string>(
   const selectClause = fields.map((f) => `(${f}::text) AS ${f}_text`).join(", ");
   const idArray = [...ids];
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 날짜 필드 헬퍼: 테이블/컬럼명 화이트리스트 검증 후 raw SQL 실행 (PG timestamptz text 변환). 호출자가 id 목록을 명시적으로 전달하므로 cross-tenant 위험 없음
   const rows = await prisma.$queryRaw<Array<Record<string, string | null>>>(
     Prisma.sql`SELECT id, ${Prisma.raw(selectClause)} FROM ${Prisma.raw(table)} WHERE id = ANY(${idArray}::text[])`,
   );

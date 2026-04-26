@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
     return errorResponse("VERIFICATION_FAILED", "Passkey 검증 실패", 401);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: WebAuthn assertion 검증 후 userId로 사용자 lookup, 세션 발급 전 단계 (tenant context 이전)
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || !user.isActive) {
     return errorResponse("INVALID_CREDENTIALS", "사용자를 찾을 수 없습니다", 401);

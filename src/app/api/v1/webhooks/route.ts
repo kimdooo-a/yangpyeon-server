@@ -1,11 +1,30 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { validateWebhookUrl } from "@/lib/webhooks/deliver";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
+import { runWithTenant } from "@yangpyeon/core/tenant/context";
+import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+
+// 운영 콘솔 — default tenant 로 RLS bypass (ADR-023 §5 운영자 BYPASS_RLS)
+const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+
+type WebhookRow = {
+  id: string;
+  name: string;
+  sourceTable: string;
+  event: string;
+  url: string;
+  headers: Record<string, string>;
+  secret: string | null;
+  enabled: boolean;
+  failureCount: number;
+  lastTriggeredAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 const WEBHOOK_DATE_FIELDS = ["created_at", "updated_at", "last_triggered_at"] as const;
 
@@ -47,9 +66,11 @@ const createSchema = z.object({
 });
 
 export const GET = withRole(["ADMIN", "MANAGER"], async () => {
-  const webhooks = await prisma.webhook.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const webhooks = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
+    prismaWithTenant.webhook.findMany({
+      orderBy: { createdAt: "desc" },
+    })
+  )) as WebhookRow[];
   return successResponse(await attachWebhookDates(webhooks));
 });
 
@@ -74,17 +95,19 @@ export const POST = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, 
     return errorResponse("INVALID_URL", validation.error, 400);
   }
 
-  const created = await prisma.webhook.create({
-    data: {
-      name: parsed.data.name,
-      sourceTable: parsed.data.sourceTable,
-      event: parsed.data.event,
-      url: parsed.data.url,
-      headers: parsed.data.headers,
-      secret: parsed.data.secret ?? null,
-      enabled: parsed.data.enabled,
-    },
-  });
+  const created = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
+    prismaWithTenant.webhook.create({
+      data: {
+        name: parsed.data.name,
+        sourceTable: parsed.data.sourceTable,
+        event: parsed.data.event,
+        url: parsed.data.url,
+        headers: parsed.data.headers,
+        secret: parsed.data.secret ?? null,
+        enabled: parsed.data.enabled,
+      },
+    })
+  )) as WebhookRow;
 
   writeAuditLog({
     timestamp: new Date().toISOString(),

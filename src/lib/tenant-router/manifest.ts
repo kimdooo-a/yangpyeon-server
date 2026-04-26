@@ -20,6 +20,7 @@ import type { ResolvedTenant } from "./types";
 export async function resolveTenantFromSlug(
   slug: string,
 ): Promise<ResolvedTenant | null> {
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- tenant 자체 해석 단계 — slug → tenant.id 결정 self-referential, base prisma 정당 (membership.ts 동일 패턴)
   const row = await prisma.tenant.findUnique({
     where: { slug },
     select: {

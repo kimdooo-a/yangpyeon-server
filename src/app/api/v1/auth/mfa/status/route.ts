@@ -16,10 +16,12 @@ export const GET = withAuth(async (_request: NextRequest, user) => {
   }
 
   const [enrollment, passkeys, recoveryRemaining] = await Promise.all([
+    // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 인증된 사용자 자신의 MFA enrollment 조회, 글로벌 auth 라우트
     prisma.mfaEnrollment.findUnique({
       where: { userId: user.sub },
       select: { id: true, confirmedAt: true, lockedUntil: true },
     }),
+    // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 인증된 사용자 자신의 Passkey 목록 조회, 글로벌 auth 라우트
     prisma.webAuthnAuthenticator.findMany({
       where: { userId: user.sub },
       select: {
@@ -32,6 +34,7 @@ export const GET = withAuth(async (_request: NextRequest, user) => {
       },
       orderBy: { createdAt: "desc" },
     }),
+    // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: 인증된 사용자 자신의 recovery code 카운트, 글로벌 auth 라우트
     prisma.mfaRecoveryCode.count({
       where: { userId: user.sub, usedAt: null },
     }),

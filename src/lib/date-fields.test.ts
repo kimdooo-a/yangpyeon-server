@@ -9,6 +9,7 @@ vi.mock("@/lib/prisma", () => ({
 import { fetchDateFieldsText, toIsoOrNull } from "./date-fields";
 import { prisma } from "@/lib/prisma";
 
+// eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 테스트 파일: vi.mock()으로 prisma 전체 모킹, $queryRaw는 mock fn 참조 용도 (실제 DB 호출 없음)
 const queryRawMock = prisma.$queryRaw as unknown as ReturnType<typeof vi.fn>;
 
 describe("fetchDateFieldsText", () => {

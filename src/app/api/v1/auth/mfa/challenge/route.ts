@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     return errorResponse("INVALID_CHALLENGE", "챌린지 토큰이 유효하지 않거나 만료되었습니다", 401);
   }
 
+  // eslint-disable-next-line tenant/no-raw-prisma-without-tenant -- 인증 인프라: MFA challenge 검증 후 userId로 사용자 lookup, 세션 발급 전 단계 (tenant context 이전)
   const user = await prisma.user.findUnique({ where: { id: challengePayload.sub } });
   if (!user || !user.isActive) {
     return errorResponse("INVALID_CREDENTIALS", "사용자를 찾을 수 없습니다", 401);
