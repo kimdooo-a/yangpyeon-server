@@ -48,6 +48,16 @@ const BLOCKED_EXTENSIONS = new Set([
   ".com", ".msi", ".scr", ".vbs", ".wsf",
 ]);
 
+// MIME fallback — file.type이 비어있거나(macOS/일부 브라우저)
+// application/octet-stream(Windows .md 일부)인 경우 확장자 기반으로 통과 허용.
+// BLOCKED_EXTENSIONS는 그대로 차단되므로 정책 약화 아님.
+const ALLOWED_EXTENSIONS_FALLBACK = new Set([
+  ".md", ".markdown", ".txt", ".csv", ".json", ".yml", ".yaml",
+  ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",
+  ".zip", ".xlsx", ".docx", ".pptx", ".xls", ".doc", ".ppt",
+  ".hwp", ".hwpx",
+]);
+
 // 디렉토리 초기화
 export async function initFilesDir(): Promise<void> {
   await fs.mkdir(FILES_DIR, { recursive: true });
@@ -223,12 +233,16 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
   if (file.size === 0) {
     return { valid: false, error: "빈 파일은 업로드할 수 없습니다" };
   }
-  if (!ALLOWED_MIME_TYPES.has(file.type)) {
-    return { valid: false, error: `허용되지 않는 파일 형식: ${file.type || "알 수 없음"}` };
-  }
   const ext = path.extname(file.name).toLowerCase();
   if (BLOCKED_EXTENSIONS.has(ext)) {
     return { valid: false, error: `실행 파일은 업로드할 수 없습니다: ${ext}` };
+  }
+  // MIME 화이트리스트 1차 검사 → 실패 시 확장자 fallback (file.type 비어있는 환경 대응)
+  if (!ALLOWED_MIME_TYPES.has(file.type) && !ALLOWED_EXTENSIONS_FALLBACK.has(ext)) {
+    return {
+      valid: false,
+      error: `허용되지 않는 파일 형식: ${file.type || "(MIME 없음)"} (확장자: ${ext || "(없음)"})`,
+    };
   }
   return { valid: true };
 }
