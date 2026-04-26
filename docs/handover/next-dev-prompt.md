@@ -1,24 +1,31 @@
-# 다음 세션 프롬프트 (세션 63)
+# 다음 세션 프롬프트 (세션 66)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 62 완료: T1.4-sweep + P1 통합 부채 정리)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 65 완료)
 
 - **프로젝트명**: 양평 부엌 서버 — **1인 운영자의 멀티테넌트 백엔드 플랫폼** (stylelucky4u.com)
 - **정체성**: closed multi-tenant BaaS (본인 소유 10~20개 프로젝트 공유 백엔드, 외부 가입 없음)
-- **스택**: Next.js 16 + TypeScript + Tailwind CSS 4 + PostgreSQL (Prisma 7) + SQLite (Drizzle)
-- **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — spec/aggregator-fixes 브랜치 진행 중
+- **스택**: Next.js 16 + TypeScript + Tailwind CSS 4 + PostgreSQL 16 (Prisma 7) + SQLite (Drizzle)
+- **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — spec/aggregator-fixes 브랜치 v1.0 출시 후 packages/tenant-almanac/ 마이그레이션 (T2.5)
+- **세션 65 핵심**: T1.6 aggregator + raw-prisma sweep 130건 통합(`0d910e8`) → 운영 적용(7 + 1 마이그레이션) → PG 16 호환성 + DB drift fix(`f0d4443`) → filebox MIME + dbgenerated 결함 일괄 fix(`e61a496`/`3e6a366`/`f8ef8a7`) → standalone 정합성(`138edbe`) + leftover 134.6MB 정리
 
 ## 서버 실행 / 접속 정보
 
 ```bash
 npm run dev
-# WSL2 배포 — /ypserver prod:
-#   /ypserver prod                      # Phase 1~5 자동 (Windows 빌드 → 복사 → migrate → PM2)
-#   /ypserver prod --skip-win-build     # Windows 빌드 항상 실패 환경에서 사용
+# WSL2 운영 배포 (ypserver 스킬 v2 — 세션 52~ 결정):
+#   /ypserver                       # 전체 파이프라인 (rsync → npm ci → build → pack → deploy → PM2)
+#   /ypserver --migrate             # 빌드 후 prisma migrate deploy 추가 실행
+#   /ypserver --quick               # rsync/npm ci 스킵, 빠른 코드 패치 검증
+
+# 마이그레이션만 즉시 적용 (Claude 직접 적용 정책 — CLAUDE.md "운영 환경 및 마이그레이션 정책"):
+#   wsl -- bash -lic 'cd /mnt/e/00_develop/260406_luckystyle4u_server && \
+#     DATABASE_URL="postgresql://postgres:Knp13579yan@localhost:5432/luckystyle4u?schema=public" \
+#     npx prisma migrate deploy'
 ```
 
 | 서비스 | URL |
@@ -26,63 +33,67 @@ npm run dev
 | 로컬 | http://localhost:3000 |
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / Knp13579!yan |
+| Almanac alias | https://stylelucky4u.com/api/v1/almanac/* (308 → /api/v1/t/almanac/*) |
+| Almanac 정식 | https://stylelucky4u.com/api/v1/t/almanac/* (인증 필요) |
 
 ---
 
-## ⭐ 세션 63 우선 작업 P0: T1.6 Almanac backfill (10h)
+## 운영 상태 (세션 65 종료 시점)
 
-세션 62에서 통합 부채 잔여 2건 (keys-tenant.ts 2-query 통합, with-request-context.ts.resolveTenantId() wiring) 모두 완료. T1.4 글로벌 @unique sweep도 완료. 이제 Almanac을 'almanac' tenant로 backfill 진입 가능.
-
-1. content_* 테이블 (content_items, content_categories, content_tags, content_revisions, content_ingested_items) 에 tenant_id 추가 (nullable → backfill → NOT NULL — Stage 3 동일 패턴).
-2. 'almanac' tenant row 생성 (`INSERT INTO tenants (id, slug, display_name) VALUES (gen_random_uuid(), 'almanac', 'Almanac')`).
-3. 모든 기존 content_* row를 almanac tenant 로 backfill.
-4. 라우터 alias: `/api/v1/almanac/*` → `/api/v1/t/almanac/*` 임시 redirect (Phase 2 plugin 마이그레이션 전 호환).
-5. M2 게이트 검증: `/api/v1/t/almanac/health` 200 + audit_logs.tenant_id NULL 0.
+- **PM2**: ypserver online (~/ypserver/server.js, restart 3회) + cloudflared online (22h+ uptime) + pm2-logrotate
+- **PostgreSQL 16**: 22 테이블 RLS enabled + tenant_id 첫 컬럼 + dbgenerated default (COALESCE fallback)
+- **Tenants**: 'default' (00000000-0000-0000-0000-000000000000) + 'almanac' (00000000-0000-0000-0000-000000000001)
+- **Roles**: app_migration / app_runtime / app_admin 생성 (32바이트 랜덤 패스워드, **현재 미사용** — DATABASE_URL은 postgres superuser. role 분리는 N>1 시)
+- **마이그레이션**: 모두 적용 완료 (`prisma migrate status` = up to date)
+- **ESLint**: 0 violations / TSC: 0 errors / Vitest: 364 pass
 
 ---
 
-## P1: 운영자 배포 작업 (T1.4 + P0-membership + T1.4-sweep 누적)
+## ⭐ 세션 66 우선 작업 P0: M3 게이트 준비 — packages/tenant-almanac/ plugin 마이그레이션 (T2.5, ~28h)
 
-본 세션 + 세션 61 commits 운영 반영 시:
+T1.6에서 Almanac aggregator schema + tenant + alias만 적용. **비즈니스 로직(runner/classify/promote/dedupe)이 미구현**.
 
-1. **마이그레이션 적용** (3건 누적):
-   ```bash
-   npx prisma migrate deploy
-   # 20260427110000_phase1_4_rls_stage3       (S61)
-   # 20260427120000_p0_tenant_membership      (S61)
-   # 20260427130000_phase1_4_sweep_drop_global_unique  (S62 신규)
-   ```
+플로우:
+1. **T2.1 ManifestSchema** (14h) — `packages/core/src/tenant/manifest.ts` (Zod TenantManifest + defineTenant 헬퍼)
+2. **T2.2 Manifest loader** (18h) — `scripts/merge-tenant-prisma-fragments.ts` + `scripts/load-tenant-manifests.ts`
+3. **T2.3 Plugin route handler** (16h) — `apps/web/app/admin/[tenant]/*` codegen
+4. **T2.4 Cron TENANT dispatcher** (12h) — registry.ts + worker-script.ts TENANT case
+5. **T2.5 Almanac → packages/tenant-almanac/** (28h) — 비즈니스 로직 + manifest + fragment.prisma
+6. **T2.6 M3 게이트** (12h) — 2번째 컨슈머 manifest only로 코드 0줄 입증
 
-2. **Role 패스워드 placeholder 교체** (S61):
-   - `migration.sql` 의 `'CHANGE_ME_APP_MIGRATION_PASSWORD'` / `'CHANGE_ME_APP_RUNTIME_PASSWORD'` → Vault 시크릿
+근거: `docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/01-task-dag.md`
 
-3. **DATABASE_URL 전환** (S61):
-   - 일반 핸들러는 `app_runtime` role 사용 (BYPASSRLS 없음 → RLS 적용)
-   - 마이그레이션 runner 만 `app_migration` role (BYPASSRLS)
+---
 
-4. **검증**:
-   ```sql
-   -- RLS 활성화 확인 (15 row, S61)
-   SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class
-     WHERE relname IN ('users','sessions','folders','files','api_keys',
-                       'sql_queries','edge_functions','edge_function_runs',
-                       'cron_jobs','webhooks','mfa_enrollments','mfa_recovery_codes',
-                       'webauthn_authenticators','rate_limit_buckets','log_drains');
+## P0-1: 메신저 도메인 Phase 1 진입 (별도 트랙)
 
-   -- 정책 존재 확인 (15 row, S61)
-   SELECT schemaname, tablename, policyname FROM pg_policies WHERE policyname = 'tenant_isolation';
+세션 64에서 ADR-030 ACCEPTED + PRD 18섹션 + 7 산출물 신설. 이월 작업:
+- **kdyspike #1** (PG NOTIFY+SSE 정합성, 30분)
+- **Phase 1 M1**: 데이터 모델 시작 (메신저 마이그레이션 6건)
+- **결정 대기**: Q1 / Q4 / Q6
 
-   -- TenantMembership OWNER 시드 확인 (S61)
-   SELECT count(*) FROM tenant_memberships WHERE tenant_id = '00000000-0000-0000-0000-000000000000';
-   -- → 활성 사용자 수와 동일
+근거: `docs/research/messenger/_index.md`
 
-   -- 글로벌 @unique 부재 + composite 존재 확인 (S62 sweep)
-   \d users          -- email NOT @unique, (tenant_id, email) UNIQUE
-   \d edge_functions -- name NOT @unique, (tenant_id, name) UNIQUE
-   \d cron_jobs      -- name NOT @unique, (tenant_id, name) UNIQUE
-   ```
+---
 
-5. **PM2 reload** (S62) — Prisma Client 재생성 필요 (composite unique 변경 반영).
+## P1: filebox-db.ts 패턴 4 마이그레이션 (~4h)
+
+세션 65 B-5 agent가 filebox-db.ts 26 위반을 패턴 3 (eslint-disable)로 처리.
+패턴 4 (시그니처에 tenantId 추가)로 전환하여 명시적 multi-tenant 지원:
+- 호출자 6파일(api/v1/filebox/*) 영향
+- runWithTenant + prismaWithTenant 전환
+- ADR-024 부속 결정
+
+DEFERRED 사유: 호출자 변경 영향 범위 + sweep 1차 범위 외.
+
+---
+
+## P2: 운영 부채 정리
+
+- **sticky-notes / messenger 별도 작업 통합**: 세션 63/64의 untracked 파일 (스키마 + UI + 마이그레이션) 본 브랜치 commit 또는 별도 브랜치 분리
+- **/logs?_rsc=dy0du 404**: 사이드바 또는 RSC prefetch가 `/logs` 라우트 참조하나 페이지 부재 — 메뉴 정리 또는 페이지 생성
+- **03:00 KST cron 정상화 1주 관찰** (세션 54 이월)
+- **filebox MIME 화이트리스트 확장 검토**: text/javascript / text/typescript 등 코드 텍스트 (보안 검토 필요)
 
 ---
 
@@ -94,17 +105,13 @@ M3 게이트 = 2번째 컨슈머가 코드 0줄 추가로 가동되는 것 = clo
 
 ---
 
-## 이월 (S60+ 누적)
+## 이월 (S64+ 누적)
 
-- ~~TenantMembership 모델 + migration + wiring~~ ✅ (S61 완료)
-- ~~T1.4 RLS 정책~~ ✅ (S61 완료)
-- ~~keys-tenant.ts 2-query → include 단일 query~~ ✅ (S62 완료, `04ee7cb`)
-- ~~with-request-context resolveTenantId wiring~~ ✅ (S62 완료, `c365597 + ced644d`)
-- ~~T1.4 sweep (글로벌 @unique 제거)~~ ✅ (S62 완료, `c1283a4 + 191ad47 + f753c4f`)
-- T1.6 Almanac backfill (10h, P0)
-- raw-prisma-sweep 126건 (4~8h, P1) — 라우트별 prismaWithTenant 마이그레이션
-- ApiKey K3 dbKey.tenant=null defense in depth 테스트 보강 (30분, P2)
-- Almanac spec 적용 (S57 이월) — v1.0 그대로 출시 → packages/tenant-almanac/ 마이그레이션 (~5~7일)
+- packages/tenant-almanac/ plugin 마이그레이션 (T2.5)
+- Almanac aggregator 비즈니스 로직 적용 (runner/classify/promote/dedupe)
+- 메신저 Phase 1 M1 (마이그 6건) + kdyspike #1
+- 스티커 메모 / 메신저 untracked 통합
+- filebox-db.ts 패턴 4 (호출자 6파일)
 - 03:00 KST cron 결과 확인 (S56 이월)
 - ADR-021 placeholder cascade 6위치 (S56 이월)
 - 글로벌 스킬 drift (S55 이월)
@@ -124,54 +131,67 @@ M3 게이트 = 2번째 컨슈머가 코드 0줄 추가로 가동되는 것 = clo
 
 ---
 
-## 필수 참조 파일 ⭐ 세션 62 종료 시점
+## 운영 환경 정책 (CLAUDE.md "운영 환경 및 마이그레이션 정책" 섹션 + 메모리)
+
+- **모든 DB 마이그레이션은 Claude Code가 직접 실행/적용**. 운영자 위임 금지.
+- 신규 마이그레이션 작성 즉시 `npx prisma migrate deploy` 실행 → 결과 보고.
+- 실패 시 rollback SQL까지 실행하고 원인 분석.
+- WSL 경유 필요 시 `wsl -- bash -lc '...'`.
+- 예외: 사용자가 명시적으로 "지금은 적용하지 마"라고 지시한 경우만 보류.
+
+연관 메모리:
+- `memory/feedback_migration_apply_directly.md` — Claude 직접 마이그레이션 적용 정책
+- `memory/reference_db_role_passwords.md` — app_* role 패스워드 보존 위치 (현재 미사용)
+- `memory/project_tenant_default_sentinel.md` — multi-tenant fallback은 'default' (spec '_system' 아님)
+- `memory/feedback_autonomy.md` — 분기 질문 금지, 권장안 즉시 채택 (파괴적 행동만 예외)
+- `memory/project_standalone_reversal.md` — standalone 모드 재도입 (2026-04-19 세션 3)
+
+---
+
+## 필수 참조 파일 ⭐ 세션 65 종료 시점
 
 ```
-CLAUDE.md (프로젝트 루트) ⭐⭐⭐
-docs/status/current.md (세션 62 행 추가)
-docs/handover/260426-session62-t14-sweep-p1-followups.md ⭐⭐⭐ 직전 세션 인수인계
-docs/handover/260426-session61-t1.4-rls-p0-membership.md ⭐⭐ S61 T1.4 RLS + P0-membership
+CLAUDE.md (프로젝트 루트) ⭐⭐⭐ — 세션 64에서 "운영 환경 및 마이그레이션 정책" + 운영 위치 정합 추가
+docs/status/current.md (세션 65 행 추가)
+docs/handover/260426-session65-deploy-filebox-standalone.md ⭐⭐⭐ 직전 세션 인수인계
+docs/handover/260426-almanac-tenant-integration.md ⭐⭐⭐ Almanac 컨슈머 통합 가이드 (10 섹션)
 
-# T1.4 sweep + P1 산출물 (S62)
-prisma/schema.prisma (User.email/EdgeFunction.name/CronJob.name @unique 제거 완료)
-prisma/migrations/20260427130000_phase1_4_sweep_drop_global_unique/migration.sql ⭐⭐
-src/lib/auth/keys-tenant.ts (include 단일 query)
-src/lib/with-request-context.ts (resolveTenantId path 기반 정식 구현)
-src/lib/with-request-context.test.ts (9 신규 테스트)
-eslint.config.mjs (no-raw-prisma-without-tenant warn → error)
+# 세션 65 핵심 산출물
+prisma/migrations/20260427110000_phase1_4_rls_stage3/migration.sql (PG 16 fix 보강)
+prisma/migrations/20260428100000_fix_dbgenerated_missing_ok/migration.sql (COALESCE 정정)
+prisma/migrations/20260427140000_t1_6_aggregator_with_tenant/migration.sql (T1.6)
+prisma/migrations/20260427140001_seed_almanac_tenant/migration.sql (almanac seed)
+src/lib/filebox-db.ts (MIME markdown + 확장자 fallback)
+src/app/api/v1/almanac/[...path]/route.ts (308 alias)
 
-# T1.4 / P0-membership 산출물 (S61)
-prisma/migrations/20260427110000_phase1_4_rls_stage3/migration.sql ⭐⭐⭐
-prisma/migrations/20260427120000_p0_tenant_membership/migration.sql ⭐⭐⭐
-src/lib/db/prisma-tenant-client.ts (Prisma Extension lazy Proxy)
-src/lib/tenant-router/membership.ts (P0 wiring 완료)
-eslint-rules/no-raw-prisma-without-tenant.cjs (severity error 승격, S62)
-tests/rls/cross-tenant-leak.test.ts (env-gated)
+# CK +2 (46→48)
+docs/solutions/2026-04-26-pg16-bypassrls-revoke-syntax.md
+docs/solutions/2026-04-26-prisma-dbgenerated-current-setting-missing-ok.md
 
-# CK 46 (변경 없음 — S62 +0)
-docs/solutions/2026-04-26-prisma-client-empty-pnpm-workspace.md (S61)
-docs/solutions/2026-04-26-prisma-client-extension-lazy-proxy-test.md (S61)
-
-# 결정 근거 (필요 시)
-docs/research/baas-foundation/04-architecture-wave/01-architecture/02-adr-023-impl-spec.md (RLS 1005줄)
-docs/research/baas-foundation/01-adrs/ (8 ADR ACCEPTED)
+# 결정 근거
+docs/research/baas-foundation/01-adrs/ (8 ADR ACCEPTED + ADR-030 메신저)
+docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/01-task-dag.md
+docs/research/messenger/_index.md (메신저 PRD)
 ```
 
 ---
 
 ## 직전 세션들 요약
 
-- **세션 62** (2026-04-26): T1.4-sweep + P1 통합 부채 정리 — kdyswarm parallel, 7 commits, 4/5 게이트 PASS (eslint --max-warnings 0 DEFERRED), CK +0 (현재)
-- **세션 61** (2026-04-26): T1.4 RLS Stage 3 + P0-membership 통합 — kdyswarm sequential, 8 commits, 5/5 게이트 PASS, CK +2
-- **세션 60** (2026-04-26): G1b 4 agent 병렬 발사 + 통합 — Phase 1 본진(T1.2/T1.3/T1.5/T1.7) 일괄 완료
-- **세션 59** (2026-04-26): Phase 0 Foundation 7 task + M1 게이트 통과 + T1.1 TenantContext
-- **세션 58** (2026-04-26): BaaS Foundation 설계 — ADR-022~029 ACCEPTED + spike 2건
+- **세션 65** (2026-04-26): 옵션 A+B 6 agent 병렬 + 운영 배포 + filebox/PG16 일괄 fix — 6 commits, 50 파일, 마이그레이션 8건 적용, CK +2 (현재)
+- **세션 64** (2026-04-26): 스티커 메모 + 메신저 도메인 PRD 산출 (계획 집중) — handover skip, `docs/research/messenger/` 7건 + ADR-030 ACCEPTED
+- **세션 63** (2026-04-26): kdyswarm 6 agent 발사 + 통합 (옵션 A+B) — 본 세션 65의 1단계 (current.md row만 분리됨)
+- **세션 62** (2026-04-26): T1.4-sweep + P1 통합 부채 정리 — kdyswarm parallel 7 commits, 364 tests, eslint warn → error
+- **세션 61** (2026-04-26): T1.4 RLS Stage 3 + P0-membership 통합 — kdyswarm sequential, 8 commits, CK +2
 
 ---
 
-## 세션 63 시작 시 추천 첫 액션
+## 세션 66 시작 시 추천 첫 액션
 
-1. **본 next-dev-prompt + handover/260426-session62* 읽기** (세션 62 결정 흡수)
-2. **T1.6 Almanac backfill 진입** (10h) — content_* 5 테이블 (content_items / content_categories / content_tags / content_revisions / content_ingested_items) 에 tenant_id 추가 → 'almanac' tenant row 생성 → 기존 row backfill → 라우터 alias `/api/v1/almanac/*` → `/api/v1/t/almanac/*` redirect → M2 게이트 검증
-3. **또는 raw-prisma-sweep 126건** (4~8h, P1) — 라우트별 prismaWithTenant 마이그레이션 (병렬 가능 — `/kdyswarm --tasks raw-prisma-sweep --strategy parallel --agents 5`)
-4. 또는 사용자 우선순위 따라 운영자 배포 작업 (P1, 마이그레이션 3건 누적) 먼저 수행
+1. **본 next-dev-prompt + handover/260426-session65* 읽기** (세션 65 결정 흡수)
+2. **세션 64 산출물 인지** — `docs/research/messenger/` + sticky-notes untracked 파일 (별도 브랜치 또는 본 브랜치 통합)
+3. **운영 상태 확인** (1주 관찰):
+   - filebox 업로드 정상화 유지
+   - 03:00 KST cron 정상 동작
+   - audit_logs.tenant_id NULL 0
+4. **P0 진입 결정**: T2.5 (packages/tenant-almanac/) vs 메신저 Phase 1 M1 vs sticky-notes/messenger 통합
