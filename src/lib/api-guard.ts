@@ -75,6 +75,12 @@ async function runHandler(
  *
  * Bearer는 외부 클라이언트용, 쿠키는 대시보드 내부 fetch 용.
  * 쿠키 경로는 실제 세션 주체의 role을 사용 (하드코딩 ADMIN 없음).
+ *
+ * Tenant API key (`pub_<slug>_*` / `srv_<slug>_*`) — ADR-027 §5.1:
+ *   본 가드는 prefix 만 인식하고 placeholder payload 로 통과시킨다.
+ *   실제 K3 cross-validation (해시 / FK / path slug 일치) 은 withTenant
+ *   (api-guard-tenant.ts) 의 §3a 블록이 담당한다.
+ *   tenant API key 는 `/api/v1/t/<slug>/*` 라우트에서만 유효하다.
  */
 export function withAuth(handler: AuthenticatedHandler) {
   return async (
@@ -83,6 +89,26 @@ export function withAuth(handler: AuthenticatedHandler) {
   ) => {
     const bearerToken = extractBearerToken(request);
     if (bearerToken) {
+      if (
+        bearerToken.startsWith("pub_") ||
+        bearerToken.startsWith("srv_")
+      ) {
+        const url = new URL(request.url);
+        if (!url.pathname.startsWith("/api/v1/t/")) {
+          return errorResponse(
+            "INVALID_TOKEN",
+            "tenant API key 는 /api/v1/t/* 라우트에서만 유효합니다",
+            401
+          );
+        }
+        const apiKeyPlaceholder: AccessTokenPayload = {
+          sub: "apikey",
+          email: bearerToken.slice(0, 20),
+          role: "USER" as Role,
+          type: "access",
+        };
+        return runHandler(handler, request, apiKeyPlaceholder, context);
+      }
       const payload = await verifyAccessToken(bearerToken);
       if (payload) return runHandler(handler, request, payload, context);
       return errorResponse("INVALID_TOKEN", "유효하지 않은 토큰입니다", 401);
