@@ -27,3 +27,13 @@ export {
   runWithTenant,
   type TenantContext,
 } from "./tenant";
+
+// Phase 1.5: Cron pure logic (lock key, circuit breaker state)
+export {
+  tenantJobLockKey,
+  decideTransition,
+  isCooldownElapsed,
+  type CircuitState,
+  type TransitionInput,
+  type TransitionResult,
+} from "./cron";
