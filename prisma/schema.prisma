@@ -34,6 +34,9 @@ model Tenant {
 
 model User {
   id             String                  @id @default(uuid())
+  // Phase 1.4 Stage 3 deviation: 글로벌 email @unique 유지 (호출 사이트 호환 — login/register/users
+  //   라우트가 findUnique({ where: { email } }) 사용). 추가로 (tenantId, email) 합성 unique 등록.
+  //   Phase 1.4 후속 PR에서 호출 사이트를 (tenantId, email) findUnique 로 일괄 전환 후 글로벌 unique 제거 검토.
   email          String                  @unique
   passwordHash   String                  @map("password_hash")
   name           String?
@@ -44,8 +47,9 @@ model User {
   lastLoginAt    DateTime?               @map("last_login_at") @db.Timestamptz(3)
   createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive — nullable, Phase 1 backfill + Stage 3 NOT NULL 전환 예정.
-  tenantId       String?                 @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default (current_setting('app.tenant_id')::uuid).
+  // 마이그레이션 SQL 에서 backfill → SET NOT NULL → SET DEFAULT 순으로 적용.
+  tenantId       String                  @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
   folders        Folder[]                @relation("UserFolders")
   files          File[]                  @relation("UserFiles")
   sqlQueries     SqlQuery[]              @relation("UserSqlQueries")
@@ -56,6 +60,9 @@ model User {
   recoveryCodes  MfaRecoveryCode[]       @relation("UserMfaRecoveryCodes")
   authenticators WebAuthnAuthenticator[] @relation("UserAuthenticators")
 
+  // Phase 1.4 Stage 3 — tenant-scoped composite unique + index.
+  @@unique([tenantId, email], map: "users_tenant_id_email_key")
+  @@index([tenantId])
   @@map("users")
 }
 
@@ -72,6 +79,7 @@ model WebAuthnAuthenticator {
   id           String    @id @default(uuid())
   userId       String    @map("user_id")
   user         User      @relation("UserAuthenticators", fields: [userId], references: [id], onDelete: Cascade)
+  // credentialId 는 RP 글로벌 ID — spec §2.3.8 에 따라 글로벌 @unique 유지.
   credentialId String    @unique @map("credential_id")
   publicKey    Bytes     @map("public_key")
   counter      BigInt    @default(0)
@@ -81,10 +89,10 @@ model WebAuthnAuthenticator {
   friendlyName String?   @map("friendly_name")
   lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz(3)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId     String?   @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId     String    @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
-  @@index([userId])
+  @@index([tenantId, userId])
   @@map("webauthn_authenticators")
 }
 
@@ -97,7 +105,8 @@ model WebAuthnChallenge {
   purpose   String // "registration" | "authentication"
   expiresAt DateTime @map("expires_at") @db.Timestamptz(3)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
+  // Phase 1.4 Stage 3 — spec §2.3.8: 등록 직전 tenant 미확정 케이스 → nullable 유지.
+  // RLS 정책에서 별도 처리(WebAuthnChallenge 는 비즈니스 isolation 대상 아님 — Phase 4 재검토).
   tenantId  String?  @map("tenant_id") @db.Uuid
 
   @@index([expiresAt])
@@ -112,6 +121,7 @@ model WebAuthnChallenge {
 /// failedAttempts: 챌린지 단계 실패 카운터. lockedUntil 초과 시 해제 (Rate Limit Step 6 전용).
 model MfaEnrollment {
   id               String    @id @default(uuid())
+  // userId @unique 유지 — User 1:1 MFA enrollment (User 가 이미 tenant-scoped).
   userId           String    @unique @map("user_id")
   user             User      @relation("UserMfaEnrollment", fields: [userId], references: [id], onDelete: Cascade)
   secretCiphertext String    @map("secret_ciphertext")
@@ -120,9 +130,10 @@ model MfaEnrollment {
   lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(3)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId         String?   @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId         String    @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
+  @@index([tenantId])
   @@map("mfa_enrollments")
 }
 
@@ -136,11 +147,12 @@ model MfaRecoveryCode {
   codeHash  String    @map("code_hash")
   usedAt    DateTime? @map("used_at") @db.Timestamptz(3)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId  String?   @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId  String    @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
+  // (userId, codeHash) 합성 unique 유지 — userId 가 이미 tenant-scoped 이므로 cross-tenant 충돌 없음.
   @@unique([userId, codeHash])
-  @@index([userId, usedAt])
+  @@index([tenantId, userId, usedAt])
   @@map("mfa_recovery_codes")
 }
 
@@ -163,7 +175,8 @@ model JwksKey {
   createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   rotatedAt  DateTime?  @map("rotated_at") @db.Timestamptz(3)
   retireAt   DateTime?  @map("retire_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive — JWKS 가 per-tenant 가 될지(Phase 3 ADR-029 결정)는 Stage 4 에서 정함.
+  // Phase 1.4 Stage 3 — spec §2.4 Tenant-bypass: JWKS 는 단일 키셋 + JWT claim 으로 식별
+  //   (현재 N=1 default tenant). nullable 유지 + RLS 미적용 (Phase 4 ADR-029 결정 시 재검토).
   tenantId   String?    @map("tenant_id") @db.Uuid
 
   @@index([status])
@@ -183,14 +196,16 @@ enum JwksStatus {
 /// 단일 노드 + PM2 cluster 워커 공유 방식. 다중 노드 확장 시 Redis 또는 별도 PG 인스턴스로 이관.
 /// cleanup: 일 1회 windowStart < NOW() - INTERVAL '1 day' 삭제 (Sessions cleanup 패턴 동일).
 model RateLimitBucket {
+  // bucketKey 는 이미 namespacing(예: "<tenantId>:<scope>:..." spec §2.3.9) 이지만,
+  // RLS 정책 일관성을 위해 tenant_id 컬럼도 보유.
   bucketKey   String   @id @map("bucket_key")
   hits        Int      @default(1)
   windowStart DateTime @default(now()) @map("window_start") @db.Timestamptz(3)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive — Phase 1 buildBucketKey() 에 tenantId prefix 추가 (마이그레이션 전략 §1.1)
-  tenantId    String?  @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId    String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
-  @@index([windowStart])
+  @@index([tenantId, windowStart])
   @@map("rate_limit_buckets")
 }
 
@@ -203,6 +218,7 @@ model Session {
   id            String    @id @default(uuid())
   userId        String    @map("user_id")
   user          User      @relation("UserSessions", fields: [userId], references: [id], onDelete: Cascade)
+  // tokenHash 는 SHA-256 hex (글로벌 충돌 0 가정) — 글로벌 @unique 유지.
   tokenHash     String    @unique @map("token_hash")
   ip            String?
   userAgent     String?   @map("user_agent")
@@ -212,10 +228,11 @@ model Session {
   revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(3)
   // 세션 37 — revoke 사유 추적. "rotation" 만 reuse 의심 대상, 나머지(self/logout/reuse/admin)는 조용히 401.
   revokedReason String?   @map("revoked_reason")
-  // Phase 0.3 Stage 1 additive
-  tenantId      String?   @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId      String    @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
-  @@index([userId, revokedAt, expiresAt])
+  // spec §2.3.2 — (userId, revokedAt, expiresAt) → (tenantId, userId, revokedAt, expiresAt) 재설계.
+  @@index([tenantId, userId, revokedAt, expiresAt])
   @@map("sessions")
 }
 
@@ -231,16 +248,20 @@ model Folder {
   isRoot    Boolean  @default(false) @map("is_root")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId  String?  @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId  String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
-  @@unique([parentId, name, ownerId])
+  // spec §2.3.3 — 기존 (parentId, name, ownerId) → (tenantId, parentId, name, ownerId).
+  // ownerId 가 이미 tenant-scoped 이므로 cross-tenant 충돌 0 — 그래도 인덱스 일관성 위해 prepend.
+  @@unique([tenantId, parentId, name, ownerId])
+  @@index([tenantId])
   @@map("folders")
 }
 
 model File {
   id           String   @id @default(uuid())
   originalName String   @map("original_name")
+  // storedName 은 UUID 기반 — 글로벌 @unique 유지 (spec §2.3.4).
   storedName   String   @unique @map("stored_name")
   size         Int
   mimeType     String   @map("mime_type")
@@ -250,9 +271,10 @@ model File {
   owner        User     @relation("UserFiles", fields: [ownerId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId     String?  @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId     String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
+  @@index([tenantId, folderId])
   @@map("files")
 }
 
@@ -278,16 +300,19 @@ model SqlQuery {
   lastRunAt DateTime?  @map("last_run_at") @db.Timestamptz(3)
   createdAt DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId  String?    @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId  String     @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
-  @@index([ownerId, scope])
+  @@index([tenantId, ownerId, scope])
   @@map("sql_queries")
 }
 
 /// Edge Functions (lite) — 사용자가 등록한 코드 스니펫
 model EdgeFunction {
   id          String            @id @default(uuid())
+  // Phase 1.4 Stage 3 deviation — 글로벌 @unique 유지 + (tenantId, name) 합성 unique 추가.
+  // 호출 사이트가 prisma.edgeFunction.findUnique({ where: { name } }) 형태를 사용할 가능성 보존.
+  // 후속 PR 에서 호출 사이트 일괄 전환 후 글로벌 unique 제거 검토 (spec §2.3.6).
   name        String            @unique
   description String?
   code        String
@@ -298,9 +323,11 @@ model EdgeFunction {
   runs        EdgeFunctionRun[]
   createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId    String?           @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId    String            @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
+  @@unique([tenantId, name], map: "edge_functions_tenant_id_name_key")
+  @@index([tenantId, ownerId])
   @@map("edge_functions")
 }
 
@@ -315,10 +342,10 @@ model EdgeFunctionRun {
   stderr     String?
   startedAt  DateTime     @default(now()) @map("started_at") @db.Timestamptz(3)
   finishedAt DateTime?    @map("finished_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId   String?      @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId   String       @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
-  @@index([functionId, startedAt])
+  @@index([tenantId, functionId, startedAt])
   @@map("edge_function_runs")
 }
 
@@ -336,9 +363,10 @@ model Webhook {
   failureCount    Int          @default(0) @map("failure_count")
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId        String?      @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId        String       @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
+  @@index([tenantId, sourceTable, event])
   @@map("webhooks")
 }
 
@@ -347,6 +375,8 @@ model Webhook {
 /// 추가 컬럼: consecutiveFailures, circuitState, circuitOpenedAt, lastSuccessAt — 07-adr-028-impl-spec §7.1.
 model CronJob {
   id                  String    @id @default(uuid())
+  // Phase 1.4 Stage 3 deviation — 글로벌 @unique 유지 + (tenantId, name) 합성 unique 추가.
+  // 호출 사이트 호환 보존 (spec §2.3.7). 후속 PR 에서 글로벌 unique 제거 검토.
   name                String    @unique
   schedule            String
   kind                CronKind
@@ -356,8 +386,8 @@ model CronJob {
   lastStatus          String?   @map("last_status")
   createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive — Phase 1.5 TenantWorkerPool 도입 시 본 컬럼이 dispatch 결정의 핵심.
-  tenantId            String?   @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default. T1.5 의 nullable FK 는 NOT NULL FK 로 전환.
+  tenantId            String    @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
   // Phase 1.5 circuit breaker — 07-adr-028-impl-spec §7.1.
   // consecutiveFailures: recordResult 가 실패마다 +1, 성공 시 0 으로 리셋.
   // circuitState: CLOSED | OPEN | HALF_OPEN. shouldDispatch 가 본 컬럼으로 게이트.
@@ -368,9 +398,11 @@ model CronJob {
   circuitOpenedAt     DateTime? @map("circuit_opened_at") @db.Timestamptz(3)
   lastSuccessAt       DateTime? @map("last_success_at") @db.Timestamptz(3)
 
-  // Phase 1.5: Stage 1 nullable FK + onDelete: SetNull (tenantId nullable 호환).
-  tenant Tenant? @relation("TenantCronJobs", fields: [tenantId], references: [id], onDelete: SetNull)
+  // Phase 1.4 Stage 3 — NOT NULL FK 로 전환. cron_jobs.tenant_id 는 RLS 정책 게이트의 핵심.
+  // onDelete: Cascade — Tenant 제거 시 본 cron 도 일괄 정리 (운영 콘솔 SUSPENDED 토글로 사전 차단 가정).
+  tenant Tenant @relation("TenantCronJobs", fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@unique([tenantId, name], map: "cron_jobs_tenant_id_name_key")
   @@index([tenantId, enabled])
   @@index([circuitState, circuitOpenedAt])
   @@map("cron_jobs")
@@ -406,6 +438,7 @@ model TenantCronPolicy {
 model ApiKey {
   id         String     @id @default(uuid())
   name       String
+  // prefix 는 발급 시 충돌 회피로 글로벌 @unique 유지 (spec §2.3.5).
   prefix     String     @unique
   keyHash    String     @unique @map("key_hash")
   type       ApiKeyType
@@ -416,14 +449,15 @@ model ApiKey {
   revokedAt  DateTime?  @map("revoked_at") @db.Timestamptz(3)
   createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive — ADR-027 K3 매칭의 FK. Stage 3 NOT NULL 전환 + 검증 강제.
-  tenantId   String?    @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default. ADR-027 K3 매칭 강제.
+  tenantId   String     @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
-  // Phase 1.5: T1.3 의 `include: { tenant: true }` 워크어라운드 정합 — Stage 1 nullable FK.
-  tenant Tenant? @relation("TenantApiKeys", fields: [tenantId], references: [id], onDelete: SetNull)
+  // Phase 1.4 Stage 3 — NOT NULL FK 로 전환. T1.3 의 K3 cross-validation 보강.
+  tenant Tenant @relation("TenantApiKeys", fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, prefix])
   @@index([tenantId, revokedAt])
+  @@index([tenantId, ownerId])
   @@map("api_keys")
 }
 
@@ -440,9 +474,10 @@ model LogDrain {
   failureCount    Int       @default(0) @map("failure_count")
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive
-  tenantId        String?   @map("tenant_id") @db.Uuid
+  // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
+  tenantId        String    @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
 
+  @@index([tenantId])
   @@map("log_drains")
 }
 
@@ -503,7 +538,8 @@ model SecretItem {
   kekVersion     Int       @default(1) @map("kek_version")
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   rotatedAt      DateTime? @map("rotated_at") @db.Timestamptz(3)
-  // Phase 0.3 Stage 1 additive — Vault 가 per-tenant 가 될지(KEK 격리)는 Stage 4 결정.
+  // Phase 1.4 Stage 3 — spec §2.4 Tenant-bypass: SecretItem (Vault) 은 환경 전역 (MFA_MASTER_KEY 등).
+  //   nullable 유지 + RLS 미적용. KEK 격리는 Phase 4 별도 ADR.
   tenantId       String?   @map("tenant_id") @db.Uuid
 
   @@map("secret_items")
