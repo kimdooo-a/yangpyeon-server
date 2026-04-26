@@ -206,3 +206,25 @@ export function withTenantRole(
     return handler(request, user, tenant, context);
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Phase 1.4 (T1.4) — Prisma RLS 통합 re-export.
+//
+// 핸들러에서 DB 접근 시:
+//   1. 단발 read/write → `prismaWithTenant.<model>.<op>()`
+//      (TenantContext 가 withTenant() 가드에서 이미 주입되어 있다.)
+//   2. multi-statement 트랜잭션 → `withTenantTx(tenant.id, async tx => { ... })`
+//      (1 회 SET LOCAL 로 전체 트랜잭션 커버 — Extension 의 매-query SET 회피.)
+//
+// `withTenant` 가드 본체는 본 파일의 위쪽 함수 — runWithTenant 로 TenantContext 주입까지만 담당.
+// PG 세션 변수 (app.tenant_id) 주입은 prismaWithTenant Extension 이 수행.
+//
+// 기존 src/lib/prisma.ts 는 변경 없음 — system 작업 / migration runner 가 계속 사용.
+// 컨슈머 라우트는 prismaWithTenant 만 사용해야 한다 (ESLint rule no-raw-prisma-without-tenant 가 강제).
+// ─────────────────────────────────────────────────────────────────────────
+export {
+  prismaWithTenant,
+  withTenantTx,
+  withTenantQuery,
+} from "@/lib/db/prisma-tenant-client";
+export type { AppPrismaClient } from "@/lib/db/prisma-tenant-client";
