@@ -29,25 +29,23 @@ npm run dev
 
 ---
 
-## ⭐ 세션 59 우선 작업 P0: kdywave Phase 1 본격 아키텍처 wave
+## ⭐ 세션 59 우선 작업 P0: Phase 0 즉시 진입 (kdyswarm 발사)
 
-세션 58에서 ADR-022~029 8건 모두 ACCEPTED. 이제 결정된 옵션 위에서 본격 아키텍처 설계 wave 진행.
+세션 58에서 ADR-022~029 8건 ACCEPTED + kdywave 압축형 4 sub-wave 완료 (15 파일, 9,761줄). 이제 Phase 0 구현 즉시 진입.
 
-**입력**:
-- `docs/research/baas-foundation/README.md` (인덱스)
-- `docs/research/baas-foundation/00-context/` (사전 분석 2건)
-- `docs/research/baas-foundation/01-adrs/ADR-022~029` (8 ACCEPTED)
-- `docs/research/baas-foundation/03-spikes/spike-baas-001~002` (2건)
+**Phase 0 작업 (1~2주, 17h, Sprint Plan §00 인용)**:
+1. ~~**spike-baas-002 부수 fix 3건** (즉시 minor PR):~~ **✅ 완료 (commit 619a952, 2026-04-26 세션 58 직후)**
+   - ~~`src/lib/cron/runner.ts:21` DEFAULT_ALLOWED_FETCH env override~~ ✅
+   - ~~`src/lib/cron/runner.ts:72` WEBHOOK fetch AbortController + timeout~~ ✅
+   - ~~`src/lib/cron/registry.ts:135` runJob catch structured log~~ ✅
+2. **모노레포 변환** (pnpm + turborepo, ~5일) — Phase 0 잔여 P0:
+   - 5단계 (S1 브랜치+workspace → S2 packages/core 신설 → S3 git mv 코드 이전 → S4 apps/web 신설 → S5 dependencies 재배치)
+3. **Tenant Prisma 모델** + Stage 1 마이그레이션 (tenant_id nullable + default 'default')
+4. **ADR-021 amendment-2** (audit_logs.tenant_id 컬럼, safeAudit 시그니처 불변, 11 콜사이트 변경 0건)
 
-**산출 위치**: `docs/research/baas-foundation/04-architecture-wave/` (신설)
+**호출**: `/kdyswarm` — Sprint Plan §9개 그룹 (G0a~G3b) 패턴으로 병렬 발사. 또는 Phase 0은 작아서 단독 진행 가능.
 
-**예상**: 3~5시간, 산출물 다수
-- 시스템 아키텍처 다이어그램 (5-Plane: manifest/core/plugin/data/ops)
-- ADR-022~029 구현 specs (각 ADR을 코드 레벨 스펙으로 풀기)
-- Phase 1~3 sprint plan (구현 task DAG)
-- 마이그레이션 전략 (단일테넌트 → 멀티테넌트)
-
-**호출**: `/kdywave docs/research/baas-foundation/` 또는 Skill tool로 invoke.
+**M3 게이트** (Phase 2 종료, 약 3개월 후): 2번째 컨슈머가 코드 0줄 추가로 가동 → closed multi-tenant BaaS 정체성 입증.
 
 ---
 
@@ -106,17 +104,28 @@ curl -H 'Authorization: Bearer <ADMIN>' http://localhost:3000/api/admin/audit/he
 
 ---
 
-## 필수 참조 파일 ⭐ 세션 58 종료 시점
+## 필수 참조 파일 ⭐ 세션 58 종료 시점 — kdywave 압축형 4 sub-wave 완료
 
 ```
 CLAUDE.md (4개 섹션 갱신: 프로젝트 정보, 문서 체계, 핵심 원칙 7원칙, 운영 규칙) ⭐⭐⭐
 docs/status/current.md (정체성/스택 갱신, 세션 58 행 추가)
 docs/handover/260426-session58-baas-foundation.md ⭐⭐⭐ 직전 세션 인수인계
-docs/research/baas-foundation/README.md ⭐⭐⭐ 진입점
+docs/research/baas-foundation/README.md ⭐⭐⭐ 진입점 (31 파일 16,826줄)
 
+# Phase 0 진입 시 직접 사용
+docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/00-roadmap-overview.md ⭐⭐⭐ Phase 0~4 sprint plan
+docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/01-task-dag.md ⭐⭐ 크리티컬 패스 178h + kdyswarm 9 그룹
+docs/research/baas-foundation/04-architecture-wave/03-migration/00-migration-strategy.md ⭐⭐ 5 Stage 마이그레이션
+docs/research/baas-foundation/04-architecture-wave/01-architecture/00-system-overview-5-plane.md ⭐⭐⭐ 5-Plane + 4 불변 인터페이스
+docs/research/baas-foundation/04-architecture-wave/01-architecture/02-adr-023-impl-spec.md (RLS 구현, 1005줄)
+docs/research/baas-foundation/04-architecture-wave/01-architecture/03-adr-024-impl-spec.md (모노레포 변환 5단계, 618줄)
+docs/research/baas-foundation/04-architecture-wave/01-architecture/07-adr-028-impl-spec.md (cron worker pool + spike 부수 fix 3건, 1053줄)
+
+# 결정 근거 (필요 시)
 docs/research/baas-foundation/01-adrs/ (8 ADR ACCEPTED 2026-04-26)
 docs/research/baas-foundation/03-spikes/spike-baas-001 (Prisma — 옵션 B 권고 변경 근거)
 docs/research/baas-foundation/03-spikes/spike-baas-002 (worker pool — 옵션 D 권고 강화 + 부수 fix 3건)
+docs/solutions/2026-04-26-compressed-kdywave-on-existing-wave.md (CK 42 — 본 세션 패턴)
 
 docs/handover/260425-session57-aggregator-spec-rewrite.md (Almanac spec 정합화)
 docs/handover/260425-session56-* (audit cleanup cron 진단)
