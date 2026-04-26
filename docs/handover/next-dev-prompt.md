@@ -1,18 +1,18 @@
-# 다음 세션 프롬프트 (세션 69)
+# 다음 세션 프롬프트 (세션 70)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 68 완료)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 69 완료)
 
 - **프로젝트명**: 양평 부엌 서버 — **1인 운영자의 멀티테넌트 백엔드 플랫폼** (stylelucky4u.com)
 - **정체성**: closed multi-tenant BaaS (본인 소유 10~20개 프로젝트 공유 백엔드, 외부 가입 없음)
 - **스택**: Next.js 16 + TypeScript + Tailwind CSS 4 + PostgreSQL 16 (Prisma 7) + SQLite (Drizzle)
-- **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — Phase 2 / T2.5 aggregator Day 1 시동(S66) → 잔여 4 endpoint + API 키 발급 + 비즈니스 로직 이식이 다음 작업
-- **두 번째 도메인 트랙**: 메신저 Phase 1 — M1(W1) 완성(S67, commit `2048378`) + **M2 정밀화 산출물 `m2-detailed-plan.md` 655줄 작성(S68)** — 도메인 헬퍼 4개 시그니처 + 라우트 19개 정확 명세 + M2-Step1/2/3 분할 + 영역 분리 매트릭스. **M2-Step1 즉시 진입 가능 상태**.
-- **세션 68 핵심**: M1 9/9 PASS 점검 + M2 정밀화. 다른 터미널 미커밋 작업(Almanac aggregator)과 영역 분리 보장 (`docs/research/messenger/` 안 2 파일만 변경). 코드 변경 0.
+- **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — Phase 2 / T2.5 양평 측 인프라 100% 가동
+- **세션 69 핵심**: 세션 66 미완 — Almanac aggregator Day 4 잔여 4 endpoint(contents/sources/today-top/items) + srv_almanac_* 키 발급 + 사전 결함 1건(withAuth tenant API key 분기 누락) fix — 모두 마무리. 평문 키 안전 채널 전달과 Almanac Vercel 측 env 등록만 남음.
+- **Track B 병행**: 메신저 M2-Step1 (도메인 헬퍼 4개) — 다른 터미널이 진행 중. 영역 분리 보장됨 (`src/lib/messenger/`, `tests/messenger/`).
 
 ## 서버 실행 / 접속 정보
 
@@ -27,6 +27,12 @@ npm run dev
 #   wsl -- bash -lic 'cd /mnt/e/00_develop/260406_luckystyle4u_server && \
 #     DATABASE_URL="postgresql://postgres:<DB_PASSWORD>@localhost:5432/luckystyle4u?schema=public" \
 #     npx prisma migrate deploy'
+
+# tenant API 키 발급 (운영 콘솔 UI 도입 전 임시 절차, S69 신설):
+#   wsl -- bash -lic 'cd ~/dev/ypserver-build && set -a && source ~/ypserver/.env && set +a && \
+#     npx tsx scripts/issue-tenant-api-key.ts \
+#       --tenant=<slug> --scope=pub|srv --name="<label>" --owner=<adminUserId> \
+#       [--scopes=a,b,c]'
 ```
 
 | 서비스 | URL |
@@ -35,48 +41,41 @@ npm run dev
 | 외부 | https://stylelucky4u.com |
 | 로그인 | kimdooo@stylelucky4u.com / <ADMIN_PASSWORD> |
 | Almanac alias | https://stylelucky4u.com/api/v1/almanac/* (308 → /api/v1/t/almanac/*) |
-| Almanac 정식 | https://stylelucky4u.com/api/v1/t/almanac/* (인증 필요) |
+| Almanac 정식 (5 endpoint) | https://stylelucky4u.com/api/v1/t/almanac/{categories,contents,sources,today-top,items/[slug]} |
 
 ---
 
-## 운영 상태 (세션 67 종료 시점)
+## 운영 상태 (세션 69 종료 시점)
 
-- **PM2**: ypserver online (~/ypserver/server.js, **restart #4**, pid 81099) + cloudflared online (23h+ uptime) + pm2-logrotate
-- **PostgreSQL 16**: **38 테이블** RLS enabled + tenant_id 첫 컬럼 + dbgenerated COALESCE fallback (메신저 9 테이블 신규 추가 — S67)
-- **Tenants**: 'default' (00000000-0000-0000-0000-000000000000) + 'almanac' (00000000-0000-0000-0000-000000000001)
-- **Almanac 콘텐츠 데이터** (S66): 37 카테고리 (build 7 / 5 트랙 6) + 60 소스 (RSS 46 / HTML 3 / API 7 / FIRECRAWL 4) — **모두 active=FALSE**. 점진 활성화 절차는 `docs/handover/260426-session66-aggregator-day1.md` §5.5
-- **Almanac 명시 라우트** (S66): `/api/v1/t/almanac/categories` (1개). 잔여 4개는 세션 68 작업.
-- **API 키**: srv_almanac_* / pub_almanac_* — **미발급**. 인프라만 가동. 세션 68 첫 작업.
-- **메신저 데이터 모델** (NEW S67): 9 테이블 (conversations/conversation_members/messages/message_attachments/message_mentions/message_receipts/user_blocks/abuse_reports/notification_preferences) + 6 enum + RLS 9 정책. 마이그 6건 (20260501000000~050000) 적용 완료. **데이터 0행** — Phase 1 M2(REST API) 진입 전.
+- **PM2**: ypserver online (~/ypserver/server.js, **restart #6**, pid 93211) + cloudflared online (24h+ uptime) + pm2-logrotate
+- **PostgreSQL 16**: 38 테이블 RLS enabled + tenant_id 첫 컬럼 + dbgenerated COALESCE fallback
+- **Tenants**: 'default' (00000000-0000-0000-0000-000000000000) + 'almanac' (00000000-0000-0000-0000-000000000001) — both `status='active'`
+- **Almanac 콘텐츠 데이터**: 37 카테고리 (build 7 / 5 트랙 6) + 60 소스 (RSS 46 / HTML 3 / API 7 / FIRECRAWL 4) — **모두 active=FALSE**. ContentItem **0건** (cron 전).
+- **Almanac 명시 라우트** (S69 4개 추가): `/api/v1/t/almanac/{categories,contents,sources,today-top,items/[slug]}` 5개 모두 가동.
+- **API 키** (NEW S69): `srv_almanac_4EJMXSLc...` 발급 완료 (scopes=read:contents/sources/categories/items/today-top, owner=kimdooo@). 평문은 운영자가 안전 채널로 직접 보관 — handover/journal 미기재.
 - **Roles**: app_migration / app_runtime / app_admin 생성 (32바이트 랜덤 패스워드, **현재 미사용** — DATABASE_URL은 postgres superuser. role 분리는 N>1 시)
-- **마이그레이션**: 28 마이그 모두 적용 완료 (`prisma migrate status` = up to date)
-- **TSC**: 0 errors / **tenant/no-raw-prisma-without-tenant**: 0 violations / **vitest tests/messenger**: 13 skip(env-gated, 정상)
+- **마이그레이션**: 모두 적용 완료 (`prisma migrate status` = up to date, 28 마이그)
+- **ESLint**: 0 violations / TSC: 0 errors / Vitest: 372 pass + 33 skipped
 
 ---
 
-## ⭐ 세션 68 우선 작업 P0: 잔여 4 endpoint + API 키 발급 + Almanac 가시화
+## ⭐ 세션 70 우선 작업 P0: Almanac Vercel env 등록 + 가시화 검증
 
-세션 66에서 `/categories` 1개 신설(commit `2682321`). 나머지 4개와 키 발급을 마치면 Almanac /explore 에 카드가 표시되기 시작합니다.
+### P0-0 — Almanac 측 env 등록 (양평 측 작업 0)
 
-플로우 (각 endpoint 30~60분):
-1. **`/api/v1/t/[tenant]/contents/route.ts`** — cursor 페이지네이션 + track/category/q/source 필터 + ContentItem JOIN. spec 참조: `docs/assets/yangpyeon-aggregator-spec/code/src/app/api/v1/almanac/contents/route.ts`. 변환 패턴 = `/categories` 와 동일 (`withTenant` + `prismaWithTenant`).
-2. **`/api/v1/t/[tenant]/sources/route.ts`** — `active=true` 만, `country` / `kind` 필터.
-3. **`/api/v1/t/[tenant]/today-top/route.ts`** — ContentItemMetric 집계 + `score_today = (0.4*views + 0.6*item.score) * (24h이내 ? 1.5 : 1.0)` 알고리즘.
-4. **`/api/v1/t/[tenant]/items/[slug]/route.ts`** — 단건 조회. `qualityFlag='blocked'` → 404.
-5. **API 키 발급** — `srv_almanac_*` (32 base64url) 1개. 발급 인프라(`src/app/api/v1/api-keys/route.ts`) 또는 직접 SQL. 평문은 안전 채널로 Almanac 운영자에게 전달.
-6. **Almanac 측 통보** — Vercel `ALMANAC_TENANT_KEY` env + `NEXT_PUBLIC_AGGREGATOR_ENABLED=true` → Redeploy → /explore 가시화.
+세션 69 발급 평문 키를 Almanac Vercel 측에:
+1. Production env 추가: `ALMANAC_TENANT_KEY=srv_almanac_*` (운영자가 갖고 있는 평문)
+2. Production env 추가: `NEXT_PUBLIC_AGGREGATOR_ENABLED=true`
+3. Vercel Redeploy
+4. /explore 카드 표시 시작 (Almanac 측 SSR/ISR 5분 캐시 활용)
 
-근거:
-- 받은 인수인계서 `docs/assets/260427-yangpyeon-phase2-aggregator-handover.md` §3 contract + §6 일정
-- 직전 세션 인수인계 `docs/handover/260426-session66-aggregator-day1.md`
+당장은 ContentItem 0건이라 카드는 안 보이지만, aggregator 비즈니스 로직 + cron 등록 후 첫 카드부터 자동 노출.
 
----
+### P0-1 — Aggregator 비즈니스 로직 이식 (~28h, T2.5 본체)
 
-## P0-1: Aggregator 비즈니스 로직 이식 (~28h, T2.5 본체)
-
-5 endpoint 완성 후 진행. spec의 10 모듈을 multi-tenant adaptation 으로 이식:
+spec 의 10 모듈을 multi-tenant adaptation 으로 이식:
 - 모든 Prisma 호출에 `prismaWithTenant` 또는 `withTenantTx`
-- `runner.ts` 진입점에 `runWithTenant({ tenantId }, ...)` 한 번 SET
+- runner.ts 진입점에 `runWithTenant({ tenantId }, ...)` 한 번 SET
 - cron AGGREGATOR kind 분기 (`src/lib/cron/runner.ts`)
 - 위치: `packages/tenant-almanac/aggregator/` (T2.5 plugin 패턴) 또는 `src/lib/aggregator/` (M3 게이트 이전 임시)
 - spec 파일: `docs/assets/yangpyeon-aggregator-spec/code/src/lib/aggregator/*` (10 파일)
@@ -85,29 +84,26 @@ npm run dev
 
 ---
 
-## P0-2: 메신저 도메인 Phase 1 M2 진입 — **정밀화 완료, 즉시 진입 가능** (별도 트랙)
+## P0-2: 메신저 M2-Step1 (Track B 병행 가능)
 
-S67에서 M1(W1) 데이터 모델 + spike-006 commit 완료(`2048378`). **S68에서 M2 정밀화 산출물 작성 완료** (`docs/research/messenger/m2-detailed-plan.md` 655줄). M1 9/9 PASS 확정. M2-Step1 즉시 진입 가능.
+`docs/research/messenger/m2-detailed-plan.md` §3 도메인 헬퍼 4개 시그니처 그대로. Track A(aggregator) 와 폴더 분리:
+- Track A: `src/app/api/v1/t/[tenant]/{categories,contents,sources,today-top,items}/`, `src/lib/aggregator/`
+- Track B: `src/lib/messenger/`, `src/lib/schemas/messenger/`, `tests/messenger/`
 
-**M2 분할 (m2-detailed-plan §7)**:
-- **M2-Step1 (1.5일)**: 도메인 헬퍼 4개 (`src/lib/messenger/{conversations,messages,blocks,reports,types}.ts`) + Zod 스키마 9개 (`src/lib/schemas/messenger/{conversations,messages,safety}.ts`) + 단위 테스트 32건 + 커버리지 80%+ — m2-detailed-plan §3 시그니처 그대로 작성
-- **M2-Step2 (2일)**: 핵심 라우트 11개 (`src/app/api/v1/t/[tenant]/messenger/conversations/...`, `members`, `typing`, `receipts`, `messages/search`) + audit 5종 발화 검증 + cross-tenant 침투 회귀
-- **M2-Step3 (1.5일)**: 안전/알림/운영자 라우트 8개 (`user-blocks`, `abuse-reports`, `notification-preferences`, `admin/reports`) + M2 종료 인수인계서
+영역 분리로 commit 시 명시 파일 지정만 하면 충돌 0.
 
-**M2 핵심 결정 (S68 ACCEPTED)**:
-1. **라우트 prefix `/api/v1/t/[tenant]/messenger/...` (Phase 1부터)** — Almanac 검증 패턴 답습. 묵시 default tenant 라우트(`/api/v1/conversations/...`) 채택 안 함 — Phase 2 plugin 분리 비용 0줄, ESLint rule 자동 강제.
-2. 도메인 헬퍼 4개 = 비즈니스 룰 SoT (clientGeneratedId 멱등 / 차단 / 한도 / 권한)
-3. clientGeneratedId 멱등 = pre-lookup + race UNIQUE catch (Promise.all 50회 동시성 게이트)
-4. `withTenantRole(["OWNER","ADMIN"], ...)` = 운영자 패널 4종에만, 나머지 15 라우트는 `withTenant` + 헬퍼 검증
-5. vitest + 실제 DB (M1 의 `RLS_TEST_DATABASE_URL` env 재사용)
-6. Audit 5종 발화 머지 게이트 (DB SELECT 자동 검증)
-7. rate-limit 기존 `src/lib/rate-limit-db.ts` 재사용
+---
 
-**다음 세션 진입 시**: `docs/research/messenger/m2-detailed-plan.md` §3 (도메인 헬퍼 시그니처) + §5 (라우트 명세 표) + §6 (테스트 시나리오) 가 단일 진실 소스. 별도 brainstorming 불필요.
+## P1: 소스 점진 활성화 (60 → 5씩, 24h 관찰)
 
-**M3 이후**: SSE 단일 conv 실시간 + 30초 keepalive (spike-006 §3 결정).
+aggregator 비즈니스 로직 + cron 후 진행. 첫 묶음 권장:
 
-근거: `docs/research/messenger/m2-detailed-plan.md` (S68 산출) / `milestones.md` M2~M3 / `spike-006-pg-notify-sse.md` §3
+```sql
+SET LOCAL app.tenant_id = '00000000-0000-0000-0000-000000000001';
+UPDATE content_sources
+SET active = TRUE
+WHERE slug IN ('openai-blog', 'anthropic-news', 'huggingface-blog', 'hn-frontpage', 'arxiv-cs-cl');
+```
 
 ---
 
@@ -125,10 +121,12 @@ DEFERRED 사유: 호출자 변경 영향 범위 + sweep 1차 범위 외.
 
 ## P2: 운영 부채 정리
 
-- **sticky-notes / messenger 별도 작업 통합**: 세션 63/64의 untracked 파일 (스키마 + UI + 마이그레이션) 본 브랜치 commit 또는 별도 브랜치 분리
+- **Tenant context missing 1건 (S66 leftover)**: 어떤 코드 경로가 withTenant 가드 밖에서 prismaWithTenant 호출했는지 추적 미완
+- **sticky-notes / messenger 별도 작업 통합**: 세션 63/64 untracked 파일 + Track B(S69 untracked) 본 브랜치 commit 또는 별도 브랜치 분리
 - **/logs?_rsc=dy0du 404**: 사이드바 또는 RSC prefetch가 `/logs` 라우트 참조하나 페이지 부재 — 메뉴 정리 또는 페이지 생성
 - **03:00 KST cron 정상화 1주 관찰** (세션 54 이월)
 - **filebox MIME 화이트리스트 확장 검토**: text/javascript / text/typescript 등 코드 텍스트 (보안 검토 필요)
+- **CK +1 후보 평가**: withAuth tenant API key 분기 패턴 (S69) — 다른 SDK/스택에서도 반복될 가능성. 재사용 가치 검토 → CK 작성 여부 결정.
 
 ---
 
@@ -142,12 +140,10 @@ M3 게이트 = 2번째 컨슈머가 코드 0줄 추가로 가동되는 것 = clo
 
 ## 이월 (S65+ 누적)
 
-- **세션 66 잔여**: 4 endpoint(contents/sources/today-top/items) + API 키 발급 + Almanac 가시화 통보 (P0)
-- **세션 66 미터치**: aggregator 비즈니스 로직 이식 (~28h) / cron AGGREGATOR 분기 + 6종 등록 / 소스 5개씩 점진 활성화 / 관리자 UI 4페이지
-- **세션 66 신규 발견 미해결**: PM2 로그 `Tenant context missing` 1건 (timestamp 20:16:10, 배포 전 인스턴스 잔재) — 어떤 코드 경로가 가드 밖에서 prismaWithTenant 호출했는지 추적
-- **세션 66 git 정리 필요**: spec 패키지 42파일 modified 표시 + 시드 + 핸들러 + handover 등 commit 묶음
+- **세션 69 미터치**: Almanac Vercel env 등록(외부 작업) / aggregator 비즈니스 로직 이식 (~28h) / cron AGGREGATOR 분기 + 6종 등록 / 소스 5개씩 점진 활성화 / 관리자 UI 4페이지
+- **세션 69 미해결 이월**: PM2 로그 `Tenant context missing` 1건 (timestamp 20:16:10, S66 leftover) — 추적 미완
 - packages/tenant-almanac/ plugin 마이그레이션 (T2.5 본체, ~28h, M3 게이트)
-- 메신저 Phase 1 M1 (마이그 6건) + kdyspike #1
+- 메신저 M2-Step1/2/3 (Track B)
 - 스티커 메모 / 메신저 untracked 통합 (sticky-notes/messenger 별도 작업)
 - filebox-db.ts 패턴 4 (호출자 6파일)
 - 03:00 KST cron 결과 확인 (S56 이월)
@@ -186,59 +182,55 @@ M3 게이트 = 2번째 컨슈머가 코드 0줄 추가로 가동되는 것 = clo
 
 ---
 
-## 필수 참조 파일 ⭐ 세션 66 종료 시점
+## 필수 참조 파일 ⭐ 세션 69 종료 시점
 
 ```
 CLAUDE.md (프로젝트 루트) ⭐⭐⭐ — 세션 64에서 "운영 환경 및 마이그레이션 정책" + 운영 위치 정합 추가
-docs/status/current.md (세션 66 행 추가)
-docs/handover/260426-session66-aggregator-day1.md ⭐⭐⭐ 직전 세션 인수인계 (NEW)
-docs/handover/260426-session65-deploy-filebox-standalone.md ⭐⭐ 세션 65 인수인계
+docs/status/current.md (세션 69 행 추가)
+docs/handover/260426-session69-aggregator-day2.md ⭐⭐⭐ 직전 세션 인수인계 (NEW)
+docs/handover/260426-session66-aggregator-day1.md ⭐⭐⭐ Track A 1차 (S66, /categories endpoint)
+docs/handover/260426-session68-messenger-m2-plan.md ⭐⭐ Track B 정밀 계획
 docs/handover/260426-almanac-tenant-integration.md ⭐⭐⭐ Almanac 컨슈머 통합 가이드 (10 섹션)
-docs/assets/260427-yangpyeon-phase2-aggregator-handover.md ⭐⭐⭐ Almanac → 양평 Phase 2 인수인계 (NEW)
-docs/assets/yangpyeon-aggregator-spec/ ⭐⭐ spec 패키지 42 파일 (NEW S66 — 워크트리에서 복원)
-docs/assets/yangpyeon-aggregator-spec/code/src/app/api/v1/almanac/*.ts ⭐ 잔여 4 endpoint 변환 참조
+docs/assets/260427-yangpyeon-phase2-aggregator-handover.md ⭐⭐⭐ Almanac → 양평 Phase 2 인수인계
+docs/assets/yangpyeon-aggregator-spec/ ⭐⭐ spec 패키지 42 파일
+docs/assets/yangpyeon-aggregator-spec/code/src/lib/aggregator/*.ts ⭐ aggregator 비즈니스 로직 spec (10 파일, 다음 P0-1)
 
-# 세션 66 핵심 산출물
-prisma/seeds/almanac-aggregator-categories.sql (37 카테고리 시드)
-prisma/seeds/almanac-aggregator-sources.sql (60 소스 시드, 모두 active=FALSE)
-src/app/api/v1/t/[tenant]/categories/route.ts (첫 명시 tenant 라우트)
-
-# 세션 65 핵심 산출물
-prisma/migrations/20260427110000_phase1_4_rls_stage3/migration.sql (PG 16 fix 보강)
-prisma/migrations/20260428100000_fix_dbgenerated_missing_ok/migration.sql (COALESCE 정정)
-prisma/migrations/20260427140000_t1_6_aggregator_with_tenant/migration.sql (T1.6)
-prisma/migrations/20260427140001_seed_almanac_tenant/migration.sql (almanac seed)
-src/lib/filebox-db.ts (MIME markdown + 확장자 fallback)
-src/app/api/v1/almanac/[...path]/route.ts (308 alias)
-
-# CK +2 (46→48)
-docs/solutions/2026-04-26-pg16-bypassrls-revoke-syntax.md
-docs/solutions/2026-04-26-prisma-dbgenerated-current-setting-missing-ok.md
+# 세션 69 핵심 산출물
+src/app/api/v1/t/[tenant]/contents/route.ts (cursor pagination + 6 필터 + sort 3종)
+src/app/api/v1/t/[tenant]/sources/route.ts (active=true + kind/country)
+src/app/api/v1/t/[tenant]/today-top/route.ts (ContentItemMetric.itemId 정합 정정)
+src/app/api/v1/t/[tenant]/items/[slug]/route.ts (composite tenantId_slug 명시)
+scripts/issue-tenant-api-key.ts (운영 콘솔 UI 도입 전 임시 절차)
+src/lib/api-guard.ts (tenant API key Bearer 분기 + scope 가드)
 
 # 결정 근거
 docs/research/baas-foundation/01-adrs/ (8 ADR ACCEPTED + ADR-030 메신저)
 docs/research/baas-foundation/04-architecture-wave/02-sprint-plan/01-task-dag.md
 docs/research/messenger/_index.md (메신저 PRD)
+docs/research/messenger/m2-detailed-plan.md (M2 정밀 계획, 655줄)
 ```
 
 ---
 
 ## 직전 세션들 요약
 
-- **세션 66** (2026-04-26): Phase 2 / T2.5 Day 1 시동 — Almanac aggregator 시드(37+60) + 첫 명시 라우트(/categories) + 운영 배포 (현재)
+- **세션 69** (2026-04-26): Track A 완성 — Almanac aggregator 잔여 4 endpoint + srv_almanac_* 키 발급 + withAuth fix (현재)
+- **세션 68** (2026-04-26): 메신저 M1 점검 9/9 PASS + M2 정밀화 산출물 (655줄, 코드 0)
+- **세션 67** (2026-04-26): 메신저 Phase 1 M1 — 9 모델 + 6 enum + 6 마이그 + RLS 테스트 + S66 정합성 정리
+- **세션 66** (2026-04-26): Phase 2 / T2.5 Day 1 시동 — Almanac aggregator 시드(37+60) + /categories endpoint + 운영 배포
 - **세션 65** (2026-04-26): 옵션 A+B 6 agent 병렬 + 운영 배포 + filebox/PG16 일괄 fix — 6 commits, 50 파일, 마이그레이션 8건 적용, CK +2
-- **세션 64** (2026-04-26): 스티커 메모 + 메신저 도메인 PRD 산출 (계획 집중) — handover skip, `docs/research/messenger/` 7건 + ADR-030 ACCEPTED
-- **세션 63** (2026-04-26): kdyswarm 6 agent 발사 + 통합 (옵션 A+B) — 본 세션 65의 1단계
-- **세션 62** (2026-04-26): T1.4-sweep + P1 통합 부채 정리 — kdyswarm parallel 7 commits, 364 tests, eslint warn → error
 
 ---
 
-## 세션 67 시작 시 추천 첫 액션
+## 세션 70 시작 시 추천 첫 액션
 
-1. **본 next-dev-prompt + handover/260426-session66-aggregator-day1.md 읽기** (세션 66 결정 흡수)
-2. **잔여 4 endpoint 작성** (P0) — 세션 66의 `/categories` 패턴을 그대로 따르면 1개당 30~60분. 순서: contents → sources → today-top → items.
-3. **운영 상태 확인** (1주 관찰):
+1. **본 next-dev-prompt + handover/260426-session69-aggregator-day2.md 읽기** (세션 69 결정 흡수)
+2. **현 운영 상태 확인** (1주 관찰):
    - filebox 업로드 정상화 유지
    - 03:00 KST cron 정상 동작
    - audit_logs.tenant_id NULL 0
-4. **P0 진입 결정**: T2.5 (packages/tenant-almanac/) vs 메신저 Phase 1 M1 vs sticky-notes/messenger 통합
+   - PM2 ypserver 상태 (restart 횟수, 메모리)
+3. **P0 진입 결정 — 세 갈래**:
+   - Track A 다음: aggregator 비즈니스 로직 이식 (~28h) — spec 10 모듈, packages/tenant-almanac/ 또는 src/lib/aggregator/
+   - Track B 진입: M2-Step1 도메인 헬퍼 4개 — m2-detailed-plan §3 시그니처 그대로
+   - 잡일 정리: Tenant context missing 추적 / Track B untracked commit / sticky-notes 통합 / filebox-db.ts 패턴 4
