@@ -45,6 +45,7 @@
     "node_modules",
     "packages/**",
     "apps/**",
-    "docs/assets/**"
+    "docs/assets/**",
+    "standalone/**"
   ]
 }
