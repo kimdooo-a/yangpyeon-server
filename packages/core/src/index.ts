@@ -20,4 +20,10 @@
 
 export const CORE_VERSION = "0.0.1";
 
-// Phase 1.1+ 에서 export 추가 예정. 본 파일은 stub.
+// Phase 1.1: TenantContext (AsyncLocalStorage)
+export {
+  getCurrentTenant,
+  getCurrentTenantOrNull,
+  runWithTenant,
+  type TenantContext,
+} from "./tenant";
