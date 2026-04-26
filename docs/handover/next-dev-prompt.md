@@ -29,21 +29,30 @@ npm run dev
 
 ---
 
-## ⭐ 세션 59 우선 작업 P0: Phase 0 즉시 진입 (kdyswarm 발사)
+## ⭐ 세션 60 우선 작업 P0: Phase 1 G1b 병렬 발사 (T1.1 완료 후)
 
-세션 58에서 ADR-022~029 8건 ACCEPTED + kdywave 압축형 4 sub-wave 완료 (15 파일, 9,761줄). 이제 Phase 0 구현 즉시 진입.
+**Phase 0 전체 ✅ 완료** (M1 게이트 통과, 8 commits ea4d89c → d65cfce):
+- T0.1 spike-baas-002 fix 3건 ✅ 619a952
+- T0.2 모노레포 변환 (pnpm-workspace + turbo + packages/core 골격) ✅ d24ea37
+- T0.3 Tenant 모델 + 18 모델 tenantId nullable Stage 1 ✅ 89ea7e4
+- T0.4 audit_logs/metrics_history/ip_whitelist tenant_id Stage 1 + ADR-021 §amendment-2 ✅ 5a06c96
+- T0.5 Almanac 마이그레이션 계획 노트 ✅ 66dd62e
+- M1 fix: tsconfig docs/assets/** exclude ✅ d65cfce
 
-**Phase 0 작업 (1~2주, 17h, Sprint Plan §00 인용)**:
-1. ~~**spike-baas-002 부수 fix 3건** (즉시 minor PR):~~ **✅ 완료 (commit 619a952, 2026-04-26 세션 58 직후)**
-   - ~~`src/lib/cron/runner.ts:21` DEFAULT_ALLOWED_FETCH env override~~ ✅
-   - ~~`src/lib/cron/runner.ts:72` WEBHOOK fetch AbortController + timeout~~ ✅
-   - ~~`src/lib/cron/registry.ts:135` runJob catch structured log~~ ✅
-2. **모노레포 변환** (pnpm + turborepo, ~5일) — Phase 0 잔여 P0:
-   - 5단계 (S1 브랜치+workspace → S2 packages/core 신설 → S3 git mv 코드 이전 → S4 apps/web 신설 → S5 dependencies 재배치)
-3. **Tenant Prisma 모델** + Stage 1 마이그레이션 (tenant_id nullable + default 'default')
-4. **ADR-021 amendment-2** (audit_logs.tenant_id 컬럼, safeAudit 시그니처 불변, 11 콜사이트 변경 0건)
+**Phase 1.1 ✅ 완료** (commit 992a191, 2026-04-26 세션 59):
+- T1.1 TenantContext (AsyncLocalStorage) — packages/core/src/tenant/context.ts
+  · TenantContext { tenantId, bypassRls? } / getCurrentTenant (fail-loud) / getCurrentTenantOrNull / runWithTenant
+  · 8 신규 vitest (누계 285/285 PASS), npm run build PASS, packages/core tsc 0 errors
 
-**호출**: `/kdyswarm` — Sprint Plan §9개 그룹 (G0a~G3b) 패턴으로 병렬 발사. 또는 Phase 0은 작아서 단독 진행 가능.
+**Phase 1.2~1.7 G1b 병렬 발사 (T1.1 완료, 모두 가동 가능)**:
+- T1.2 withTenant() 가드 + catch-all router `/api/v1/t/[tenant]/[...path]` (16h, 크리티컬)
+- T1.3 ApiKey K3 매칭 (prefix + FK, 12h)
+- T1.5 TenantWorkerPool (worker_threads, 30h, spike-baas-002 §6 sketch 활용 시 -8h)
+- T1.7 audit-metrics tenant 차원 (bucketName + per-tenant audit-failure, 6h)
+
+**호출**: `/kdyswarm --tasks T1.2,T1.3,T1.5,T1.7 --strategy parallel`
+- T1.4 RLS 정책 (18h)는 별도 — DBA 작업이라 수동 검증 필요. T1.2 완료 후 단독 진행.
+- T1.6 Almanac backfill (10h)는 컨슈머 작업이라 spec/aggregator-fixes 머지 후.
 
 **M3 게이트** (Phase 2 종료, 약 3개월 후): 2번째 컨슈머가 코드 0줄 추가로 가동 → closed multi-tenant BaaS 정체성 입증.
 
