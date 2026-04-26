@@ -1,18 +1,18 @@
-# 다음 세션 프롬프트 (세션 68)
+# 다음 세션 프롬프트 (세션 69)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 67 완료)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 68 완료)
 
 - **프로젝트명**: 양평 부엌 서버 — **1인 운영자의 멀티테넌트 백엔드 플랫폼** (stylelucky4u.com)
 - **정체성**: closed multi-tenant BaaS (본인 소유 10~20개 프로젝트 공유 백엔드, 외부 가입 없음)
 - **스택**: Next.js 16 + TypeScript + Tailwind CSS 4 + PostgreSQL 16 (Prisma 7) + SQLite (Drizzle)
 - **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — Phase 2 / T2.5 aggregator Day 1 시동(S66) → 잔여 4 endpoint + API 키 발급 + 비즈니스 로직 이식이 다음 작업
-- **두 번째 도메인 트랙**: 메신저 Phase 1 M1(W1) 완성(S67) — 11 모델 + 6 enum + 6 마이그 + RLS 테스트 + spike-006(Conditional Go) commit
-- **세션 67 핵심**: 미커밋 상태로 누적된 **두 세션 산출물 동시 정리** — (1) aggregator Day 1(S66) 시드+route+handover commit (2) 메신저 M1(S67) 검증+commit (3) 종료 절차 일괄. 본 세션 commit 3건: `2048378` + `2682321` + 본 commit.
+- **두 번째 도메인 트랙**: 메신저 Phase 1 — M1(W1) 완성(S67, commit `2048378`) + **M2 정밀화 산출물 `m2-detailed-plan.md` 655줄 작성(S68)** — 도메인 헬퍼 4개 시그니처 + 라우트 19개 정확 명세 + M2-Step1/2/3 분할 + 영역 분리 매트릭스. **M2-Step1 즉시 진입 가능 상태**.
+- **세션 68 핵심**: M1 9/9 PASS 점검 + M2 정밀화. 다른 터미널 미커밋 작업(Almanac aggregator)과 영역 분리 보장 (`docs/research/messenger/` 안 2 파일만 변경). 코드 변경 0.
 
 ## 서버 실행 / 접속 정보
 
@@ -85,14 +85,29 @@ npm run dev
 
 ---
 
-## P0-2: 메신저 도메인 Phase 1 M2 진입 (별도 트랙)
+## P0-2: 메신저 도메인 Phase 1 M2 진입 — **정밀화 완료, 즉시 진입 가능** (별도 트랙)
 
-S67에서 M1(W1) 데이터 모델 + spike-006 commit 완료(`2048378`). 다음 단계:
-- **M2 (W2~3)**: REST API 11 endpoint — conv 5(GET/POST conversations / GET/PATCH/DELETE id) + msg 5(GET/POST messages / PATCH/DELETE id / POST recall) + safety 1(POST blocks)
-- **M3 (W4)**: SSE 단일 conv 실시간 + 30초 keepalive (spike-006 §3 결정)
-- **결정 대기**: Q1 (DM 폐기 정책) / Q4 (group 인원) / Q6 (mention 알림 우선순위)
+S67에서 M1(W1) 데이터 모델 + spike-006 commit 완료(`2048378`). **S68에서 M2 정밀화 산출물 작성 완료** (`docs/research/messenger/m2-detailed-plan.md` 655줄). M1 9/9 PASS 확정. M2-Step1 즉시 진입 가능.
 
-근거: `docs/research/messenger/milestones.md` M2~M3 / `docs/research/spikes/spike-006-pg-notify-sse.md` §3
+**M2 분할 (m2-detailed-plan §7)**:
+- **M2-Step1 (1.5일)**: 도메인 헬퍼 4개 (`src/lib/messenger/{conversations,messages,blocks,reports,types}.ts`) + Zod 스키마 9개 (`src/lib/schemas/messenger/{conversations,messages,safety}.ts`) + 단위 테스트 32건 + 커버리지 80%+ — m2-detailed-plan §3 시그니처 그대로 작성
+- **M2-Step2 (2일)**: 핵심 라우트 11개 (`src/app/api/v1/t/[tenant]/messenger/conversations/...`, `members`, `typing`, `receipts`, `messages/search`) + audit 5종 발화 검증 + cross-tenant 침투 회귀
+- **M2-Step3 (1.5일)**: 안전/알림/운영자 라우트 8개 (`user-blocks`, `abuse-reports`, `notification-preferences`, `admin/reports`) + M2 종료 인수인계서
+
+**M2 핵심 결정 (S68 ACCEPTED)**:
+1. **라우트 prefix `/api/v1/t/[tenant]/messenger/...` (Phase 1부터)** — Almanac 검증 패턴 답습. 묵시 default tenant 라우트(`/api/v1/conversations/...`) 채택 안 함 — Phase 2 plugin 분리 비용 0줄, ESLint rule 자동 강제.
+2. 도메인 헬퍼 4개 = 비즈니스 룰 SoT (clientGeneratedId 멱등 / 차단 / 한도 / 권한)
+3. clientGeneratedId 멱등 = pre-lookup + race UNIQUE catch (Promise.all 50회 동시성 게이트)
+4. `withTenantRole(["OWNER","ADMIN"], ...)` = 운영자 패널 4종에만, 나머지 15 라우트는 `withTenant` + 헬퍼 검증
+5. vitest + 실제 DB (M1 의 `RLS_TEST_DATABASE_URL` env 재사용)
+6. Audit 5종 발화 머지 게이트 (DB SELECT 자동 검증)
+7. rate-limit 기존 `src/lib/rate-limit-db.ts` 재사용
+
+**다음 세션 진입 시**: `docs/research/messenger/m2-detailed-plan.md` §3 (도메인 헬퍼 시그니처) + §5 (라우트 명세 표) + §6 (테스트 시나리오) 가 단일 진실 소스. 별도 brainstorming 불필요.
+
+**M3 이후**: SSE 단일 conv 실시간 + 30초 keepalive (spike-006 §3 결정).
+
+근거: `docs/research/messenger/m2-detailed-plan.md` (S68 산출) / `milestones.md` M2~M3 / `spike-006-pg-notify-sse.md` §3
 
 ---
 

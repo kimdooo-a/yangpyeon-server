@@ -15,7 +15,8 @@ docs/research/messenger/
 ├── wireframes.md ············· 화면 ASCII 와이어프레임 + 데이터 흐름 시퀀스
 ├── data-model.md ············· Prisma 모델 11종 상세 + RLS 정책 + 인덱스 전략
 ├── api-surface.md ············ API 라우트 명세 + SSE 채널 키 + 에러 코드 표준
-└── milestones.md ············· Phase 1 6주 마일스톤 + Phase 2/3 트리거
+├── milestones.md ············· Phase 1 6주 마일스톤 + Phase 2/3 트리거
+└── m2-detailed-plan.md ······· (세션 67) M1 점검 (9/9 PASS) + M2 정밀화 — 라우트 prefix `/t/[tenant]/messenger/`, 도메인 헬퍼 4개 시그니처, 3-세션 분할 (67/68/69)
 ```
 
 ## 관련 ADR
@@ -34,14 +35,23 @@ docs/research/messenger/
 - `docs/MASTER-DEV-PLAN.md` — Phase 1 메신저 마일스톤 1행 추가
 - `docs/status/current.md` — 세션 63 요약표 1행 추가
 
-## 다음 액션
+## 진행 상태 (2026-04-26 기준)
 
-1. **Phase 1 시작 게이트**:
-   - kdyspike #1 (PG NOTIFY+SSE 정합성, 30분) 수행
-   - 본 디렉토리 5개 산출물 모두 작성 확인 (PRD/personas/matrix/wireframes/data-model/api-surface/milestones)
-2. **Phase 1 W1**:
-   - prisma/schema.prisma에 enum 6종 + 모델 11종 추가
-   - 마이그 #1~6 작성 + Claude 직접 deploy
-3. **Phase 1 종료 시**:
-   - Phase 2 진입 결정 — DAU ≥ 30 또는 컨슈머 앱 요구 시점
-   - ADR-031, ADR-032 작성 시작
+- [x] **M0 사전** (세션 63): ADR-030 ACCEPTED + 8개 기획 문서 + spike-006
+- [x] **M1 (W1) 데이터 모델** (세션 64, commit `2048378`): 9 model + 6 enum + 6 마이그 + RLS 9 테이블 + RLS 단위 테스트 13 it (env-gated)
+- [ ] **M2 (W2) API CRUD + 멱등성 + 권한** (M2-Step1/2/3 분할, 예상 세션 69~71): 도메인 헬퍼 4개 + 라우트 19개 + 통합 테스트 — `m2-detailed-plan.md` 참조
+- [ ] M3 (W3) SSE 실시간 — `milestones.md §M3`
+- [ ] M4~M6 (W4~W6) — `milestones.md §M4~M6`
+
+## 다음 액션 (M2 진입)
+
+1. **M2-Step1 (도메인 헬퍼 4개)** — 다음 세션 즉시 진입 가능:
+   - `m2-detailed-plan.md §3` 시그니처대로 `src/lib/messenger/{conversations,messages,blocks,reports,types}.ts` 작성
+   - `src/lib/schemas/messenger/{conversations,messages,safety}.ts` Zod 스키마
+   - 단위 테스트 32건 작성 + PASS 확인 (커버리지 80%+)
+2. **M2-Step2 (핵심 라우트 11개)** + **M2-Step3 (안전/알림/운영자 8개)**:
+   - 라우트 prefix `/api/v1/t/[tenant]/messenger/` 채택 (Almanac 패턴 답습)
+   - audit 5종 발화 검증 + cross-tenant 침투 회귀
+3. **M2 종료 시**:
+   - M3 진입 (SSE 실시간) — `api-surface.md §4`
+   - 인수인계서 작성
