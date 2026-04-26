@@ -35,7 +35,7 @@ const TENANT_PATH_RE = /^\/api\/v1\/t\/([a-z0-9][a-z0-9-]{1,30})(\/|$)/;
  * active=false 인 경우 410 Gone 응답을 책임진다.
  * tenant.id 를 주입함으로써 감사 로그가 실제 tenant UUID 를 기록할 수 있어
  * "누가 정지된 테넌트를 호출하는지" 추적이 가능하다.
- * undefined 반환 시 audit 는 '_system' sentinel 로 기록되어 추적성이 저하된다.
+ * undefined 반환 시 audit 는 'default' sentinel 로 기록되어 (어느 tenant 인지) 추적성이 저하된다.
  *
  * **JWT `aud` claim 검증**: 본 단계에서 구현하지 않음.
  * `withTenant` 가드 (T1.3 keys-tenant) 가 책임진다.
