@@ -85,13 +85,13 @@ ALTER TABLE "log_drains"             ALTER COLUMN "tenant_id" SET DEFAULT (curre
 -- 4. 기존 cron_jobs / api_keys FK 변경 (SetNull → Cascade) — schema 정합.
 --    NOT NULL 전환과 함께 ON DELETE 정책도 Cascade 로 (SetNull 은 NOT NULL 위반).
 -- ────────────────────────────────────────────────────────────
-ALTER TABLE "cron_jobs" DROP CONSTRAINT "cron_jobs_tenant_id_fkey";
+ALTER TABLE "cron_jobs" DROP CONSTRAINT IF EXISTS "cron_jobs_tenant_id_fkey";
 ALTER TABLE "cron_jobs"
     ADD CONSTRAINT "cron_jobs_tenant_id_fkey"
     FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id")
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE "api_keys" DROP CONSTRAINT "api_keys_tenant_id_fkey";
+ALTER TABLE "api_keys" DROP CONSTRAINT IF EXISTS "api_keys_tenant_id_fkey";
 ALTER TABLE "api_keys"
     ADD CONSTRAINT "api_keys_tenant_id_fkey"
     FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id")
@@ -106,7 +106,8 @@ CREATE UNIQUE INDEX "edge_functions_tenant_id_name_key" ON "edge_functions"("ten
 CREATE UNIQUE INDEX "cron_jobs_tenant_id_name_key"     ON "cron_jobs"("tenant_id", "name");
 
 -- folders: 기존 (parent_id, name, owner_id) → (tenant_id, parent_id, name, owner_id) 로 교체.
-ALTER TABLE "folders" DROP CONSTRAINT "folders_parent_id_name_owner_id_key";
+-- 운영 DB drift 대응: 기존 constraint 부재 가능 (IF EXISTS 가드).
+ALTER TABLE "folders" DROP CONSTRAINT IF EXISTS "folders_parent_id_name_owner_id_key";
 CREATE UNIQUE INDEX "folders_tenant_id_parent_id_name_owner_id_key"
     ON "folders"("tenant_id", "parent_id", "name", "owner_id");
 
@@ -195,7 +196,9 @@ END $$;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO app_migration;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_migration;
 
-REVOKE BYPASSRLS FROM app_runtime;
+-- PG 16+: REVOKE BYPASSRLS FROM <role> 구문이 BYPASSRLS를 role name으로 잘못 해석 (P3018).
+-- 정답: ALTER ROLE ... NOBYPASSRLS — role attribute를 명시 변경.
+ALTER ROLE app_runtime NOBYPASSRLS;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_runtime;
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO app_runtime;
 
