@@ -1,21 +1,25 @@
 /**
- * tenant-router/membership — TenantMembership 조회 스텁.
+ * tenant-router/membership — TenantMembership 조회 (cookie 인증 경로).
  *
- * Phase 1.2 (T1.2) 시점에는 prisma/schema.prisma 에 TenantMembership 모델이
- * 아직 없다 (T1.5 가 schema 소유권). 본 모듈은 그 공백을 메우는 스텁이며,
- * T1.5 가 모델을 추가한 후에는 prisma.tenantMembership.findUnique 호출로
- * 본문을 교체한다.
+ * P0-membership (세션 61) — Phase 1.2 의 fail-closed stub 본문을 실 prisma 호출로 교체.
  *
- * TODO(T1.5): 본 파일 본문을 prisma 직접 호출로 교체할 것. 시그니처는 유지.
+ * 호출 흐름:
+ *   1. T1.2 router 의 cookie 분기에서 사용자가 인증된 후 (userId 확정).
+ *   2. 요청 path 의 <tenant> slug 로 tenant.id 를 lookup.
+ *   3. 본 함수가 (tenantId, userId) 멤버십 행 조회.
+ *   4. row 존재 → 멤버 → 핸들러로 분기. row 없음 → null → 403.
  *
- *   return prisma.tenantMembership.findUnique({
- *     where: { tenantId_userId: { tenantId, userId } },
- *     select: { role: true },
- *   });
+ * RLS 의도적 미적용 (T1.4 spec §2.4 Tenant-bypass 카테고리):
+ *   - 멤버십 조회는 tenant context 가 *결정되기 전* 단계 — RLS 가 app.tenant_id 를 요구하면
+ *     self-defeating (어느 tenant 에 속하는지 본 query 가 판정 중).
+ *   - (tenantId, userId) 양쪽 명시 bind parameter 이므로 cross-tenant 안전.
+ *   - 따라서 prismaWithTenant 가 아닌 base prisma 를 사용한다.
  *
- * 그때까지는 항상 null 을 반환하여 cookie 경로를 안전하게 차단한다 — ADR-027
- * §4.2 step 3b 의 정책(미멤버 = 403)을 디폴트로 적용하는 fail-closed 모드.
+ * Prisma generated client 가 @ts-nocheck 인 영향으로 tenantMembership 모델이 외부 typecheck 에서
+ * unknown 일 수 있다 — 다른 호출 사이트(jwks/store.ts, sessions/tokens.ts)와 동일하게 any 캐스트.
  */
+// eslint-disable-next-line no-restricted-imports -- 본 모듈은 인증 인프라 — base prisma 직접 사용 정당.
+import { prisma } from "@/lib/prisma";
 import type { TenantRole } from "./roles";
 
 export interface TenantMembershipRow {
@@ -30,14 +34,25 @@ export interface FindMembershipInput {
 /**
  * 주어진 (tenantId, userId) 조합의 멤버십을 조회.
  *
- * 현 단계 (Phase 1.2): 항상 null — cookie 경로는 항상 403 으로 차단됨.
- * T1.5 통합 시점에 실제 DB 조회로 교체.
- *
- * @returns 멤버십 row 또는 null (미가입 / 모델 미존재).
+ * @returns 멤버십 row 또는 null (미가입). DB 에러 시에는 throw — fail-loud 로 422/500 변환.
  */
 export async function findTenantMembership(
-  _input: FindMembershipInput,
+  input: FindMembershipInput,
 ): Promise<TenantMembershipRow | null> {
-  // TODO(T1.5): prisma.tenantMembership.findUnique 호출로 교체.
-  return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const row = await (prisma as any).tenantMembership.findUnique({
+    where: {
+      tenantId_userId: { tenantId: input.tenantId, userId: input.userId },
+    },
+    select: { role: true },
+  });
+  if (!row) return null;
+
+  // role 은 DB 에서 string 으로 저장되지만 TenantRole literal union 으로 narrow.
+  // 비정상 값(예: schema 변경 후 stale row)이 들어오면 미멤버로 처리하여 fail-closed 유지.
+  const role = row.role as TenantRole;
+  if (role !== "OWNER" && role !== "ADMIN" && role !== "MEMBER" && role !== "VIEWER") {
+    return null;
+  }
+  return { role };
 }
