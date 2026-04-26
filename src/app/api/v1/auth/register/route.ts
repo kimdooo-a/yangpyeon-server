@@ -4,6 +4,9 @@ import { hashPassword } from "@/lib/password";
 import { registerSchema } from "@/lib/schemas/auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
+// T1.4 sweep: /api/v1/auth/register 는 글로벌 등록 엔드포인트. 운영자 콘솔 전용 → 'default' sentinel (패턴 c).
+const ADMIN_TENANT_ID = "default";
+
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -20,8 +23,10 @@ export async function POST(request: NextRequest) {
 
   const { email, password, name, phone } = parsed.data;
 
-  // 이메일 중복 확인
-  const existing = await prisma.user.findUnique({ where: { email } });
+  // T1.4 sweep: (tenantId, email) composite unique 로 전환. 글로벌 @unique 의존 제거.
+  const existing = await prisma.user.findUnique({
+    where: { tenantId_email: { tenantId: ADMIN_TENANT_ID, email } },
+  });
   if (existing) {
     return errorResponse("EMAIL_EXISTS", "이미 사용 중인 이메일입니다", 409);
   }

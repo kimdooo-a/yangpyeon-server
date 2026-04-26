@@ -7,6 +7,10 @@ import { issueMfaChallenge, CHALLENGE_MAX_AGE } from "@/lib/mfa/challenge";
 import { applyRateLimit } from "@/lib/rate-limit-guard";
 import { finalizeLoginResponse } from "@/lib/sessions/login-finalizer";
 
+// T1.4 sweep: /api/v1/auth/login 은 URL에 tenant slug 가 없는 글로벌 인증 엔드포인트.
+// 운영자 콘솔(admin context) → 'default' sentinel 사용 (패턴 c).
+const ADMIN_TENANT_ID = "default";
+
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -33,7 +37,10 @@ export async function POST(request: NextRequest) {
   });
   if (blocked) return blocked;
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  // T1.4 sweep: (tenantId, email) composite unique 로 전환. 글로벌 @unique 의존 제거.
+  const user = await prisma.user.findUnique({
+    where: { tenantId_email: { tenantId: ADMIN_TENANT_ID, email } },
+  });
   if (!user || !user.isActive) {
     return errorResponse("INVALID_CREDENTIALS", "이메일 또는 비밀번호가 올바르지 않습니다", 401);
   }
