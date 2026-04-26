@@ -99,8 +99,118 @@ describe("audit-metrics — safeAudit 카운터", () => {
     expect(after.total.success).toBe(0);
     expect(after.total.failure).toBe(0);
     expect(after.byBucket).toEqual([]);
+    expect(after.byTenant).toEqual([]);
     expect(new Date(after.startedAt).getTime()).toBeGreaterThan(
       new Date(before.startedAt).getTime(),
     );
+  });
+});
+
+// Phase 1.7 (T1.7) ADR-029 §2.2.5 — per-tenant 차원 추가 검증.
+describe("audit-metrics — byTenant 차원 (Phase 1.7)", () => {
+  beforeEach(() => resetAuditMetrics());
+
+  it("tenantId 미지정 시 'default' 로 폴백 + byTenant array 에 등장", () => {
+    recordAuditOutcome(true, "SESSION_LOGIN");
+    recordAuditOutcome(false, "SESSION_LOGIN", new Error("err"));
+    const m = getAuditMetrics();
+    expect(m.byTenant).toHaveLength(1);
+    expect(m.byTenant[0].tenantId).toBe("default");
+    expect(m.byTenant[0].total.success).toBe(1);
+    expect(m.byTenant[0].total.failure).toBe(1);
+    expect(m.byTenant[0].total.failureRate).toBeCloseTo(0.5);
+    expect(m.byTenant[0].byBucket).toHaveLength(1);
+    expect(m.byTenant[0].byBucket[0].name).toBe("SESSION_LOGIN");
+  });
+
+  it("tenantId 별 카운터 분리 — almanac 과 default 가 독립 집계", () => {
+    recordAuditOutcome(true, "SESSION_LOGIN", undefined, "almanac");
+    recordAuditOutcome(true, "SESSION_LOGIN", undefined, "almanac");
+    recordAuditOutcome(false, "SESSION_LOGIN", new Error("e"), "default");
+
+    const m = getAuditMetrics();
+    expect(m.byTenant).toHaveLength(2);
+    const almanac = m.byTenant.find((t) => t.tenantId === "almanac");
+    const def = m.byTenant.find((t) => t.tenantId === "default");
+    expect(almanac?.total.success).toBe(2);
+    expect(almanac?.total.failure).toBe(0);
+    expect(def?.total.success).toBe(0);
+    expect(def?.total.failure).toBe(1);
+  });
+
+  it("byTenant 정렬 — 실패 많은 tenant 가 상단 (Operator Console 빨간 ROW)", () => {
+    // tenant-A: 1 success
+    recordAuditOutcome(true, "X", undefined, "tenant-A");
+    // tenant-B: 3 failures
+    recordAuditOutcome(false, "X", new Error("e"), "tenant-B");
+    recordAuditOutcome(false, "X", new Error("e"), "tenant-B");
+    recordAuditOutcome(false, "X", new Error("e"), "tenant-B");
+    // tenant-C: 1 failure
+    recordAuditOutcome(false, "X", new Error("e"), "tenant-C");
+
+    const m = getAuditMetrics();
+    // 실패 개수: B(3) > C(1) > A(0).
+    expect(m.byTenant.map((t) => t.tenantId)).toEqual([
+      "tenant-B",
+      "tenant-C",
+      "tenant-A",
+    ]);
+  });
+
+  it("MAX_TENANTS=50 — 51번째 tenant 진입 시 가장 오래 들어온 tenant FIFO evict", () => {
+    // 50 tenant 채움
+    for (let i = 0; i < 50; i += 1) {
+      recordAuditOutcome(true, "X", undefined, `tenant-${i}`);
+    }
+    let m = getAuditMetrics();
+    expect(m.byTenant).toHaveLength(50);
+
+    // 51번째 — 첫 번째 tenant evict 되어야 함
+    recordAuditOutcome(true, "X", undefined, "tenant-overflow");
+    m = getAuditMetrics();
+    expect(m.byTenant).toHaveLength(50);
+    expect(m.byTenant.find((t) => t.tenantId === "tenant-0")).toBeUndefined();
+    expect(
+      m.byTenant.find((t) => t.tenantId === "tenant-overflow"),
+    ).toBeDefined();
+  });
+
+  it("MAX_BUCKETS_PER_TENANT=100 — 동일 tenant 의 101번째 bucket FIFO evict", () => {
+    // tenant 'almanac' 에 100 bucket 채움
+    for (let i = 0; i < 100; i += 1) {
+      recordAuditOutcome(true, `BUCKET_${i}`, undefined, "almanac");
+    }
+    let m = getAuditMetrics();
+    let almanac = m.byTenant.find((t) => t.tenantId === "almanac");
+    expect(almanac?.byBucket).toHaveLength(100);
+
+    // 101번째 bucket — BUCKET_0 evict
+    recordAuditOutcome(true, "BUCKET_OVERFLOW", undefined, "almanac");
+    m = getAuditMetrics();
+    almanac = m.byTenant.find((t) => t.tenantId === "almanac");
+    expect(almanac?.byBucket).toHaveLength(100);
+    expect(almanac?.byBucket.find((b) => b.name === "BUCKET_0")).toBeUndefined();
+    expect(
+      almanac?.byBucket.find((b) => b.name === "BUCKET_OVERFLOW"),
+    ).toBeDefined();
+  });
+
+  it("기존 byBucket (tenant-agnostic) 차원도 동시에 갱신됨 — 회귀 0", () => {
+    // 같은 bucket 을 두 tenant 가 호출 → byBucket 은 합산, byTenant 는 분리.
+    recordAuditOutcome(true, "SHARED", undefined, "tenant-A");
+    recordAuditOutcome(false, "SHARED", new Error("e"), "tenant-B");
+
+    const m = getAuditMetrics();
+    // byBucket (tenant-agnostic) — 두 tenant 합산
+    const shared = m.byBucket.find((b) => b.name === "SHARED");
+    expect(shared?.success).toBe(1);
+    expect(shared?.failure).toBe(1);
+    // byTenant — 분리.
+    expect(
+      m.byTenant.find((t) => t.tenantId === "tenant-A")?.total.success,
+    ).toBe(1);
+    expect(
+      m.byTenant.find((t) => t.tenantId === "tenant-B")?.total.failure,
+    ).toBe(1);
   });
 });
