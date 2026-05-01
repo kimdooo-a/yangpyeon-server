@@ -168,6 +168,31 @@ M  prisma/schema.prisma                                # File.storageType 컬럼
 
 ---
 
+## 검증 결과 (트랙 A commit 275464c, 다른 터미널 종료 시점)
+
+본 세션 71 종료 직후 다른 터미널이 ADR-032 ACCEPTED 승격까지 진행 (자기 세션 72로 명명, commit `275464c`). 본 터미널이 그 결과를 정적 검증.
+
+**✅ 통과 8/8**:
+- commit 275464c 무결성 (18 파일 +6180/-3037, 메시지 + 변경 매핑 완벽)
+- `src/lib/r2.ts` ↔ `prepared-code/r2-client.ts.txt` 1:1 적용 (사전 코드 패턴 검증됨)
+- 라우트 2개 (r2-presigned/r2-confirm) prepared-code 1:1
+- Prisma 마이그레이션 additive + DO 검증 블록 (3 row backfill)
+- ADR-032 §1 `Accepted (2026-05-01 세션 71)` (다른 터미널 명명 71)
+- 의존성 `@aws-sdk/*@3.1040`
+- `scripts/r2-poc.mjs` 헬스체크 재사용 보너스
+- PM2 ypserver pid 187964 online
+
+**⚠️ 마무리 부족 6건 (S73+ 정정 권장)**:
+- M1 spike-032 §4.2 PoC 실측 컬럼 미기입 (1.8ms / 100% / 17.3s 가 commit 메시지에만)
+- M2 §3.2 권고 "옵션 B" 그대로 (실제 V1=A 정정 미반영) + §8 v0.3 row 미추가
+- M3 ADR-032 §7 ACCEPTED 게이트 체크리스트 빈칸 (CORS / 1GB wall-clock 보류 사유 미명시)
+- M4 `wsl-build-deploy.sh` `/.env` exclude 패치 미적용 (메모리 룰 + 솔루션 문서만 등록)
+- M5 다운로드 라우트 미신설 (V1 백엔드만)
+- M6 UI 50MB 분기 미적용 (`/filebox/page.tsx` 미수정)
+
+M1~M3 = 추적성 보강 (각 5분), M4 = 운영 부채 영구 잔존 (5분 fix), M5~M6 = V1 진화 (다음 세션 별도 PR).
+
 ## 변경 이력
 
 - 2026-05-01 v0.1 (세션 71): 초안 작성. S71-A spike + ADR-032 PROPOSED + V1 사전 코드 + SP-013/016 강화 + 베이스라인 검증 메모리 룰. 트랙 B 두 건 outdated 함정 회피로 취소.
+- 2026-05-01 v0.2 (세션 71 종료 직후): 다른 터미널 commit 275464c 검증 결과 §검증 후술. M1~M6 부족 항목 명시 (S73+ 이월).
