@@ -117,7 +117,13 @@ npm run dev
 
 > 세션 76 에서 §S76-D 1·2단계 완료 (commit `8bf1b5f`). 3단계는 cron runner kind 확장 필요로 별도 PR §S77-A. 그 외 §S76-C R2 콘솔 CORS 와 §S76-A WSL 배포 + 폰 실측은 그대로 이월.
 
-### S77-A. **24h pending cleanup cron — R2 SDK 호출 지원** (P1, ~3h, S76-D 후속)
+### ~~S77-A.~~ **24h pending cleanup cron — R2 SDK 호출 지원** ⚠️ **SUPERSEDED 2026-05-01 (세션 77 옵션 C)**
+
+> **2026-05-01 옵션 C 채택으로 본 작업 SUPERSEDED.**
+> R2 폐기 + SeaweedFS 자가호스팅 전환 (ADR-033 ACCEPTED) 에 따라 R2_CLEANUP cron 자체가 불필요.
+> SeaweedFS 자가호스팅은 외부 quota 회계 부채가 없고, 디스크 사용량 모니터링 + filer leveldb 오케스트레이션만 필요.
+> 후속 작업: SP-016 ACCEPTED + ADR-033 (세션 77 PHASE 5 산출).
+> 본 §S77-A 본문은 역사 보존 목적으로 그대로 유지.
 
 세션 76 에서 R2 즉시 삭제 best-effort 적용. 그러나 일시 장애로 best-effort 실패하거나 r2-presigned 발급 후 confirm 안 된 객체가 누적되면 R2 quota 회계 부채 → 24h cleanup cron 으로 회수 필요.
 
