@@ -11,6 +11,7 @@ import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/prisma";
+import { deleteR2Object } from "@/lib/r2";
 
 // 파일 저장 디렉토리
 const FILEBOX_DIR = process.env.FILEBOX_DIR || path.join(process.env.HOME || "/tmp", "filebox");
@@ -315,8 +316,7 @@ export async function getFileForDownload(fileId: string, userId: string, isAdmin
 
 // 파일 삭제
 // 로컬: DB row 삭제 + 물리 파일 unlink
-// R2: DB row 만 삭제 — R2 객체 cleanup 은 별도 PR 의 24h cron / 즉시 deleteObject 호출에서 처리
-//     (현재는 R2 객체 잔존 → R2 quota 누적. 다음 단계 작업 항목)
+// R2: DB row 삭제 + R2 객체 best-effort 삭제 (실패해도 row 는 이미 사라짐 → 24h cleanup 보조)
 export async function deleteFile(fileId: string, userId: string) {
   const file = await prisma.file.findUnique({ where: { id: fileId } });
   if (!file || file.ownerId !== userId) throw new Error("파일을 찾을 수 없습니다");
@@ -324,7 +324,15 @@ export async function deleteFile(fileId: string, userId: string) {
   await prisma.file.delete({ where: { id: fileId } });
 
   if (file.storageType === "r2") {
-    // R2 객체 잔존 — 별도 PR 에서 deleteR2Object(file.storedName) 호출 추가 필요
+    try {
+      await deleteR2Object(file.storedName);
+    } catch (err) {
+      // best-effort: DB row 는 이미 사라졌으므로 R2 잔존 객체는 24h cleanup cron 로 회수.
+      console.warn(
+        `[filebox] R2 객체 삭제 실패 (DB row 는 삭제 완료): key=${file.storedName}`,
+        err,
+      );
+    }
     return;
   }
 

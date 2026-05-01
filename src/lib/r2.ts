@@ -8,7 +8,12 @@
 // - src/app/api/v1/filebox/files/r2-presigned/route.ts (PUT URL 발급)
 // - src/app/api/v1/filebox/files/r2-confirm/route.ts (HEAD 검증)
 // - 미래: 다운로드 presigned GET URL 발급
-import { S3Client, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  HeadObjectCommand,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
@@ -130,6 +135,27 @@ export async function presignR2GetUrl(
       : {}),
   });
   return getSignedUrl(client, command, { expiresIn: expiresInSec });
+}
+
+// ── R2 객체 즉시 삭제 ─────────────────────────────────────────
+// best-effort: NotFound (이미 없음) 은 성공으로 간주 — 호출자가 DB row 를
+// 이미 삭제한 후 호출하므로 R2 객체만 잔존하는 상황이 정상 케이스.
+// 그 외 네트워크/권한 에러는 throw — 호출자가 console.warn 후 swallow.
+export async function deleteR2Object(key: string): Promise<void> {
+  const client = getR2Client();
+  try {
+    await client.send(new DeleteObjectCommand({ Bucket: R2_BUCKET!, Key: key }));
+  } catch (err) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "name" in err &&
+      (err as { name: string }).name === "NotFound"
+    ) {
+      return;
+    }
+    throw err;
+  }
 }
 
 // ── public URL (custom domain 설정 시) ─────────────────────────
