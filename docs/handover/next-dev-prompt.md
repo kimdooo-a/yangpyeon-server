@@ -5,9 +5,24 @@
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 80 종료, B3 동일 세션 추가)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 80 종료 — 3차 정합화: B4+B5+B6 추가)
 
-- **세션 80 핵심 (Track B Aggregator 첫 진입 — B-pre + B1 + B2 + B3, 7 commits +2,835 LOC)**:
+- **세션 80 최종 (Track B Aggregator 본진 P0 완주 — B-pre+B1+B2+B3+B4+B5+B6, 10 commits +6,112 LOC)**:
+  1. **본진 spec 6 모듈 multi-tenant 적응 완료**: types (95) + dedupe (158) + classify (308) + fetchers/{index,rss,html,api} (725) + llm (213) + promote (134) + runner (273) = **약 1,906 LOC 이식**.
+  2. **spec port-time bug 4건 누적 차단** (TDD RED phase 매번 표면화):
+     - B2: spec dedupe.ts `URLSearchParams.keys()` multi-value duplication
+     - B3: spec classify.ts `\b` ASCII-only boundary (한글 매처 비기능)
+     - B4: spec fetchers/api.ts ArXiv link regex `rel="alternate"` 위치 의존
+     - B5: spec promote.ts slugify NFKD 가 한글 음절 (가-힣) 을 jamo (U+1100~) 로 분해
+     - **메타**: spec 동결판은 single-environment + happy-path tested. CK 통합 1건 신규.
+  3. **B6 kind union 확장 4 파일 동시 단일 commit**: `SQL|FUNCTION|WEBHOOK` → `+AGGREGATOR`. supabase-clone.ts CronKindPayload + cron/registry.ts ScheduledJob.kind + cron/runner.ts dispatchCron + API route z.enum 2개 동시.
+  4. **multi-tenant 패턴 일관**: 모든 DB 사용 모듈 (dedupe/promote/runner) 이 `tenantPrismaFor(ctx)` closure 패턴 + ctx 첫 인자.
+  5. **vi.mock 호이스팅 분기 룰 발견** (memory 신규): factory 의 mock 직접 참조 → `vi.hoisted` 필수, closure 안 참조 → dedupe 패턴 OK.
+  6. **검증** (B6 종료): tsc 0 / 전체 509/569 (60 skip env-gated) / 신규 110 케이스 (25+40+30+27+15) PASS / 회귀 0.
+  7. **CK 신규 3건** (multi-value / 한글 boundary / 4-cases 통합) + **memory 신규 1건** (vi.mock 호이스팅 분기).
+  8. **세션 81 첫 작업** = **B7 시드 + 배포** (P0 본진 마지막 코드 작업, ~3h).
+
+- **세션 80 1차 핵심 (B-pre + B1 + B2 + B3, 7 commits +2,835 LOC — 위 내용에 흡수)**:
   1. **wave 진행도 plan 작성** (Plan mode + 3 Explore 병렬): Track A BaaS Phase 0~4 (~85%) / Track B Aggregator T1~T9 (0%) / Track C Messenger M0~M6 (~30%) / Track D Filebox (stabilized) 4 트랙 시퀀싱 결정. plan 파일 `C:\Users\smart\.claude\plans\wave-wiggly-axolotl.md`. 결론: Track B 우선 (세션 80~84 직진), Track C 병행 86~.
   2. **베이스라인 검증 plan 가정 3건 정정** (메모리 룰 `feedback_baseline_check_before_swarm` 적용):
      - T1.7 audit-metrics tenant 차원 ✅ **이미 구현** (`src/lib/audit-metrics.ts:42` byTenant Map + AuditMetricsTenant 타입 + 6 단위 테스트). 초기 Explore grep 한계로 missed.
@@ -29,35 +44,44 @@
 
 ---
 
-## ⭐ 세션 81 첫 작업 우선순위 (세션 80 종료 + B3 추가 시점, 2026-05-02)
+## ⭐ 세션 81 첫 작업 우선순위 (세션 80 3차 정합화 후, 2026-05-02)
 
-| # | 작업 | 우선 | 소요 | 차단 사항 |
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
 |---|------|------|------|----------|
-| ~~B3~~ | ~~classify.ts port~~ | ✅ **세션 80 추가 완료** (`e74f3ef`) | — | 매핑 41 항목 적용 + 한글 boundary fix |
-| **B4** | 4 fetchers (rss/html/api/firecrawl) port + mocked 30 케이스 | **P0 다음** | ~5h | nock/msw mock 패턴, 한글 source title/summary 처리는 B3 fix 로 자동 정상 |
-| B5 | llm.ts + promote.ts port + 27 케이스 | P0 다음 | ~4h | GEMINI_API_KEY 운영자 발급 (graceful 가능) |
-| **S78-H** | multipart cleanup cron (`s3.clean.uploads -timeAgo=24h` 주 1회) | P1 | ~30분 | B5 와 같은 commit 사이클로 묶기 권고 |
-| B6 | runner.ts + cron AGGREGATOR dispatcher (kind union 확장) | P0 다음 | ~6h | `dispatchCron` `kind` literal union 확장 시 caller 시그니처 일괄 수정 — 단일 commit 필수 |
-| B7 | seed 6 cron jobs (disabled) + WSL 빌드 + 배포 | P0 다음 | ~3h | enabled=FALSE 시작 |
-| B8 | 5 소스 점진 활성화 + 24h 관찰 + 첫 카드 | P0 다음 | ~2h | 60 소스 중 5만, 24h 관찰 후 60 점진 확장 |
+| ~~B3~~ | ~~classify.ts port~~ | — | — | ✅ **세션 80 완료** (`e74f3ef`) |
+| ~~B4~~ | ~~4 fetchers (rss/html/api/firecrawl) port~~ | — | — | ✅ **세션 80 완료** (`100ae5c`) |
+| ~~B5~~ | ~~llm.ts + promote.ts port~~ | — | — | ✅ **세션 80 완료** (`58a526a`) |
+| ~~B6~~ | ~~runner.ts + cron AGGREGATOR dispatcher~~ | — | — | ✅ **세션 80 완료** (`7c50c9f`) |
+| **B7** | **`scripts/seed-aggregator-cron.ts` + cron_jobs 6 row INSERT (enabled=FALSE) + WSL 빌드 + PM2 배포** | **P0 본진 마지막** | **~3h** | **세션 81 첫 작업**. 마이그레이션 0건 (DDL 변경 X), `feedback_migration_apply_directly` 룰 = Claude 직접 시드 실행. cron 6 jobs (rss-fetch / html-scrape / api-poll / classify / promote / cleanup) 모두 enabled=FALSE 로 시작. |
+| B8 | 5 소스 점진 활성화 + cron 6 jobs enable + 24h 관찰 + 첫 카드 | P0 본진 | ~2h | content_sources 60 중 5 active=TRUE → 24h 후 60 점진 확장. GEMINI_API_KEY 누락 시 ruleResult only (graceful). |
+| **S78-H** | multipart cleanup cron 등록 (`s3.clean.uploads -timeAgo=24h` 주 1회) | P1 | ~30분 | B7 사이클로 묶기 권고 (cron 인프라 동시 작업) |
 | S78-D | 폰 모바일 드래그 실측 (c7f1c39 PointerEvent) | P1 | ~5분 | 보너스, 어느 세션이든 |
 | S78-I | filer leveldb 전환 | P2 | ~30분 | 50만 entry 도달 시만 (현재 0건) |
 | S78-J | PM2 startup 자동화 | P2 | 운영자 결정 | "내 컴퓨터" 정합성 영향 별개 |
+| **세션 85** (관찰) | 24h 관찰 SQL — ContentItem count, Gemini 한도, consecutiveFailures, 첫 카드 가시화 | P0 본진 | — | B8 직후 관찰 윈도우 |
+| **세션 86~** (Track C) | Messenger M2 19 라우트 (4 그룹 직진) | P0 Track C | — | Track B 완주 후 진입 |
 
-### B4 진입 시 게이트 (필수)
+### B7 진입 시 게이트 (필수)
 
-1. **B3 의 한글 boundary fix 패턴 답습**: classify.ts `compilePattern` 의 lookbehind/lookahead `[\\w가-힣]` 통합 word-class. fetcher 들에서 url normalization / title 추출 / summary 추출 시 한글 처리 필요한 곳 동일 패턴 적용.
-2. **mock 패턴**: 4 fetcher (rss/html/api/firecrawl) 외부 HTTP 호출 격리 — nock 또는 msw. dedupe.test.ts 의 `vi.mock("@/lib/db/prisma-tenant-client", ...)` 패턴 참고.
-3. **TDD ~30 케이스**: fetcher 별 7~8 케이스 (happy path / 빈 응답 / 잘못된 형식 / 인코딩 / 타임아웃 / 한글 title / 동시 호출 / fail-after-N-retry).
-4. **TenantContext closure**: 모든 fetcher 가 `tenantPrismaFor(ctx)` 사용 (`project_workspace_singleton_globalthis` 메모리 룰 — Prisma 7 ALS propagation 회피).
+1. **시드 스크립트 위치**: `scripts/seed-aggregator-cron.ts` 신규. 기존 `scripts/issue-tenant-api-key.ts` 패턴 답습 (env 로드 + tenantPrismaFor + 멱등 upsert).
+2. **6 cron jobs spec** (모두 `tenantId='almanac'`, `enabled=FALSE`, `kind='AGGREGATOR'`):
+   - `almanac-rss-fetch` (every 30m, payload `{module:"rss-fetcher"}`)
+   - `almanac-html-scrape` (every 1h, payload `{module:"html-scraper"}`)
+   - `almanac-api-poll` (every 1h, payload `{module:"api-poller"}`)
+   - `almanac-classify` (every 15m, payload `{module:"classifier", batch:50}`)
+   - `almanac-promote` (every 30m, payload `{module:"promoter", batch:50}`)
+   - `almanac-cleanup` (daily 04:00, payload TBD — cleanup 정책 명세 필요)
+3. **마이그레이션 0건** (DDL 변경 없음 — cron_jobs 테이블은 이미 존재).
+4. **배포**: `/ypserver` 스킬로 WSL 빌드 + PM2 재시작 (enabled=FALSE 라 cron 즉시 가동되지 않음 — 안전).
+5. **검증**: PM2 status / 6 row 존재 (psql) / cron registry 가 enabled=FALSE 6건 모두 무시 (loadAll 시점 로그 확인) / dispatchCron 의 AGGREGATOR case 가 enable 시 작동할 준비 (B6 commit `7c50c9f` 적용).
 
 ### S81 진입 시 첫 행동
 
 1. `git status` + `git log --oneline -5` 점검 (다른 터미널 동시 작업 여부 — 메모리 룰 `feedback_concurrent_terminal_overlap`)
 2. `git pull origin spec/aggregator-fixes` (필요 시)
-3. plan 파일 `C:\Users\smart\.claude\plans\wave-wiggly-axolotl.md` 와 plan 본문 `docs/research/baas-foundation/05-aggregator-migration/2026-04-26-plan.md` §6 T5 동시 read
-4. spec 4 fetchers (`docs/assets/yangpyeon-aggregator-spec/code/src/lib/aggregator/{rss,html,api,firecrawl}-fetcher.ts`) read
-5. B4 commit 진입
+3. `scripts/issue-tenant-api-key.ts` read (시드 스크립트 패턴 참조)
+4. `prisma/schema.prisma` 의 `model CronJob` 필드 확인 (tenantId / kind / payload Json / enabled / schedule)
+5. B7 commit 진입 — 시드 스크립트 작성 + WSL 실행 (`feedback_migration_apply_directly` 룰 적용 = Claude 직접 실행) + PM2 재시작 + 검증
 
 ---
 

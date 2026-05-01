@@ -325,4 +325,140 @@ spec 의 `compilePattern` 이 `\\b` 사용. JS 의 `\\b` 는 `\\w` (=[A-Za-z0-9_
 - 한글 fix 후속 효과: fetcher 측 source title/summary 한글 처리도 자동 정상 (classify 가 매치하므로)
 
 ---
+
+## 후속 후기 — B4 + B5 + B6 (동일 세션 80, 0ad2f9a 정합화 후 추가)
+
+> 0ad2f9a B3 정합화 직후 사용자 "b4 진행 / b5,b6 도 진행" 요청으로 P0 본진의 나머지 3 commit 추가. Track B 의 코드 본진 6 모듈 (types/dedupe/classify/fetchers/llm/promote/runner + cron AGGREGATOR dispatcher) **모두 완료**. 잔여 = B7 시드+배포 / B8 활성화.
+
+### 토픽 9 — B4: 4 fetchers (rss/html/api/firecrawl) port + TDD 30
+
+> **사용자**: "b4 진행 ...."
+
+next-dev-prompt vs 직전 assistant 메시지 정의 충돌 해소 (assistant 가 B4/B6 혼동) — `wave-wiggly-axolotl.md` + `next-dev-prompt` 모두 일관되게 fetchers 가리킴. **baseline 검증 룰이 정확히 이런 케이스 회피**.
+
+spec 4 파일 (706 LOC) → src/lib/aggregator/fetchers/ 이식. **DB 미터치 → multi-tenant 적응 0줄**. fetcher 는 외부 HTTP only.
+
+**TDD 30 케이스**: rss(7) + html(8) + index(2) + api(13: HN+Reddit+ProductHunt+ArXiv+Firecrawl). 1차 21/30 PASS, 2 distinct issues:
+1. **vi.fn(arrow) `new` 호출 불가** (rss-parser mock 7건): function expression 으로 변경
+2. **B4 spec port-time bug — ArXiv link regex 순서 의존**: `rel="alternate"` 가 `href` 앞에 있을 때만 매치. 양 순서 처리하는 `extractAlternateLink()` 신규.
+
+추가 1 fix: `cheerio.AnyNode` import 경로 변경 (cheerio 1.x → `domhandler` 직접).
+
+**검증**: 30/30 PASS / tsc 0 / 전체 467/527 (B3 437 + B4 30, 회귀 0).
+
+**Commit**: `100ae5c feat(aggregator): port 4 fetchers ... (B4)` — 5 파일 +1,481 LOC.
+
+### 토픽 10 — B5: llm + promote multi-tenant tx + TDD 27
+
+> **사용자**: "b4 끝나고 B5, b6도 진행."
+
+**llm.ts** (DB 미터치 → spec 그대로): Gemini Flash 래퍼, 6.5초 throttle, 일일 한도 200, 모든 실패 graceful (ruleResult only).
+
+**promote.ts** (multi-tenant 적응 2건):
+- `promotePending(ctx, batch?)` 시그니처 (ctx 첫 인자)
+- findMany 2건 → `tenantPrismaFor(ctx)` / upsert + update → `withTenantTx(ctx.tenantId, fn)` 1 transaction
+
+**TDD 27 (2 파일)**: llm 13 + promote 14. 1차: llm 13/13 ✓ / promote 0/14 (vi.mock 호이스팅 fail).
+
+**fix 1 — vi.hoisted 패턴**: factory 가 outer mock 인스턴스 직접 참조 → 호이스팅 시 const 미초기화. `vi.hoisted(() => {...})` 로 mock 묶음. dedupe 패턴 (closure 안 참조) 과의 차이 = assertion 위해 mock instance reference 필요할 때만.
+
+**fix 2 — B5 spec port-time bug — slugify NFKD**: `'AI 도구 소개'` → expected `ai-도구-소개-<hash8>` / 실제 `ai-<hash8>`. spec slugify 의 `normalize("NFKD")` 가 한글 음절 (가-힣) 을 jamo (U+1100~U+11FF) 로 분해 → 이후 `[^a-z0-9가-힣]` 가 jamo 매치 실패 → 한글이 모두 hyphen → 빈 슬러그. **fix**: NFKD 후 NFC 재결합. Latin diacritic 제거 효과는 보존.
+
+**운영 함정**: 운영 발견 시 한글 카드 모두 `slug = "item-<urlHash>"` → 의미 없는 URL + slug 충돌 가능.
+
+**검증**: 27/27 PASS / tsc 0 / 전체 494/554 (B4 467 + B5 27, 회귀 0).
+
+**Commit**: `58a526a feat(aggregator): port llm + promote with multi-tenant tx (TDD 27, B5)` — 4 파일 +981 LOC.
+
+### 토픽 11 — B6: runner + cron AGGREGATOR dispatcher + kind union 확장 + TDD 15
+
+**4 파일 동시 수정 — 단일 commit 필수** (TS 컴파일 차단 회피):
+- `src/lib/types/supabase-clone.ts`: CronKindPayload 에 AGGREGATOR variant
+- `src/lib/cron/registry.ts`: ScheduledJob.kind union + 2 cast 모두 4-value
+- `src/lib/cron/runner.ts`: dispatchCron job.kind + 신규 `dispatchAggregatorOnMain`
+- `src/app/api/v1/cron/{,[id]/}route.ts`: z.enum 4-value
+
+**runner.ts 신규** (multi-tenant 적응 + 5 sub-runner):
+- `runAggregatorModule(ctx, {module, batch?})` — ctx 첫 인자
+- 5 sub-runner: rss-fetcher / html-scraper / api-poller / classifier / promoter
+- processSingleSource: cross-source 격리 (소스 try-catch). 성공 시 consecutiveFailures=0 + lastSuccessAt
+- markSourceFailure: 5 도달 시 active=false 자동 비활성
+
+**cron AGGREGATOR**: `dispatchAggregatorOnMain(payload, tenantId, started)` — payload.module 검증 + ctx={tenantId} wrap.
+
+**TDD 15 (2 파일)**: runner 10 (module dispatch 5 + 알 수 없는 module + processSingleSource success/failure/임계/cross-source 격리) + cron-aggregator-dispatch 5 (kind=AGGREGATOR / module 누락 / tenantId / batch / 결과 반환).
+
+**1차 RED → GREEN 단번에 15/15 PASS** (vi.hoisted 패턴 사전 적용 효과). spec port-time bug 추가 0건.
+
+**검증**: 15/15 PASS / tsc 0 / 전체 509/569 (B5 494 + B6 15, 회귀 0).
+
+**Commit**: `7c50c9f feat(aggregator): port runner + cron AGGREGATOR dispatcher (TDD 15, B6)` — 8 파일 +815/-12 LOC.
+
+### 토픽 12 — 사용자 질문: "B작업은 몇번까지 있어?"
+
+전체 시퀀스 매핑 보고: B-pre + B1~B8 = **9개**. 완료 7개 (B-pre/B1/B2/B3/B4/B5/B6) / 남음 2개 (B7 시드+배포 ~3h / B8 활성화 ~2h). 후속 = 세션 85 24h 관찰, 86~ Track C M2 19 라우트.
+
+### 토픽 13 — /cs 의식 — 세션 80 3차 정합화
+
+세션 80 안에서 /cs 가 3회 처리 (b46918c B-pre+B1+B2 / 0ad2f9a B3 정합화 / 본 conversation B4+B5+B6 정합화). 산출 ~9 파일.
+
+---
+
+## 후속 의사결정 요약
+
+| # | 결정 | 선택지 | 선택 이유 |
+|---|------|--------|----------|
+| 9 | B4 정의 = 4 fetchers (assistant 혼동 정정) | A. fetchers (next-dev-prompt) / B. runner+cron (assistant) | A — wave plan + handover 모두 일관, baseline 검증 룰 적용 |
+| 10 | vi.mock 호이스팅 — vi.hoisted 패턴 | A. inline closure (dedupe) / B. vi.hoisted | B — assertion 위해 mock instance reference 필요한 promote/runner test 에서만 |
+| 11 | NFKD slugify 한글 fix | A. NFC 재결합 (선택) / B. NFKD 제거 (Latin diacritic 효과 손실) / C. 정규식에 jamo 추가 (복잡) | A — Latin diacritic 효과 보존 + 한글 음절 복원 |
+| 12 | B6 kind union 4 파일 단일 commit | A. 단일 (선택) / B. 분할 | A — TS literal union 부분 commit 시 타입 cascade |
+| 13 | 같은 세션 안 /cs 3회 정합화 | A. 매번 정합화 (선택) / B. 마지막 1회만 | A — 다른 터미널 작업물 (b46918c, 0ad2f9a) 이 이미 docs 갱신 → 추가 작업도 누적 정합화 필요 |
+
+## 후속 수정 파일 (17개)
+
+| # | 파일 | 변경 |
+|---|------|------|
+| 1 | src/lib/aggregator/fetchers/index.ts | 신규 (53 LOC) — kind 디스패처 |
+| 2 | src/lib/aggregator/fetchers/rss.ts | 신규 (130 LOC) — rss-parser |
+| 3 | src/lib/aggregator/fetchers/html.ts | 신규 (191 LOC) — cheerio + AnyNode from domhandler |
+| 4 | src/lib/aggregator/fetchers/api.ts | 신규 (351 LOC) — 5 어댑터 + extractAlternateLink (B4 fix) |
+| 5 | tests/aggregator/fetchers.test.ts | 신규 (TDD 30) |
+| 6 | src/lib/aggregator/llm.ts | 신규 (213 LOC) — spec 그대로 |
+| 7 | src/lib/aggregator/promote.ts | 신규 (134 LOC) — multi-tenant tx + slugify NFC fix (B5) |
+| 8 | tests/aggregator/llm.test.ts | 신규 (TDD 13, vi.hoisted + resetModules) |
+| 9 | tests/aggregator/promote.test.ts | 신규 (TDD 14, vi.hoisted) |
+| 10 | src/lib/aggregator/runner.ts | 신규 (273 LOC) — 5 sub-runner + cross-source 격리 |
+| 11 | src/lib/cron/runner.ts | dispatchCron + dispatchAggregatorOnMain |
+| 12 | src/lib/cron/registry.ts | ScheduledJob.kind + 2 cast 4-value |
+| 13 | src/lib/types/supabase-clone.ts | CronKindPayload + AGGREGATOR variant |
+| 14 | src/app/api/v1/cron/route.ts | z.enum 4-value |
+| 15 | src/app/api/v1/cron/[id]/route.ts | z.enum 4-value |
+| 16 | tests/aggregator/runner.test.ts | 신규 (TDD 10) |
+| 17 | tests/cron/cron-aggregator-dispatch.test.ts | 신규 (TDD 5) |
+
+## 후속 검증 결과
+
+- `npx tsc --noEmit` — 에러 0
+- `npx vitest run`(전체) — 509/569 (B6 15 신규 + 회귀 0)
+- B4 30/30 / B5 27/27 / B6 15/15 = 신규 72 PASS
+
+## 후속 알려진 이슈
+
+- 없음. B7 진입 차단 사항 0.
+
+## 후속 다음 작업 제안
+
+1. **B7 시드 + 배포** (~3h, 세션 81 첫 작업) — `scripts/seed-aggregator-cron.ts` 작성. cron_jobs 6 row INSERT (enabled=FALSE):
+   - almanac-rss-fetch (every 30m, AGGREGATOR module=rss-fetcher)
+   - almanac-html-scrape (every 1h, html-scraper)
+   - almanac-api-poll (every 1h, api-poller)
+   - almanac-classify (every 15m, classifier batch=50)
+   - almanac-promote (every 30m, promoter batch=50)
+   - almanac-cleanup (daily 04:00, ???)
+   - **마이그레이션 0건** (DDL 변경 X). `feedback_migration_apply_directly` 메모리 룰 = Claude 직접 시드 실행 책임.
+2. **B8 5 소스 점진 활성화** (~2h, B7 직후) — content_sources 60 중 5 active=TRUE + cron_jobs 6 enabled=TRUE → 24h 관찰 윈도우.
+3. **운영자 발급 대기**: GEMINI_API_KEY (B5 graceful 가능 — 누락 시 ruleResult only). FIRECRAWL_API_KEY (선택, Firecrawl 어댑터만 영향). PRODUCT_HUNT_TOKEN (선택, ProductHunt 어댑터만).
+4. **세션 85 관찰 SQL** 준비: `SELECT COUNT(*) FROM content_items WHERE tenant_id='almanac'` + cron_jobs.consecutiveFailures + Gemini quota.
+
+---
 [← handover/_index.md](./_index.md)
