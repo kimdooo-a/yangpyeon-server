@@ -20,17 +20,55 @@
 
 ## ⭐ 세션 78 추천 작업
 
-### S78-A. **옵션 C 새 터미널 결과 통합** (P0, 의존: 새 터미널 PHASE 0~7 완료)
+### ~~S78-A.~~ **옵션 C 새 터미널 결과 통합** ✅ **완료 2026-05-01**
 
-새 터미널이 SeaweedFS 마이그레이션 풀 패키지 (저널 [5] / handover 260501-session77-* §"옵션 C 새 터미널 프롬프트") 진행 중이면 본 세션은:
+새 터미널 (= 옵션 C 새 conversation, handover [260501-session77-option-c-new-terminal-execution.md](./260501-session77-option-c-new-terminal-execution.md)) PHASE 0~7 모두 완료 + push (origin `19454d4..632d26a`). 5 commits:
+- `ee68a07` PHASE 0 §S77-A SUPERSEDED note
+- `87de464` PHASE 1 SP-016 ACCEPTED 4/4 임계 PASS + sp016-load-test.py
+- `28273a0` PHASE 3 C1 endpoint 교체 (~62/-20)
+- `63521d2` PHASE 5 ADR-032 SUPERSEDED + ADR-033 ACCEPTED + 가이드/메모리
+- `632d26a` PHASE 7 handover + _index.md
 
-1. 통합 검증 — 새 터미널의 ADR-033 / SP-016 ACCEPTED / supersede notes 정합성
-2. 운영자 R2 콘솔 정리 (PHASE 6) 완료 확인
-3. 전체 git push 통합 점검
+PHASE 6 운영자 R2 콘솔 정리도 운영자 본인이 PHASE 0 시점에 이미 처리 완료 (bucket + API token + 알람 모두 삭제). **잔여 회귀: 100MB+ 파일 PUT 회귀 (S78-G multipart 통합 까지 지속)**.
 
-새 터미널 미실행 시 → S78-B.
+### ~~S78-B.~~ **옵션 C 본 세션 직접 진행** ❌ **무용** (S78-A 완료로 superseded)
 
-### S78-B. **옵션 C 본 세션 직접 진행** (P0 alt, ~3.5h, 새 터미널 미실행 시)
+S78-A 새 터미널이 7 PHASE 모두 완료 → 본 세션 직접 진행은 중복 작업.
+
+### S78-G. **multipart upload 통합 PR** (P0, ~3.5h, ~530줄, 100MB+ 회귀 회수)
+
+옵션 C C1 머지 후 100MB+ 파일 PUT 회귀 (cloudflare tunnel 100MB hard limit 직격) 회수. SeaweedFS S3 multipart upload API 호환:
+
+1. **`src/lib/r2.ts` 또는 `object-storage.ts` rename** + multipart 함수 4개 추가:
+   - `presignMultipartCreate({ key, contentType, size })` → uploadId 발급 + chunk 수 계산
+   - `presignUploadPartUrl({ key, uploadId, partNumber })` × N → presigned URL 배치
+   - `completeMultipart({ key, uploadId, parts })` → CompleteMultipartUploadCommand
+   - `abortMultipart({ key, uploadId })` → AbortMultipartUploadCommand
+2. **신규 라우트 3개** (`/api/v1/filebox/files/multipart/{create, complete, abort}`)
+3. **`src/components/filebox/file-upload-zone.tsx`** chunk 분할 + 병렬 PUT × 3-5 + 진행률 통합 + abort 처리
+4. **chunk size 50~80MB** (cloudflare 100MB 안전 마진)
+5. **presigned URL 만료 시간 1h** (default 5분 — 1GB 파일 13 chunk 5분 부족)
+6. **테스트**: 단위 (chunk 분할 / ETag 수집) + E2E (1 chunk → 2 chunk → 13 chunk 점진)
+
+주의: SeaweedFS multipart S3 표준 호환 + `s3.clean.uploads -timeAgo=24h` 자체 cleanup 명령 제공 (24h+ stale auto abort).
+
+### S78-H. **multipart cleanup cron** (P1, ~30분, S78-G 후속)
+
+`s3.clean.uploads -timeAgo=24h` 명령 cron 등록 (주 1회). 또는 cron runner kind 확장 — `S77-A SUPERSEDED 다음 sub-task` 의 부활.
+
+### S78-I. **filer leveldb 전환** (P2, 50만 entry 도달 시)
+
+운영 누적 시 sqlite default → leveldb 전환. 1회 작업 ~30분. ADR-033 §위험 R4 트리거.
+
+### S78-J. **PM2 startup 자동화** (P2, 운영자 결정)
+
+WSL2 자체 crash 후 수동 `pm2 resurrect` 부담 — `pm2 startup` 적용 시 자동 복원. 운영자 가치관 ("내 컴퓨터" 정합성) 영향 별개 결정.
+
+### S78-K. **CGNAT 여부 즉시 확인** (P2, 5초)
+
+`curl ifconfig.me` 결과 vs 라우터 LAN WAN IP 비교. 다르면 CGNAT 확정 (cloudflare tunnel 외 옵션 0). 같으면 옵션 (DDNS + 직접 노출) 재고 가능 (보안 부담 별개).
+
+### ~~S78-B (구).~~ **옵션 C 본 세션 직접 진행** (P0 alt, ~3.5h, 새 터미널 미실행 시) — 무용
 
 저널 [5] 의 7 PHASE 를 본 세션이 직접 수행:
 
