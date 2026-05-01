@@ -11,6 +11,7 @@ import { withTenant } from "@/lib/api-guard-tenant";
 import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { messengerErrorResponse } from "@/lib/messenger/route-utils";
+import { publishConvEvent } from "@/lib/messenger/sse";
 
 export const runtime = "nodejs";
 
@@ -88,6 +89,11 @@ export const POST = withTenant(async (request, user, tenant, context) => {
         lastReadMessageId: parsed.data.lastReadMessageId,
         lastReadAt,
       },
+    });
+    publishConvEvent(tenant.id, convId, "receipt.updated", {
+      userId: user.sub,
+      lastReadMessageId: parsed.data.lastReadMessageId,
+      lastReadAt: lastReadAt.toISOString(),
     });
     return successResponse({ receipt });
   } catch (err) {

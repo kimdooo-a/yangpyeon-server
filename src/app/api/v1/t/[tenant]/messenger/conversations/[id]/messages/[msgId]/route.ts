@@ -15,6 +15,7 @@ import {
   messengerErrorResponse,
   emitMessengerAudit,
 } from "@/lib/messenger/route-utils";
+import { publishConvEvent } from "@/lib/messenger/sse";
 
 export const runtime = "nodejs";
 
@@ -23,7 +24,9 @@ interface RouteContext {
 }
 
 export const PATCH = withTenant(async (request, user, tenant, context) => {
-  const { msgId } = await (context as unknown as RouteContext).params;
+  const { id: convId, msgId } = await (
+    context as unknown as RouteContext
+  ).params;
   let raw: unknown;
   try {
     raw = await request.json();
@@ -53,6 +56,12 @@ export const PATCH = withTenant(async (request, user, tenant, context) => {
         messageId: msgId,
         editCount: updated.editCount,
       },
+    });
+    publishConvEvent(tenant.id, convId, "message.updated", {
+      messageId: msgId,
+      body: updated.body,
+      editedAt: updated.editedAt,
+      editCount: updated.editCount,
     });
     return successResponse({ message: updated });
   } catch (err) {
@@ -90,6 +99,11 @@ export const DELETE = withTenant(async (request, user, tenant, context) => {
         messageId: msgId,
         deletedBy: recalled.deletedBy,
       },
+    });
+    publishConvEvent(tenant.id, convId, "message.deleted", {
+      messageId: msgId,
+      deletedAt: recalled.deletedAt,
+      deletedBy: recalled.deletedBy,
     });
     return successResponse({ message: recalled });
   } catch (err) {

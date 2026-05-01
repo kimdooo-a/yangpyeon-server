@@ -14,6 +14,7 @@ import {
   messengerErrorResponse,
   emitMessengerAudit,
 } from "@/lib/messenger/route-utils";
+import { publishConvEvent } from "@/lib/messenger/sse";
 
 export const runtime = "nodejs";
 
@@ -75,6 +76,9 @@ export const POST = withTenant(async (request, user, tenant, context) => {
           skippedCount: result.skipped.length,
         },
       });
+      for (const m of result.added) {
+        publishConvEvent(tenant.id, id, "member.joined", { member: m });
+      }
     }
     return successResponse(result, 201);
   } catch (err) {

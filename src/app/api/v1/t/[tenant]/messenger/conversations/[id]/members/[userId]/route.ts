@@ -13,6 +13,7 @@ import {
   messengerErrorResponse,
   emitMessengerAudit,
 } from "@/lib/messenger/route-utils";
+import { publishConvEvent } from "@/lib/messenger/sse";
 
 export const runtime = "nodejs";
 
@@ -52,6 +53,10 @@ export const DELETE = withTenant(async (request, user, tenant, context) => {
         removedUserId,
         selfLeave: removedUserId === user.sub,
       },
+    });
+    publishConvEvent(tenant.id, convId, "member.left", {
+      userId: removedUserId,
+      leftAt: result.leftAt,
     });
     return successResponse({ member: result });
   } catch (err) {

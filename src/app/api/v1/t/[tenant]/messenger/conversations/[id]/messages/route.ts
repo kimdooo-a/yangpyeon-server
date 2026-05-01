@@ -24,6 +24,7 @@ import {
   messengerErrorResponse,
   emitMessengerAudit,
 } from "@/lib/messenger/route-utils";
+import { publishConvEvent } from "@/lib/messenger/sse";
 
 export const runtime = "nodejs";
 
@@ -132,6 +133,9 @@ export const POST = withTenant(async (request, user, tenant, context) => {
           messageId: result.message.id,
           kind: parsed.data.kind,
         },
+      });
+      publishConvEvent(tenant.id, id, "message.created", {
+        message: result.message,
       });
     }
     return successResponse(

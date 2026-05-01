@@ -1,15 +1,17 @@
 /**
  * /api/v1/t/[tenant]/messenger/conversations/[id]/typing
  *
- * POST — typing 신호 (M3 SSE publish 도입 전 stub). 본인 멤버 자격 + rate-limit 1/sec/user.
+ * POST — typing 신호. 본인 멤버 자격 + rate-limit 1/sec/user. SSE publish (typing.started, M3).
  *
- * Phase 1 Note: M3 도입 전까지는 publish 없음 → 200 OK 만 반환 (클라이언트 호출은 noop 보장).
+ * Phase 1: typing 은 저장하지 않고 publish 만 (PRD §284 결정 — 무저장 publish only).
+ *   payload: { conversationId, userId, expiresAt }  expiresAt = now+6s (클라이언트 TTL 가이드)
  */
 import type { NextRequest } from "next/server";
 import { withTenant } from "@/lib/api-guard-tenant";
 import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { applyRateLimit } from "@/lib/rate-limit-guard";
+import { publishConvEvent } from "@/lib/messenger/sse";
 
 export const runtime = "nodejs";
 
@@ -41,6 +43,10 @@ export const POST = withTenant(async (request, user, tenant, context) => {
     );
   }
 
-  // M3 게이트 — SSE bus.publish 도입 전 stub.
-  return successResponse({ acknowledged: true });
+  const expiresAt = new Date(Date.now() + 6_000).toISOString();
+  publishConvEvent(tenant.id, id, "typing.started", {
+    userId: user.sub,
+    expiresAt,
+  });
+  return successResponse({ acknowledged: true, expiresAt });
 });
