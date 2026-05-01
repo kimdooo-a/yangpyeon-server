@@ -325,8 +325,11 @@ model File {
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   // Phase 1.4 Stage 3 — NOT NULL + dbgenerated default.
   tenantId     String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  // ADR-032 V1 — local | r2 (R2 hybrid 스토리지). 마이그레이션 20260501100000.
+  storageType  String   @default("local") @map("storage_type")
 
   @@index([tenantId, folderId])
+  @@index([tenantId, storageType])
   @@map("files")
 }
 

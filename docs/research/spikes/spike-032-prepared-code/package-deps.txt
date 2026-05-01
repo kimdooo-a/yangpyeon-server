@@ -1,0 +1,16 @@
+# ADR-032 V1 의존성 (ACCEPTED 후 npm install)
+
+npm install \
+  @aws-sdk/client-s3@^3.620.0 \
+  @aws-sdk/s3-request-presigner@^3.620.0
+
+# 설치 확인
+# npx tsc --noEmit --skipLibCheck src/lib/r2.ts
+#
+# 두 패키지 합쳐 약 ~3MB (gzipped). standalone 빌드에 포함됨.
+# Cloudflare R2 는 region 'auto' 사용 — 추가 region 패키지 불필요.
+#
+# 본 의존성 다음 사용처 확장 시 추가 import 가능:
+# - DeleteObjectCommand (파일 삭제)
+# - ListObjectsV2Command (cleanup cron)
+# - CreateMultipartUploadCommand 등 (V2 multipart 진입 시)
