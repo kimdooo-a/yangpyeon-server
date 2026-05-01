@@ -1,7 +1,19 @@
-# 다음 세션 프롬프트 (세션 76)
+# 다음 세션 프롬프트 (세션 77)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 76 종료)
+
+- **세션 76 핵심 (R2 객체 즉시 삭제 best-effort, S76-D 1·2단계, commit `8bf1b5f`)**:
+  1. **`deleteR2Object(key)` 신규** (`src/lib/r2.ts` +28-1): `DeleteObjectCommand` 호출. NotFound 은 success swallow (호출자가 DB row 먼저 삭제한 정상 케이스), 그 외 에러 throw — 라이브러리는 라이브러리, swallow 정책은 호출자 영역.
+  2. **`deleteFile()` R2 분기 보강** (`src/lib/filebox-db.ts` +10-3): `prisma.file.delete()` 후 `try { await deleteR2Object(file.storedName) } catch { console.warn(...) }` (best-effort). DB row 는 이미 사라졌으므로 R2 잔존 객체는 24h cleanup cron 의 회수 대상 — eventually consistent 모델, 동기 트랜잭션 외부 SDK 확장 회피.
+  3. **3단계 분리 결정**: 24h pending cleanup cron 은 cron runner `kind` enum (SQL/FUNCTION/WEBHOOK) 가 R2 SDK 호출 미지원 → 새 kind 또는 별도 스케줄러 필요. 별도 PR (§S77-A).
+  4. **검증**: `npx tsc --noEmit` exit 0.
+  5. **본 conversation /cs 산출** (코드 0, 의식 5): journal §"세션 76" / current.md row 76 / logs/2026-05.md s76 entry / handover `260501-session76-r2-deleteobject.md` / 본 prompt 갱신.
+  6. **세션 77 첫 작업** = §S77-A 24h pending cleanup cron 또는 §S77-B R2 콘솔 CORS 적용 (운영자 본인 3분).
 
 ---
 
@@ -100,25 +112,41 @@ npm run dev
 
 ---
 
-## ⭐ 세션 76 추천 작업
+## ⭐ 세션 77 추천 작업
 
-> 세션 75 (본) 는 redundant verification 으로 commit 0 — 추천 작업은 직전 세션 73/74 에서 이월된 항목 그대로
+> 세션 76 에서 §S76-D 1·2단계 완료 (commit `8bf1b5f`). 3단계는 cron runner kind 확장 필요로 별도 PR §S77-A. 그 외 §S76-C R2 콘솔 CORS 와 §S76-A WSL 배포 + 폰 실측은 그대로 이월.
 
-### S76-A. **세션 74 commit + WSL 배포 + 폰에서 모바일 드래그 실측** (P0, ~30분)
+### S77-A. **24h pending cleanup cron — R2 SDK 호출 지원** (P1, ~3h, S76-D 후속)
 
-세션 74에서 ALS 마이그레이션 + 모바일 드래그 코드 완료, `tsc` 통과. 미커밋 상태.
+세션 76 에서 R2 즉시 삭제 best-effort 적용. 그러나 일시 장애로 best-effort 실패하거나 r2-presigned 발급 후 confirm 안 된 객체가 누적되면 R2 quota 회계 부채 → 24h cleanup cron 으로 회수 필요.
 
-1. **commit 영역 분리**: `git add` 본 세션 영역만 (32 파일 — 인수인계서 §"수정 파일" 표 참조). 다른 무관 미커밋 영역(세션 72 R2 V1, 세션 73 R2 UI, scripts/wsl-build-deploy.sh, docs/research/baas-foundation/, prisma/schema.prisma, package.json, ...)은 본 commit 에서 분리.
-2. commit message 예: `fix(als): sticky-notes ALS 함정 회피 — 31 라우트 + 모바일 드래그 PointerEvent 전환`
-3. `/ypserver` 스킬로 빌드+배포+PM2 재시작
-4. 폰에서 stylelucky4u.com → /memo → 헤더 드래그 실측 (헤더만 드래그 활성, 텍스트 영역 편집 정상)
-5. **회귀 검증**: 자주 안 쓰는 라우트(log-drains/test, webhooks/[id]/trigger, cron/[id] PATCH/DELETE, admin/users/[id]/{sessions,mfa/reset}) 한 번씩 ping smoke
+1. **cron runner `kind` 확장**: `src/lib/cron/runner.ts` 의 dispatch 분기에 `R2_CLEANUP` kind 추가. 또는 새 cron 시스템(node-cron, BullMQ) 도입 평가.
+2. **cleanup handler**: R2 `ListObjectsV2` (prefix=`tenants/`) → DB `File` row 매핑 (`storedName === key && storageType === 'r2'`) → 매핑 없는 객체 중 `LastModified > 24h` 만 `DeleteObject`.
+3. **운영 등록**: 매주 1회 실행. cron 표 등록 + 실패 시 audit log.
+4. **검증**: 50MB+ 파일 업로드 → confirm 안 함 → 24h+ 후 cron 실행 → R2 콘솔에서 객체 사라짐 확인.
 
-### S76-B. **세션 72/73 미커밋 R2 V1 + R2 UI 영역 정리** (P0, ~30분)
+권고: 옵션 X (cron runner kind 확장). 기존 cron 시스템 dispatch 패턴이 단순 — 새 kind 1개 + handler 추가가 별도 스케줄러 도입보다 운영 부담 낮음.
 
-- 세션 72 handover 가 commit `275464c` 주장하나 실제 git log 부재 → R2 V1 영역 (src/lib/r2.ts, src/app/api/v1/filebox/files/r2-{presigned,confirm}/, prisma/migrations/20260501100000_..., prisma/schema.prisma 등) 미커밋 상태 검증 후 commit.
-- 세션 73 R2 UI 영역 (FileUploadZone 50MB 분기, [id]/route.ts 다운로드 302, lib/filebox-db.ts deleteFile R2 분기 TODO 등) 미커밋 상태 검증 후 commit.
-- 본 세션 74 commit과 영역 분리하여 별개 commit (3 PR 또는 영역별 chained commit).
+### ~~S76-D.~~ **R2 객체 cleanup 부채 정리 1·2단계** ✅ **세션 76 완료** (commit `8bf1b5f`)
+
+deleteR2Object 신규 + deleteFile R2 분기 best-effort 적용 완료. 3단계(24h cleanup cron) 만 §S77-A 로 이월.
+
+### S77-W. **WSL 배포 + 폰에서 모바일 드래그 실측 + 회귀 ping smoke** (P0, ~20분)
+
+세션 74 ALS 마이그레이션 + 모바일 드래그 commit `c7f1c39` + 세션 76 R2 cleanup commit `8bf1b5f` 모두 미배포 상태(PM2 ypserver 가 c7f1c39 이전 빌드).
+
+1. `/ypserver` 스킬로 빌드+배포+PM2 재시작
+2. 폰에서 stylelucky4u.com → /memo → 헤더 드래그 실측 (헤더만 드래그 활성, 텍스트 영역 편집 정상)
+3. R2 파일 업로드 → 삭제 → R2 콘솔에서 객체 사라짐 확인 (best-effort 정상 동작)
+4. **회귀 검증**: 자주 안 쓰는 라우트(log-drains/test, webhooks/[id]/trigger, cron/[id] PATCH/DELETE, admin/users/[id]/{sessions,mfa/reset}) 한 번씩 ping smoke
+
+### ~~S76-A.~~ **세션 74 commit** ✅ **완료** (commit `c7f1c39 refactor(tenant-als): 31 라우트/lib tenantPrismaFor 마이그레이션 + 모바일 드래그 PointerEvent`)
+
+ALS 마이그레이션 32 파일 + 모바일 드래그 1 + close ritual artifacts 6 = 38 파일 +1070-615 commit 완료. WSL 배포 + 폰 실측은 §S77-W 로 이월.
+
+### ~~S76-B.~~ **세션 72/73 미커밋 정리** ✅ **완료** (commit `275464c` + `9eac758` 이미 존재)
+
+세션 72 R2 V1 (`275464c feat(filebox): R2 hybrid 업로드 V1 옵션 A 적용`), 세션 73 R2 UI (`9eac758 feat(filebox): R2 UI 50MB 분기 + XHR 진행률 + 다운로드 302 redirect`) 모두 commit 됐음을 세션 75/76 에서 확인. 영역 분리 정리 완료.
 
 ### S76-C. **R2 콘솔 CORS 적용 + 브라우저 실측** (P0, ~10분 + 검증 5분)
 
