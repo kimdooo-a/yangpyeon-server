@@ -25,9 +25,14 @@ export interface TenantContext {
 }
 
 // Turbopack 이 본 모듈을 라우트별 chunk 에 인라인 복제 → 각 chunk 가 자체 `new AsyncLocalStorage`
-// 를 가지면 runWithTenant 가 쓰는 storage 와 prismaWithTenant interceptor 가 읽는 storage 가
-// 달라져 "Tenant context missing" 이 발생. globalThis + Symbol.for 로 프로세스 단위 단일 인스턴스
-// 를 강제해 모든 chunk 사본이 동일 storage 를 공유하도록 한다.
+// 를 가지면 storage 가 분기됨. globalThis + Symbol.for 로 프로세스 단위 단일 인스턴스를
+// 강제해 모든 chunk 사본이 동일 storage 를 공유하도록 한다.
+//
+// ⚠ 2026-05-01 진단 결과: globalThis 싱글턴은 정상 작동하나, Prisma 7 의 client extension
+// $allOperations 콜백이 internal worker 로 dispatch 되며 ALS async context 자체가 끊어지는
+// 케이스가 관측됨. 따라서 prismaWithTenant + runWithTenant 조합은 신뢰 불가.
+// 신규 호출 사이트는 src/lib/db/prisma-tenant-client.ts 의 `tenantPrismaFor(ctx)` 를 사용할 것.
+// runWithTenant/getCurrentTenant 자체는 다른 비-Prisma 용도(예: audit-log 자동주입)에서 유효.
 const STORAGE_KEY = Symbol.for("@yangpyeon/core/tenant/context::tenantStorage");
 type GlobalWithStorage = typeof globalThis & {
   [STORAGE_KEY]?: AsyncLocalStorage<TenantContext>;
@@ -60,6 +65,8 @@ export function getCurrentTenantOrNull(): TenantContext | null {
 /**
  * 주어진 컨텍스트로 비동기 함수를 실행.
  * AsyncLocalStorage 가 await/Promise/setTimeout 경계를 가로질러 컨텍스트를 전파한다.
+ *
+ * ⚠ Prisma 호출 경로에는 사용 금지 (위 모듈 헤더 참조). 다른 비동기 용도용.
  */
 export function runWithTenant<T>(
   ctx: TenantContext,

@@ -26,6 +26,7 @@ import { prisma as basePrisma } from "@/lib/prisma";
 import {
   getCurrentTenantOrNull,
   runWithTenant,
+  type TenantContext,
 } from "@yangpyeon/core/tenant/context";
 import type { PrismaClient } from "@/generated/prisma/client";
 
@@ -121,6 +122,53 @@ export const prismaWithTenant = new Proxy({} as PrismaClient, {
 });
 
 export type AppPrismaClient = typeof prismaWithTenant;
+
+/**
+ * tenantPrismaFor — TenantContext 를 closure 로 직접 캡처하는 라우트-범위 클라이언트.
+ *
+ * 배경 (2026-05-01 사고):
+ *   prismaWithTenant + runWithTenant 조합은 AsyncLocalStorage 에 의존하는데,
+ *   Prisma 7 의 client extension 이 $allOperations 콜백을 internal worker/queue 로
+ *   dispatch 하며 ALS async context 를 잃는 경우가 관측됨 (진단 로그상 같은 ALS
+ *   인스턴스인데도 .getStore() 가 null 반환). globalThis 싱글턴으로 chunk 복제는
+ *   해결됐으나 ALS propagation 자체가 끊김.
+ *
+ * 해법:
+ *   요청마다 새 extended client 를 만들고 $allOperations callback 의 closure 에
+ *   ctx 를 직접 캡처. ALS 의존성 자체를 제거한다. $extends() 비용은 µs 단위라
+ *   요청당 호출에도 무시 가능.
+ *
+ * @example
+ *   const tx = tenantPrismaFor({ tenantId: '...', bypassRls: true });
+ *   const rows = await tx.stickyNote.findMany({ ... });
+ */
+export function tenantPrismaFor(ctx: TenantContext): PrismaClient {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (basePrisma as PrismaClient).$extends({
+    name: "tenant-rls-direct",
+    query: {
+      $allOperations: async (params: AllOperationsParams) => {
+        const { args, query } = params;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (basePrisma as PrismaClient).$transaction(async (tx: any) => {
+          if (ctx.bypassRls) {
+            await tx.$executeRawUnsafe(`SET LOCAL ROLE app_admin`);
+          } else {
+            const safeUuid = assertValidUuid(ctx.tenantId);
+            await tx.$executeRawUnsafe(
+              `SET LOCAL app.tenant_id = '${safeUuid}'`,
+            );
+          }
+          return query(args);
+        });
+      },
+    },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }) as any as PrismaClient;
+}
+
+// TenantContext type 재export (호출 사이트에서 별도 import 안 해도 됨)
+export type { TenantContext } from "@yangpyeon/core/tenant/context";
 
 /**
  * Multi-statement transaction wrapper.

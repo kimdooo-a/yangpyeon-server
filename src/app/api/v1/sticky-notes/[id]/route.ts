@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 import { withAuth } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { updateStickyNoteSchema } from "@/lib/schemas/sticky-notes";
 
 export const runtime = "nodejs";
 
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true };
 
 type StickyNoteRow = { ownerId: string; visibility: "PRIVATE" | "SHARED" };
 
@@ -30,26 +30,20 @@ export const PATCH = withAuth(async (request: NextRequest, user, context) => {
     return errorResponse("VALIDATION_ERROR", message, 400);
   }
 
-  const result = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    async () => {
-      const row = (await prismaWithTenant.stickyNote.findUnique({
-        where: { id },
-        select: { ownerId: true, visibility: true },
-      })) as StickyNoteRow | null;
-      if (!row) return { kind: "NOT_FOUND" as const };
-      if (row.ownerId !== user.sub) return { kind: "FORBIDDEN" as const };
-      const updated = await prismaWithTenant.stickyNote.update({
-        where: { id },
-        data: parsed.data,
-      });
-      return { kind: "OK" as const, updated };
-    },
-  );
-
-  if (result.kind === "NOT_FOUND") return errorResponse("NOT_FOUND", "메모를 찾을 수 없습니다", 404);
-  if (result.kind === "FORBIDDEN") return errorResponse("FORBIDDEN", "본인 메모만 수정할 수 있습니다", 403);
-  return successResponse(result.updated);
+  const db = tenantPrismaFor(OPS_CTX);
+  const row = (await db.stickyNote.findUnique({
+    where: { id },
+    select: { ownerId: true, visibility: true },
+  })) as StickyNoteRow | null;
+  if (!row) return errorResponse("NOT_FOUND", "메모를 찾을 수 없습니다", 404);
+  if (row.ownerId !== user.sub) {
+    return errorResponse("FORBIDDEN", "본인 메모만 수정할 수 있습니다", 403);
+  }
+  const updated = await db.stickyNote.update({
+    where: { id },
+    data: parsed.data,
+  });
+  return successResponse(updated);
 });
 
 // 메모 삭제 — 소유자만.
@@ -58,21 +52,15 @@ export const DELETE = withAuth(async (_req: NextRequest, user, context) => {
   const id = params?.id;
   if (!id) return errorResponse("VALIDATION_ERROR", "id 누락", 400);
 
-  const result = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    async () => {
-      const row = (await prismaWithTenant.stickyNote.findUnique({
-        where: { id },
-        select: { ownerId: true },
-      })) as { ownerId: string } | null;
-      if (!row) return "NOT_FOUND" as const;
-      if (row.ownerId !== user.sub) return "FORBIDDEN" as const;
-      await prismaWithTenant.stickyNote.delete({ where: { id } });
-      return "OK" as const;
-    },
-  );
-
-  if (result === "NOT_FOUND") return errorResponse("NOT_FOUND", "메모를 찾을 수 없습니다", 404);
-  if (result === "FORBIDDEN") return errorResponse("FORBIDDEN", "본인 메모만 삭제할 수 있습니다", 403);
+  const db = tenantPrismaFor(OPS_CTX);
+  const row = (await db.stickyNote.findUnique({
+    where: { id },
+    select: { ownerId: true },
+  })) as { ownerId: string } | null;
+  if (!row) return errorResponse("NOT_FOUND", "메모를 찾을 수 없습니다", 404);
+  if (row.ownerId !== user.sub) {
+    return errorResponse("FORBIDDEN", "본인 메모만 삭제할 수 있습니다", 403);
+  }
+  await db.stickyNote.delete({ where: { id } });
   return successResponse({ id });
 });
