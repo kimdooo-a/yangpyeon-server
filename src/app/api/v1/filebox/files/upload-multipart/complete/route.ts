@@ -1,38 +1,46 @@
-// POST /api/v1/filebox/files/r2-confirm
-// ADR-032 V1 옵션 A — R2 PUT 완료 후 DB file row 등록
+// POST /api/v1/filebox/files/upload-multipart/complete
+// ADR-033 후속 (S78-A) — multipart 완료 + DB row 생성
 //
-// 요청: { key, originalName, size, mimeType, folderId, etag? }
-// 응답: { metadata: File }
+// 요청: { uploadId, key, parts: [{partNumber, etag}, ...], originalName, size, mimeType, folderId }
+// 응답: 생성된 File row (storageType='r2', storedName=key)
 //
 // 절차:
-// 1. 입력 검증 + folder 소유권 확인
-// 2. R2 HEAD 호출 — 객체 실제 존재 + 크기 일치 검증
-// 3. DB file row 생성 (storageType='r2', storedName=key)
+// 1. 입력 검증 + key prefix + folder 소유권
+// 2. CompleteMultipartUpload 호출 (모든 part 의 etag 를 partNumber 순서로 전달)
+// 3. HEAD 검증 — 객체 실제 존재 + 크기 일치 (±10% — multipart commit 정합성 확인)
+// 4. DB file row 생성 (storageType='r2', storedName=key)
 //
 // 보안:
 // - withAuth 필수
-// - 객체 키 prefix 검증 (tenants/{tenantId}/users/{user.sub}/...) — 타인 객체 등록 차단
-// - HEAD 결과 size 가 요청 size 와 ±10% 이내 (HTTP/2 chunk overhead 허용)
-// - MIME 화이트리스트 (presigned 단계와 동일)
+// - key prefix tenants/{tenantId}/users/{user.sub}/... — 타인 객체 등록 차단
 //
-// 실패 시: R2 객체는 그대로 — 24h cleanup cron 이 미등록 객체 회수
+// 실패 시: SeaweedFS 객체는 그대로 — 24h cleanup (S78-B 별도 cron) 이 미등록 객체 회수
 /* eslint-disable tenant/no-raw-prisma-without-tenant */
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { withAuth } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
-import { headR2Object } from "@/lib/r2";
+import { completeMultipartUpload, headR2Object } from "@/lib/r2";
 
 export const runtime = "nodejs";
 
-const confirmSchema = z.object({
+const completeSchema = z.object({
+  uploadId: z.string().min(10).max(500),
   key: z.string().min(10).max(500),
+  parts: z
+    .array(
+      z.object({
+        partNumber: z.number().int().min(1).max(10000),
+        etag: z.string().min(1).max(64),
+      }),
+    )
+    .min(1)
+    .max(10000),
   originalName: z.string().min(1).max(255),
   size: z.number().int().positive(),
   mimeType: z.string().max(255),
   folderId: z.string().uuid(),
-  etag: z.string().max(64).optional(),
 });
 
 export const POST = withAuth(async (request: NextRequest, user) => {
@@ -42,13 +50,14 @@ export const POST = withAuth(async (request: NextRequest, user) => {
   } catch {
     return errorResponse("INVALID_REQUEST", "JSON 형식이 잘못되었습니다", 400);
   }
-  const parsed = confirmSchema.safeParse(body);
+
+  const parsed = completeSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse("INVALID_INPUT", parsed.error.issues[0]?.message ?? "입력 오류", 400);
   }
-  const { key, originalName, size, mimeType, folderId } = parsed.data;
+  const { uploadId, key, parts, originalName, size, mimeType, folderId } = parsed.data;
 
-  // 1. 객체 키 prefix 검증 — 타인 객체 등록 차단
+  // 1. key prefix 검증
   const tenantId = "00000000-0000-0000-0000-000000000000"; // 'default'. T1.5 시 user.tenantId.
   const expectedPrefix = `tenants/${tenantId}/users/${user.sub}/`;
   if (!key.startsWith(expectedPrefix)) {
@@ -64,35 +73,43 @@ export const POST = withAuth(async (request: NextRequest, user) => {
     return errorResponse("FOLDER_NOT_FOUND", "폴더를 찾을 수 없습니다", 404);
   }
 
-  // 3. R2 HEAD 검증 (객체 실제 존재 + 크기 일치)
+  // 3. multipart 완료
+  try {
+    await completeMultipartUpload({ key, uploadId, parts });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "multipart 완료 실패";
+    return errorResponse("MULTIPART_COMPLETE_FAILED", message, 500);
+  }
+
+  // 4. HEAD 검증 — 실제 commit 된 객체의 존재/크기 확인
   let head;
   try {
     head = await headR2Object(key);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "R2 HEAD 실패";
-    return errorResponse("R2_HEAD_FAILED", message, 500);
+    const message = err instanceof Error ? err.message : "HEAD 실패";
+    return errorResponse("STORAGE_HEAD_FAILED", message, 500);
   }
   if (!head.exists) {
-    return errorResponse("OBJECT_NOT_FOUND", "R2 객체가 존재하지 않습니다 (PUT 미완료)", 404);
+    return errorResponse("OBJECT_NOT_FOUND", "객체가 commit 되지 않았습니다", 404);
   }
-  // 크기 검증 (±10% 허용 — HTTP/2 chunk overhead)
+  // 크기 검증 (±10% — part 경계 padding 등 가능성 차단)
   const sizeDiff = Math.abs((head.contentLength ?? 0) - size);
   if (sizeDiff > size * 0.1) {
     return errorResponse(
       "SIZE_MISMATCH",
-      `크기 불일치 (요청 ${size}, R2 ${head.contentLength})`,
+      `크기 불일치 (요청 ${size}, 실제 ${head.contentLength})`,
       400,
     );
   }
 
-  // 4. DB row 생성 (storageType='r2', storedName=key)
+  // 5. DB file row 생성
   try {
     const file = await prisma.file.create({
       data: {
         originalName: originalName.replace(/[<>"'`&\\]/g, "").slice(0, 255),
-        storedName: key, // R2 object key (글로벌 unique 보장 — uuid 포함)
+        storedName: key, // SeaweedFS object key (uuid 포함 글로벌 unique)
         size: head.contentLength ?? size,
-        mimeType: mimeType,
+        mimeType,
         folderId,
         ownerId: user.sub,
         storageType: "r2",
