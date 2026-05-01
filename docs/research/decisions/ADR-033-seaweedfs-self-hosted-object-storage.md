@@ -46,6 +46,8 @@ ADR-032 채택의 핵심 동기는 cloudflare tunnel 무료/Pro 의 **request bo
 
 → 따라서 회피는 **코드 측면 multipart upload** 만 가능 (S3 multipart API, 각 part < 100MB).
 
+> **CGNAT 검증 (S78-F, 2026-05-01)**: `curl ifconfig.me` → `118.33.222.67` (KT 정상 IPv4 대역, NOT CGNAT 100.64.0.0/10). 운영자 가설 "CGNAT 강제" 는 반증되었으나, §3.5 옵션 (DDNS + 포트포워딩) 거부 이유 (운영 부담 ↑ + 보안 부담 + Let's Encrypt 갱신 1인 BaaS 정합 X) 는 그대로 유효. Cloudflare Tunnel 강제 결정 영향 0.
+
 ---
 
 ## 2. 결정
@@ -79,9 +81,40 @@ ADR-032 채택의 핵심 동기는 cloudflare tunnel 무료/Pro 의 **request bo
 
 본 ADR-033 V1 = 50MB ~ 90MB 즉시 작동. 100MB+ 는 후속 PR multipart 통합으로 회수.
 
-### 2.4 후속 PR — multipart upload (S78-?)
+### 2.4 multipart upload — S78-A 구현 (commit `963eba5`, 2026-05-01)
 
-cloudflare tunnel 100MB 우회 = S3 multipart upload (5~50MB chunk + resumable). SeaweedFS S3 API multipart 표준 호환 (`s3.clean.uploads` 자체 명령으로 stale multipart cleanup 지원). 추정 PR 사이즈 ~530줄, 분리 PR.
+cloudflare tunnel 100MB 우회 = S3 multipart upload. **X1 server proxy 패턴 채택** (§2.5 참조). +495 / -160 = 335 net (s77 추정 ~530 보다 압축 — dead presign 제거 + rename 흡수).
+
+작동 범위 (현 시점):
+- ≤50MB: 로컬 POST (FILEBOX_DIR 디스크) — 변경 없음
+- 50MB ~ 5GB: multipart upload (50MB part × N, 동시 3 슬롯)
+- 5GB+: 클라이언트 차단
+
+검증: tsc 0 / WSL 빌드 + 배포 PASS / upload-multipart/{init,part,complete,abort} 401 (auth gate) / 회귀 ping 9 라우트 401 / 신규 ALS 에러 0.
+S78-E 운영자 60MB+ 실측은 별도 (ALS 결정적 회귀 검증 — auth-gate 진입 후 prismaWithTenant 호출 시점).
+
+### 2.5 X1 server proxy vs X2 cloudflared S3 ingress — 아키텍처 결정 근거
+
+**S78-A 진입 시 발견** — s77 PHASE 4 검증이 auth-gate ping 만 수행하고 actual upload 가 빠져 있어, C1 commit `28273a0` 의 r2-presigned/r2-confirm 라우트가 architecturally broken 상태로 머지된 사실이 표면화:
+
+```
+OBJECT_STORAGE_ENDPOINT=http://127.0.0.1:8333  (localhost only)
+SeaweedFS S3 :8333 = 127.0.0.1 only (외부 도달 불가)
+cloudflared ingress = stylelucky4u.com → :3000 만 (S3 ingress 부재)
+→ presigned PUT URL 의 host 가 127.0.0.1:8333 → 브라우저 도달 불가
+```
+
+| 옵션 | 패턴 | 운영자 가치관 정합 | 100MB 한계 | 신규 외부 의존 |
+|---|---|---|---|---|
+| **X1 server proxy** ✅ | browser → tunnel → ypserver (SDK PutObject) → SeaweedFS localhost | ✅ "외부 의존 0" 정합 | 적용됨 → multipart 필수 | DNS 0 / CORS 0 |
+| X2 cloudflared S3 ingress | s3.stylelucky4u.com → :8333, browser 직접 PUT | ⚠️ 외부 hostname + DNS A/CNAME 추가 + SeaweedFS CORS | 적용됨 → multipart 필수 | DNS 1건 + CORS 정책 |
+| X3 hostname rewrite | presigned URL host string 치환 | ❌ SigV4 signature host 검증 깨짐 | — | — |
+
+→ **X1 채택**. 양쪽 모두 multipart 필요한 동일 한계, 그리고 §1.1 "내 컴퓨터, 외부 의존 0" 운영자 핵심 가치 정합. 다운로드 패턴 (s77 stream forward) 과 대칭 → 일관성.
+
+X1 의 트레이드오프: ypserver 가 part body 를 메모리 buffer 로 받아 SeaweedFS SDK 호출. 50MB part × 동시 3 = peak ~150MB 메모리. 8GB+ 머신에서 무시 수준.
+
+**§7 운영자 가치관 정합성 점검 매트릭스 적용 결과**: 6/6 PASS (X2 의 §7-B "서비스 추가" 항목 기준 미달이 X1 채택 결정 요인).
 
 ---
 
@@ -199,19 +232,25 @@ cloudflare tunnel 100MB 우회 = S3 multipart upload (5~50MB chunk + resumable).
 ## 8. 변경 이력
 
 - **2026-05-01 v1.0** ACCEPTED — 세션 77 옵션 C 새 터미널, ADR-032 SUPERSEDED + SP-016 정량 근거. 코드 commit `28273a0` (C1 endpoint 교체). 후속 multipart PR S78-? 별도.
+- **2026-05-01 v1.1** — 세션 78 S78-A multipart 구현 (commit `963eba5`). §2.4 multipart 완료 + §2.5 X1 server proxy 결정 추가 + §1.3 CGNAT 검증 footnote (NOT CGNAT — 운영자 가설 반증, §3.5 거부 이유는 그대로 유효).
 
 ---
 
 ## 9. 관련 파일
 
-- `src/lib/r2.ts` — Object Storage 클라이언트 (의미 재정의, 함수명 R2_* 그대로)
+- `src/lib/r2.ts` — Object Storage 클라이언트 (의미 재정의, 함수명 R2_* 그대로) + multipart 4 함수 (s78)
 - `src/app/api/v1/filebox/files/[id]/route.ts` — 다운로드 stream forward
-- `src/app/api/v1/filebox/files/r2-presigned/route.ts` — 단일 PUT presigned (50~90MB)
-- `src/app/api/v1/filebox/files/r2-confirm/route.ts` — HEAD 검증
-- `src/components/filebox/file-upload-zone.tsx` — UI 50MB 분기 (multipart 후속 PR 시 chunk 분할 + 진행률 통합)
+- `src/app/api/v1/filebox/files/upload-multipart/{init,part,complete,abort}/route.ts` — multipart 라우트 4건 (s78, X1 server proxy)
+- `src/components/filebox/file-upload-zone.tsx` — UI 50MB 분기 + uploadMultipart (50MB part × 동시 3 슬롯, s78)
 - `src/lib/filebox-db.ts` — `deleteFile()` SeaweedFS 분기 (best-effort)
 - `~/seaweedfs/start-weed.sh` — PM2 daemon entry script
 - `~/seaweedfs/data/` — SeaweedFS volume data
 - `~/seaweedfs/filer/` — filer leveldb (deferred)
 - `docs/guides/seaweedfs-monitoring.md` — 운영 모니터링 가이드 (별도 신규)
+- `docs/solutions/2026-05-01-plan-estimate-vs-reality-gap-infrastructure-blind-spot.md` — CK (cc231fd, sibling session) — plan 추정 50× 격차 = 인프라 측 미검토 영역 신호. **본 s78 자체가 그 패턴 추가 사례**: s77 PHASE 4 검증 gap (auth-gate ping 만, actual upload 빠짐) → C1 머지 후 S78-A 진입 시점에 architectural broken 상태 발견.
+
+### ~~삭제됨~~ (s78 X1 server proxy 채택으로 대체)
+
+- ~~`src/app/api/v1/filebox/files/r2-presigned/route.ts`~~ → `upload-multipart/init/route.ts` 로 대체 (browser 도달 불가능)
+- ~~`src/app/api/v1/filebox/files/r2-confirm/route.ts`~~ → `upload-multipart/complete/route.ts` 로 흡수
 - `docs/research/spikes/spike-016-seaweedfs-50gb-result.md` §5 — 정량 검증 근거
