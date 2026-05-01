@@ -1,14 +1,15 @@
 import type { NextRequest } from "next/server";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { hashPassword } from "@/lib/password";
 import { z } from "zod";
 import type { Role } from "@/generated/prisma/client";
 import { requireRoleApi } from "@/lib/auth-guard";
 
 /** 관리자 운영 콘솔 — 기본 테넌트(default) UUID */
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 /** 사용자 raw SELECT row (Date ::text 캐스팅 결과) */
 type UserRow = {
@@ -49,17 +50,13 @@ export async function GET(request: NextRequest) {
 
   // 세션 43: Date 필드는 raw SELECT + ::text 로 정확 읽기 (parsing-side 시프트 회피).
   // ORDER BY created_at DESC 서버측 수행.
-  const rows = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    (): Promise<UserRow[]> =>
-      prismaWithTenant.$queryRaw<UserRow[]>`
-        SELECT id, email, name, role, is_active,
-          (last_login_at::text) AS last_login_at_text,
-          (created_at::text)    AS created_at_text
-        FROM users
-        ORDER BY created_at DESC
-      `,
-  );
+  const rows = await tenantPrismaFor(OPS_CTX).$queryRaw<UserRow[]>`
+    SELECT id, email, name, role, is_active,
+      (last_login_at::text) AS last_login_at_text,
+      (created_at::text)    AS created_at_text
+    FROM users
+    ORDER BY created_at DESC
+  `;
   const users = (rows as UserRow[]).map((r) => ({
     id: r.id,
     email: r.email,
@@ -96,45 +93,35 @@ export async function POST(request: NextRequest) {
 
   const { email, name, password, role } = parsed.data;
 
+  const db = tenantPrismaFor(OPS_CTX);
+
   // 이메일 중복 확인
-  const existing = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () =>
-      prismaWithTenant.user.findUnique({
-        where: { tenantId_email: { tenantId: DEFAULT_TENANT_UUID, email } },
-      }),
-  );
+  const existing = await db.user.findUnique({
+    where: { tenantId_email: { tenantId: DEFAULT_TENANT_UUID, email } },
+  });
   if (existing) {
     return errorResponse("DUPLICATE_EMAIL", "이미 등록된 이메일입니다", 409);
   }
 
   const passwordHash = await hashPassword(password);
 
-  const created = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () =>
-      prismaWithTenant.user.create({
-        data: {
-          email,
-          name: name ?? null,
-          passwordHash,
-          role: role as Role,
-        },
-        select: { id: true, email: true, name: true, role: true, isActive: true },
-      }),
-  );
+  const created = await db.user.create({
+    data: {
+      email,
+      name: name ?? null,
+      passwordHash,
+      role: role as Role,
+    },
+    select: { id: true, email: true, name: true, role: true, isActive: true },
+  });
 
   // 세션 43: create 직후 createdAt 은 raw SELECT ::text 로 재조회.
-  const rows = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () =>
-      prismaWithTenant.$queryRaw<Array<{ created_at_text: string }>>`
-        SELECT (created_at::text) AS created_at_text
-        FROM users
-        WHERE id = ${created.id}
-        LIMIT 1
-      `,
-  );
+  const rows = await db.$queryRaw<Array<{ created_at_text: string }>>`
+    SELECT (created_at::text) AS created_at_text
+    FROM users
+    WHERE id = ${created.id}
+    LIMIT 1
+  `;
   const createdAt = rows[0] ? new Date(rows[0].created_at_text).toISOString() : null;
 
   return successResponse({ ...created, createdAt }, 201);
@@ -163,11 +150,10 @@ export async function PATCH(request: NextRequest) {
 
   const { userId, role, isActive } = parsed.data;
 
+  const db = tenantPrismaFor(OPS_CTX);
+
   // 대상 사용자 존재 확인
-  const target = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () => prismaWithTenant.user.findUnique({ where: { id: userId } }),
-  );
+  const target = await db.user.findUnique({ where: { id: userId } });
   if (!target) {
     return errorResponse("NOT_FOUND", "사용자를 찾을 수 없습니다", 404);
   }
@@ -176,28 +162,20 @@ export async function PATCH(request: NextRequest) {
   if (role !== undefined) updateData.role = role;
   if (isActive !== undefined) updateData.isActive = isActive;
 
-  await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () =>
-      prismaWithTenant.user.update({
-        where: { id: userId },
-        data: updateData,
-      }),
-  );
+  await db.user.update({
+    where: { id: userId },
+    data: updateData,
+  });
 
   // 세션 43: update 직후 Date 필드는 raw SELECT ::text 로 재조회.
-  const rows = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    (): Promise<UserRow[]> =>
-      prismaWithTenant.$queryRaw<UserRow[]>`
-        SELECT id, email, name, role, is_active,
-          (last_login_at::text) AS last_login_at_text,
-          (created_at::text)    AS created_at_text
-        FROM users
-        WHERE id = ${userId}
-        LIMIT 1
-      `,
-  );
+  const rows = await db.$queryRaw<UserRow[]>`
+    SELECT id, email, name, role, is_active,
+      (last_login_at::text) AS last_login_at_text,
+      (created_at::text)    AS created_at_text
+    FROM users
+    WHERE id = ${userId}
+    LIMIT 1
+  `;
   const row = rows[0]!;
   return successResponse({
     id: row.id,

@@ -15,7 +15,7 @@
  *   - 멤버 제거: actor 가 ADMIN/OWNER 또는 self. soft remove (leftAt SET).
  */
 import {
-  prismaWithTenant,
+  tenantPrismaFor,
   withTenantTx,
 } from "@/lib/db/prisma-tenant-client";
 import type {
@@ -78,8 +78,10 @@ export async function findOrCreateDirect(input: {
     );
   }
 
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(ctx);
   // 활성 DIRECT 중 양쪽 모두 leftAt IS NULL 인 페어 검색.
-  const existing = await prismaWithTenant.conversation.findFirst({
+  const existing = await db.conversation.findFirst({
     where: {
       kind: "DIRECT",
       archivedAt: null,
@@ -239,9 +241,11 @@ export async function addMembers(input: {
   added: ConversationMember[];
   skipped: SkippedMember[];
 }> {
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
   const ctx = getCurrentTenant();
+  const db = tenantPrismaFor(ctx);
 
-  const conv = await prismaWithTenant.conversation.findUnique({
+  const conv = await db.conversation.findUnique({
     where: { id: input.conversationId },
     select: { id: true, kind: true, archivedAt: true },
   });
@@ -255,7 +259,7 @@ export async function addMembers(input: {
     );
   }
 
-  const activeMembers = await prismaWithTenant.conversationMember.findMany({
+  const activeMembers = await db.conversationMember.findMany({
     where: { conversationId: conv.id, leftAt: null },
     select: { userId: true },
   });
@@ -362,7 +366,9 @@ export async function removeMember(input: {
     );
   }
 
-  const member = await prismaWithTenant.conversationMember.findUnique({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const member = await db.conversationMember.findUnique({
     where: {
       conversationId_userId: {
         conversationId: input.conversationId,
@@ -374,7 +380,7 @@ export async function removeMember(input: {
     throw new MessengerError("NOT_FOUND", "멤버를 찾을 수 없습니다");
   }
 
-  return prismaWithTenant.conversationMember.update({
+  return db.conversationMember.update({
     where: { id: member.id },
     data: { leftAt: new Date() },
   });
@@ -393,7 +399,9 @@ export async function updateMemberSelf(input: {
   /** ISO string 또는 null (해제). undefined 면 변경 없음. */
   mutedUntil?: Date | null;
 }): Promise<ConversationMember> {
-  const member = await prismaWithTenant.conversationMember.findUnique({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const member = await db.conversationMember.findUnique({
     where: {
       conversationId_userId: {
         conversationId: input.conversationId,
@@ -416,7 +424,7 @@ export async function updateMemberSelf(input: {
     data.mutedUntil = input.mutedUntil;
   }
 
-  return prismaWithTenant.conversationMember.update({
+  return db.conversationMember.update({
     where: { id: member.id },
     data,
   });
@@ -434,7 +442,9 @@ export async function archiveConversation(input: {
   actorId: string;
 }): Promise<Conversation> {
   void input.actorId;
-  const conv = await prismaWithTenant.conversation.findUnique({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const conv = await db.conversation.findUnique({
     where: { id: input.conversationId },
     select: { id: true, archivedAt: true },
   });
@@ -442,11 +452,11 @@ export async function archiveConversation(input: {
     throw new MessengerError("NOT_FOUND", "대화를 찾을 수 없습니다");
   }
   if (conv.archivedAt !== null) {
-    return prismaWithTenant.conversation.findUniqueOrThrow({
+    return db.conversation.findUniqueOrThrow({
       where: { id: input.conversationId },
     });
   }
-  return prismaWithTenant.conversation.update({
+  return db.conversation.update({
     where: { id: input.conversationId },
     data: { archivedAt: new Date() },
   });

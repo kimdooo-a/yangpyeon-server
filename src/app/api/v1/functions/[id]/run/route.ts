@@ -2,15 +2,16 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { runIsolatedFunction } from "@/lib/runner/isolated";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 
 // 글로벌 운영자 콘솔 — default tenant UUID 사용 (ADR-023 §5)
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID } as const;
 
 const bodySchema = z.object({
   input: z.unknown().optional(),
@@ -21,9 +22,8 @@ const ALLOWED_FETCH_HOSTS = ["api.github.com", "stylelucky4u.com"];
 export const POST = withRole(["ADMIN"], async (request: NextRequest, user, context) => {
   const { id } = await (context as { params: Promise<{ id: string }> }).params;
 
-  const fn = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
-    return prismaWithTenant.edgeFunction.findUnique({ where: { id } });
-  });
+  const db = tenantPrismaFor(OPS_CTX);
+  const fn = await db.edgeFunction.findUnique({ where: { id } });
   if (!fn) return errorResponse("NOT_FOUND", "함수를 찾을 수 없습니다", 404);
   if (fn.ownerId !== user.sub)
     return errorResponse("FORBIDDEN", "소유자만 실행할 수 있습니다", 403);
@@ -51,18 +51,16 @@ export const POST = withRole(["ADMIN"], async (request: NextRequest, user, conte
   });
   const finished = new Date();
 
-  await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
-    return prismaWithTenant.edgeFunctionRun.create({
-      data: {
-        functionId: fn.id,
-        status: result.status,
-        durationMs: result.durationMs,
-        stdout: result.stdout,
-        stderr: result.stderr,
-        startedAt: started,
-        finishedAt: finished,
-      },
-    });
+  await db.edgeFunctionRun.create({
+    data: {
+      functionId: fn.id,
+      status: result.status,
+      durationMs: result.durationMs,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      startedAt: started,
+      finishedAt: finished,
+    },
   });
 
   writeAuditLog({

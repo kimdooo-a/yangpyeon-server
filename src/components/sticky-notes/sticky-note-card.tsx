@@ -62,28 +62,52 @@ export function StickyNoteCard({
     setContent(note.content);
   }, [note.content]);
 
-  const startDrag = (e: React.MouseEvent) => {
+  // 드래그 — PointerEvent 사용으로 마우스/터치/펜 통합 (모바일 지원).
+  // 터치 환경에서 textarea 등 자식 input 의 포커스/제스처와 충돌 방지를 위해
+  // 헤더에서만 시작하며, 시작 직후 setPointerCapture 로 트래킹 보장.
+  const startDrag = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isOwner) return;
+    // 텍스트 선택/스크롤 방지 (모바일에서 헤더 드래그 시 페이지가 따라 움직이는 것 차단).
+    e.preventDefault();
     draggingRef.current = {
       startX: e.clientX,
       startY: e.clientY,
       baseX: position.x,
       baseY: position.y,
     };
-    document.addEventListener("mousemove", onDrag);
-    document.addEventListener("mouseup", endDrag, { once: true });
+    const target = e.currentTarget;
+    try {
+      target.setPointerCapture(e.pointerId);
+    } catch {
+      // setPointerCapture 미지원 환경(구형) 무시.
+    }
+    target.addEventListener("pointermove", onDrag);
+    target.addEventListener("pointerup", endDrag, { once: true });
+    target.addEventListener("pointercancel", endDrag, { once: true });
   };
 
-  const onDrag = (e: MouseEvent) => {
+  const onDrag = (e: Event) => {
+    const pe = e as PointerEvent;
     const d = draggingRef.current;
     if (!d) return;
-    const x = Math.max(0, d.baseX + (e.clientX - d.startX));
-    const y = Math.max(0, d.baseY + (e.clientY - d.startY));
+    const x = Math.max(0, d.baseX + (pe.clientX - d.startX));
+    const y = Math.max(0, d.baseY + (pe.clientY - d.startY));
     setPosition({ x, y });
   };
 
-  const endDrag = () => {
-    document.removeEventListener("mousemove", onDrag);
+  const endDrag = (e: Event) => {
+    const target = e.currentTarget as HTMLDivElement | null;
+    if (target) {
+      target.removeEventListener("pointermove", onDrag);
+      const pe = e as PointerEvent;
+      try {
+        if (target.hasPointerCapture(pe.pointerId)) {
+          target.releasePointerCapture(pe.pointerId);
+        }
+      } catch {
+        // ignore
+      }
+    }
     const d = draggingRef.current;
     draggingRef.current = null;
     if (!d) return;
@@ -114,7 +138,8 @@ export function StickyNoteCard({
         className={`flex items-center gap-1 px-2 py-1 border-b border-black/10 ${
           isOwner ? "cursor-grab active:cursor-grabbing" : "cursor-default"
         }`}
-        onMouseDown={startDrag}
+        style={{ touchAction: isOwner ? "none" : "auto" }}
+        onPointerDown={startDrag}
       >
         <span className="text-[10px] text-black/50 truncate flex-1">
           {sharedBadge ? "공유" : "내 메모"}

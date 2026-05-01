@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { ensureStarted, updateJob, removeJob } from "@/lib/cron/registry";
@@ -9,7 +8,9 @@ import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 /** Cron 관리 — operator console, 기본 테넌트(default) UUID */
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 export const runtime = "nodejs";
 
@@ -43,20 +44,15 @@ async function getId(context: unknown): Promise<string> {
 
 export const GET = withRole(["ADMIN", "MANAGER"], async (_req, _user, context) => {
   const id = await getId(context);
-  const row = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () => prismaWithTenant.cronJob.findUnique({ where: { id } }),
-  );
+  const row = await tenantPrismaFor(OPS_CTX).cronJob.findUnique({ where: { id } });
   if (!row) return errorResponse("NOT_FOUND", "Cron Job을 찾을 수 없습니다", 404);
   return successResponse(await withCronDates(row));
 });
 
 export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, user, context) => {
   const id = await getId(context);
-  const existing = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () => prismaWithTenant.cronJob.findUnique({ where: { id } }),
-  );
+  const db = tenantPrismaFor(OPS_CTX);
+  const existing = await db.cronJob.findUnique({ where: { id } });
   if (!existing) return errorResponse("NOT_FOUND", "Cron Job을 찾을 수 없습니다", 404);
 
   let body: unknown;
@@ -76,20 +72,16 @@ export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest,
     return errorResponse("FORBIDDEN", "enable/disable은 ADMIN만 가능합니다", 403);
   }
 
-  const updated = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () =>
-      prismaWithTenant.cronJob.update({
-        where: { id },
-        data: {
-          ...(parsed.data.name !== undefined && { name: parsed.data.name }),
-          ...(parsed.data.schedule !== undefined && { schedule: parsed.data.schedule }),
-          ...(parsed.data.kind !== undefined && { kind: parsed.data.kind }),
-          ...(parsed.data.payload !== undefined && { payload: parsed.data.payload as object }),
-          ...(parsed.data.enabled !== undefined && { enabled: parsed.data.enabled }),
-        },
-      }),
-  );
+  const updated = await db.cronJob.update({
+    where: { id },
+    data: {
+      ...(parsed.data.name !== undefined && { name: parsed.data.name }),
+      ...(parsed.data.schedule !== undefined && { schedule: parsed.data.schedule }),
+      ...(parsed.data.kind !== undefined && { kind: parsed.data.kind }),
+      ...(parsed.data.payload !== undefined && { payload: parsed.data.payload as object }),
+      ...(parsed.data.enabled !== undefined && { enabled: parsed.data.enabled }),
+    },
+  });
 
   ensureStarted();
   await updateJob(id);
@@ -111,15 +103,10 @@ export const PATCH = withRole(["ADMIN", "MANAGER"], async (request: NextRequest,
 
 export const DELETE = withRole(["ADMIN", "MANAGER"], async (_req, _user, context) => {
   const id = await getId(context);
-  const row = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () => prismaWithTenant.cronJob.findUnique({ where: { id } }),
-  );
+  const db = tenantPrismaFor(OPS_CTX);
+  const row = await db.cronJob.findUnique({ where: { id } });
   if (!row) return errorResponse("NOT_FOUND", "Cron Job을 찾을 수 없습니다", 404);
-  await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () => prismaWithTenant.cronJob.delete({ where: { id } }),
-  );
+  await db.cronJob.delete({ where: { id } });
   removeJob(id);
   return successResponse({ deleted: true });
 });

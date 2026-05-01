@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { issueApiKey } from "@/lib/auth/keys";
@@ -9,7 +8,9 @@ import { writeAuditLog } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 /** API 키 관리 — operator console, 기본 테넌트(default) UUID */
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 const API_KEY_DATE_FIELDS = [
   "created_at",
@@ -46,24 +47,20 @@ const createSchema = z.object({
 });
 
 export const GET = withRole(["ADMIN"], async () => {
-  const keys = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () =>
-      prismaWithTenant.apiKey.findMany({
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          name: true,
-          prefix: true,
-          type: true,
-          scopes: true,
-          ownerId: true,
-          lastUsedAt: true,
-          revokedAt: true,
-          createdAt: true,
-        },
-      }),
-  );
+  const keys = await tenantPrismaFor(OPS_CTX).apiKey.findMany({
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      prefix: true,
+      type: true,
+      scopes: true,
+      ownerId: true,
+      lastUsedAt: true,
+      revokedAt: true,
+      createdAt: true,
+    },
+  });
   return successResponse(await attachApiKeyDates(keys));
 });
 

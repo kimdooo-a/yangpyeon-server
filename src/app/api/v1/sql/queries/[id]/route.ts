@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 
 export const runtime = "nodejs";
 
 // 운영 콘솔 — default tenant 로 RLS bypass (ADR-023 §5 운영자 BYPASS_RLS)
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 type SqlQueryRow = {
   id: string;
@@ -28,21 +29,19 @@ export const GET = withRole(
     const id = params?.id;
     if (!id) return errorResponse("VALIDATION_ERROR", "id 누락", 400);
 
-    const row = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
-      prismaWithTenant.sqlQuery.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          name: true,
-          sql: true,
-          scope: true,
-          ownerId: true,
-          lastRunAt: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      })
-    )) as SqlQueryRow | null;
+    const row = (await tenantPrismaFor(OPS_CTX).sqlQuery.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        sql: true,
+        scope: true,
+        ownerId: true,
+        lastRunAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })) as SqlQueryRow | null;
 
     if (!row) return errorResponse("NOT_FOUND", "쿼리를 찾을 수 없습니다", 404);
     if (row.ownerId !== user.sub && row.scope !== "SHARED") {
@@ -60,20 +59,17 @@ export const DELETE = withRole(
     const id = params?.id;
     if (!id) return errorResponse("VALIDATION_ERROR", "id 누락", 400);
 
-    const result = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, async () => {
-      const row = (await prismaWithTenant.sqlQuery.findUnique({
-        where: { id },
-        select: { ownerId: true },
-      })) as { ownerId: string } | null;
-      if (!row) return "NOT_FOUND" as const;
-      if (row.ownerId !== user.sub) return "FORBIDDEN" as const;
+    const db = tenantPrismaFor(OPS_CTX);
+    const row = (await db.sqlQuery.findUnique({
+      where: { id },
+      select: { ownerId: true },
+    })) as { ownerId: string } | null;
+    if (!row) return errorResponse("NOT_FOUND", "쿼리를 찾을 수 없습니다", 404);
+    if (row.ownerId !== user.sub) {
+      return errorResponse("FORBIDDEN", "본인 쿼리만 삭제할 수 있습니다", 403);
+    }
 
-      await prismaWithTenant.sqlQuery.delete({ where: { id } });
-      return "OK" as const;
-    });
-
-    if (result === "NOT_FOUND") return errorResponse("NOT_FOUND", "쿼리를 찾을 수 없습니다", 404);
-    if (result === "FORBIDDEN") return errorResponse("FORBIDDEN", "본인 쿼리만 삭제할 수 있습니다", 403);
+    await db.sqlQuery.delete({ where: { id } });
     return successResponse({ id });
   }
 );

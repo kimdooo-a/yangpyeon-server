@@ -29,7 +29,8 @@
  */
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { withTenant, prismaWithTenant } from "@/lib/api-guard-tenant";
+import { withTenant } from "@/lib/api-guard-tenant";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 export const runtime = "nodejs";
@@ -80,7 +81,7 @@ function todayUtcYmd(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export const GET = withTenant(async (request, _user, _tenant) => {
+export const GET = withTenant(async (request, _user, tenant) => {
   try {
     const { searchParams } = new URL(request.url);
     const parsed = querySchema.safeParse(Object.fromEntries(searchParams));
@@ -96,7 +97,9 @@ export const GET = withTenant(async (request, _user, _tenant) => {
     const { start, end } = getDayRange(dateStr);
     const boostThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const metrics = await prismaWithTenant.contentItemMetric.findMany({
+    // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+    const db = tenantPrismaFor({ tenantId: tenant.id });
+    const metrics = await db.contentItemMetric.findMany({
       where: { date: { gte: start, lt: end } },
       select: { itemId: true, views: true },
     });
@@ -105,7 +108,7 @@ export const GET = withTenant(async (request, _user, _tenant) => {
       viewsMap.set(m.itemId, m.views);
     }
 
-    const candidates = await prismaWithTenant.contentItem.findMany({
+    const candidates = await db.contentItem.findMany({
       where: { qualityFlag: { not: "blocked" } },
       orderBy: [{ score: "desc" }, { publishedAt: "desc" }],
       take: 1000,

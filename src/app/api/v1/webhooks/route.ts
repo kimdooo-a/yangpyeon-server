@@ -5,11 +5,12 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { validateWebhookUrl } from "@/lib/webhooks/deliver";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 
 // 운영 콘솔 — default tenant 로 RLS bypass (ADR-023 §5 운영자 BYPASS_RLS)
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 type WebhookRow = {
   id: string;
@@ -66,11 +67,9 @@ const createSchema = z.object({
 });
 
 export const GET = withRole(["ADMIN", "MANAGER"], async () => {
-  const webhooks = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
-    prismaWithTenant.webhook.findMany({
-      orderBy: { createdAt: "desc" },
-    })
-  )) as WebhookRow[];
+  const webhooks = (await tenantPrismaFor(OPS_CTX).webhook.findMany({
+    orderBy: { createdAt: "desc" },
+  })) as WebhookRow[];
   return successResponse(await attachWebhookDates(webhooks));
 });
 
@@ -95,19 +94,17 @@ export const POST = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, 
     return errorResponse("INVALID_URL", validation.error, 400);
   }
 
-  const created = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
-    prismaWithTenant.webhook.create({
-      data: {
-        name: parsed.data.name,
-        sourceTable: parsed.data.sourceTable,
-        event: parsed.data.event,
-        url: parsed.data.url,
-        headers: parsed.data.headers,
-        secret: parsed.data.secret ?? null,
-        enabled: parsed.data.enabled,
-      },
-    })
-  )) as WebhookRow;
+  const created = (await tenantPrismaFor(OPS_CTX).webhook.create({
+    data: {
+      name: parsed.data.name,
+      sourceTable: parsed.data.sourceTable,
+      event: parsed.data.event,
+      url: parsed.data.url,
+      headers: parsed.data.headers,
+      secret: parsed.data.secret ?? null,
+      enabled: parsed.data.enabled,
+    },
+  })) as WebhookRow;
 
   writeAuditLog({
     timestamp: new Date().toISOString(),

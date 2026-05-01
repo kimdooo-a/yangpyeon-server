@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { errorResponse } from "@/lib/api-response";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
 
 /** 관리자 운영 콘솔 — 기본 테넌트(default) UUID */
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 /**
  * POST /api/admin/users/[id]/mfa/reset — 관리자 강제 MFA 해제.
@@ -23,24 +24,19 @@ export const POST = withRole(
       return errorResponse("VALIDATION_ERROR", "대상 사용자 id 가 필요합니다", 400);
     }
 
-    const target = await runWithTenant(
-      { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-      () =>
-        prismaWithTenant.user.findUnique({
-          where: { id: targetId },
-          select: { id: true, email: true, mfaEnabled: true },
-        }),
-    );
+    const db = tenantPrismaFor(OPS_CTX);
+    const target = await db.user.findUnique({
+      where: { id: targetId },
+      select: { id: true, email: true, mfaEnabled: true },
+    });
     if (!target) {
       return errorResponse("USER_NOT_FOUND", "사용자를 찾을 수 없습니다", 404);
     }
 
-    await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, async () => {
-      // 관리자 강제 MFA 해제: TOTP 비활성화 + 복구 코드 + 등록 정보 전체 삭제
-      await prismaWithTenant.user.update({ where: { id: target.id }, data: { mfaEnabled: false } });
-      await prismaWithTenant.mfaRecoveryCode.deleteMany({ where: { userId: target.id } });
-      await prismaWithTenant.mfaEnrollment.deleteMany({ where: { userId: target.id } });
-    });
+    // 관리자 강제 MFA 해제: TOTP 비활성화 + 복구 코드 + 등록 정보 전체 삭제
+    await db.user.update({ where: { id: target.id }, data: { mfaEnabled: false } });
+    await db.mfaRecoveryCode.deleteMany({ where: { userId: target.id } });
+    await db.mfaEnrollment.deleteMany({ where: { userId: target.id } });
 
     writeAuditLog({
       timestamp: new Date().toISOString(),

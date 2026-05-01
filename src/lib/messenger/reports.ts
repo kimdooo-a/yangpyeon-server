@@ -14,7 +14,7 @@
  *   - DELETE_MESSAGE 는 targetKind=MESSAGE 에만, BLOCK_USER 는 targetKind=USER 에만 적용.
  */
 import type { AbuseReport, Prisma } from "@/generated/prisma/client";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { getCurrentTenant } from "@yangpyeon/core/tenant/context";
 import {
   MessengerError,
@@ -35,10 +35,12 @@ export async function fileReport(input: {
   targetId: string;
   reason: string;
 }): Promise<AbuseReport> {
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
   const ctx = getCurrentTenant();
+  const db = tenantPrismaFor(ctx);
 
   if (input.targetKind === "MESSAGE") {
-    const msg = await prismaWithTenant.message.findUnique({
+    const msg = await db.message.findUnique({
       where: { id: input.targetId },
       select: { id: true },
     });
@@ -47,7 +49,7 @@ export async function fileReport(input: {
     }
   } else {
     // USER target — RLS 가 적용되지 않을 수 있어 명시 tenant 필터 (defense-in-depth).
-    const user = await prismaWithTenant.user.findFirst({
+    const user = await db.user.findFirst({
       where: { id: input.targetId, tenantId: ctx.tenantId },
       select: { id: true },
     });
@@ -57,7 +59,7 @@ export async function fileReport(input: {
   }
 
   // UNIQUE pre-lookup — 친화적 에러.
-  const existing = await prismaWithTenant.abuseReport.findUnique({
+  const existing = await db.abuseReport.findUnique({
     where: {
       reporterId_targetKind_targetId: {
         reporterId: input.reporterId,
@@ -75,7 +77,7 @@ export async function fileReport(input: {
     );
   }
 
-  return prismaWithTenant.abuseReport.create({
+  return db.abuseReport.create({
     data: {
       reporterId: input.reporterId,
       targetKind: input.targetKind,
@@ -104,7 +106,9 @@ export async function resolveReport(input: {
   action: "DELETE_MESSAGE" | "BLOCK_USER" | "DISMISS";
   note?: string;
 }): Promise<{ report: AbuseReport; performedActions: string[] }> {
-  const report = await prismaWithTenant.abuseReport.findUnique({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const report = await db.abuseReport.findUnique({
     where: { id: input.reportId },
   });
   if (!report) {
@@ -126,12 +130,12 @@ export async function resolveReport(input: {
         "DELETE_MESSAGE 는 MESSAGE 타입 신고에만 적용 가능합니다",
       );
     }
-    const msg = await prismaWithTenant.message.findUnique({
+    const msg = await db.message.findUnique({
       where: { id: report.targetId },
       select: { id: true, deletedAt: true },
     });
     if (msg && msg.deletedAt === null) {
-      await prismaWithTenant.message.update({
+      await db.message.update({
         where: { id: report.targetId },
         data: {
           deletedAt: new Date(),
@@ -156,7 +160,7 @@ export async function resolveReport(input: {
     performedActions.push("USER_BLOCK_RECORDED");
   }
 
-  const updated = await prismaWithTenant.abuseReport.update({
+  const updated = await db.abuseReport.update({
     where: { id: input.reportId },
     data: {
       status: input.action === "DISMISS" ? "DISMISSED" : "RESOLVED",
@@ -204,7 +208,9 @@ export async function listOpenReports(input: {
     }
   }
 
-  const rows = await prismaWithTenant.abuseReport.findMany({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const rows = await db.abuseReport.findMany({
     where: {
       status: input.status ?? "OPEN",
       ...(cursorFilter ?? {}),

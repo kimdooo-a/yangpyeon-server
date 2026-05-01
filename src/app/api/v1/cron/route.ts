@@ -1,14 +1,15 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { ensureStarted, addJob } from "@/lib/cron/registry";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 /** Cron 관리 — operator console, 기본 테넌트(default) UUID */
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 export const runtime = "nodejs";
 
@@ -51,10 +52,9 @@ const createSchema = z.object({
 // GET: Cron 목록 (MANAGER 이상)
 export const GET = withRole(["ADMIN", "MANAGER"], async () => {
   ensureStarted();
-  const rows = await runWithTenant(
-    { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-    () => prismaWithTenant.cronJob.findMany({ orderBy: { createdAt: "desc" } }),
-  );
+  const rows = await tenantPrismaFor(OPS_CTX).cronJob.findMany({
+    orderBy: { createdAt: "desc" },
+  });
   // 세션 44: Prisma 7 parsing-side +9h 시프트 회피 (CK orm-date-filter-audit-sweep)
   return successResponse(await attachCronDates(rows));
 });
@@ -73,19 +73,15 @@ export const POST = withRole(["ADMIN", "MANAGER"], async (request: NextRequest) 
     return errorResponse("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "검증 실패", 400);
   }
   try {
-    const row = await runWithTenant(
-      { tenantId: DEFAULT_TENANT_UUID, bypassRls: true },
-      () =>
-        prismaWithTenant.cronJob.create({
-          data: {
-            name: parsed.data.name,
-            schedule: parsed.data.schedule,
-            kind: parsed.data.kind,
-            payload: parsed.data.payload as object,
-            enabled: parsed.data.enabled,
-          },
-        }),
-    );
+    const row = await tenantPrismaFor(OPS_CTX).cronJob.create({
+      data: {
+        name: parsed.data.name,
+        schedule: parsed.data.schedule,
+        kind: parsed.data.kind,
+        payload: parsed.data.payload as object,
+        enabled: parsed.data.enabled,
+      },
+    });
     if (row.enabled) await addJob(row.id);
     const [withDates] = await attachCronDates([row]);
     return successResponse(withDates, 201);

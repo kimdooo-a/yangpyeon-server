@@ -1,13 +1,24 @@
-# 다음 세션 프롬프트 (세션 74)
+# 다음 세션 프롬프트 (세션 75)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 74 종료)
+
+- **세션 74 핵심 (메모 사고 후속 — 모바일 드래그 + ALS 마이그레이션)**:
+  1. **모바일 드래그 PointerEvent 전환** — `sticky-note-card.tsx` `MouseEvent` → `PointerEvent` 통합. `setPointerCapture` + `touchAction: 'none' (owner only)` + `pointercancel` 핸들러. 헤더 owner-only 차단 + read-only 사용자 page scroll 정상 보존.
+  2. **28→31 라우트 ALS 마이그레이션 일괄 적용**: 운영 콘솔 22(`OPS_CTX = { tenantId, bypassRls: true } as const` 패턴, functions/log-drains 7 파일은 bypassRls 미설정 정책 유지) + 테넌트 5(`tenantPrismaFor({ tenantId: tenant.id })` 가드 arg 활용) + 메신저 라이브러리 4(`getCurrentTenant() + ctx 캐시`, `withTenantTx` 그대로 유지). 다중 statement `runWithTenant` 블록은 `db = tenantPrismaFor(...)` 캐시 + sequence 분해.
+  3. **의도적 제외 3건**: `lib/filebox-db.ts` (raw prisma + ADR-024 부속결정 T1.5), `lib/tenant-router/membership.ts` (tenant 결정 *전* 단계 base prisma 정당), `app/api/v1/filebox/files/r2-presigned/route.ts` (TODO T1.5).
+  4. **검증**: `tsc --noEmit` exit 0, 잔여 `prismaWithTenant.X` 호출 0건. 메모리 `project_workspace_singleton_globalthis.md` 함정 2 섹션에 마이그레이션 완료 사실 추가.
+  5. **미커밋**: 32 파일 + 메모리 1. 세션 75 진입 시 commit + WSL 배포 + 폰 실측 필요.
+
+---
+
 ## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 73 종료)
 
-- **세션 73 핵심**: 세션 72 백엔드 위에 **UI 50MB 분기 + XHR 진행률 + 다운로드 302 redirect** 적용 완료. 코드는 운영 검증 가능 상태. 단 **R2 콘솔 CORS 1회 작업 보류** — 현 토큰이 Object Read/Write 한정, bucket-level 정책 변경 시 AccessDenied(403). 콘솔 작업 또는 admin 토큰 발급 필요.
+- **세션 73 핵심 (다른 터미널 — R2 UI 50MB 분기 + 다운로드 302)**: 세션 72 백엔드 위에 **UI 50MB 분기 + XHR 진행률 + 다운로드 302 redirect** 적용 완료. 코드는 운영 검증 가능 상태. 단 **R2 콘솔 CORS 1회 작업 보류** — 현 토큰이 Object Read/Write 한정, bucket-level 정책 변경 시 AccessDenied(403). 콘솔 작업 또는 admin 토큰 발급 필요.
   1. **변경 5건**: `src/components/filebox/file-upload-zone.tsx` (50MB 분기 + XHR 진행률 + 5GB cap) / `src/lib/filebox-db.ts` (getFileForDownload R2 분기 + deleteFile R2 분기 — R2 객체 잔존 TODO) / `src/lib/r2.ts` (presignR2GetUrl `responseContentDisposition` 옵션) / `src/app/api/v1/filebox/files/[id]/route.ts` (storageType='r2' 시 302 redirect) / `scripts/r2-cors-apply.mjs` (admin 토큰 발급 후 사용 가능).
   2. **세션 74 첫 작업** = 운영자 R2 콘솔 CORS 적용(아래 §S74-A 1단계, 3분) + 50MB+ 브라우저 PUT 실측(5분).
   3. **R2 객체 잔존 부채**: deleteFile 가 R2 파일은 DB row 만 삭제. deleteR2Object 추가 + 24h cleanup cron(미등록 객체 회수)이 다음 PR.
@@ -78,9 +89,25 @@ npm run dev
 
 ---
 
-## ⭐ 세션 74 추천 작업
+## ⭐ 세션 75 추천 작업
 
-### S74-A. **R2 콘솔 CORS 적용 + 브라우저 실측** (P0, ~10분 + 검증 5분)
+### S75-A. **세션 74 commit + WSL 배포 + 폰에서 모바일 드래그 실측** (P0, ~30분)
+
+세션 74에서 ALS 마이그레이션 + 모바일 드래그 코드 완료, `tsc` 통과. 미커밋 상태.
+
+1. **commit 영역 분리**: `git add` 본 세션 영역만 (32 파일 — 인수인계서 §"수정 파일" 표 참조). 다른 무관 미커밋 영역(세션 72 R2 V1, 세션 73 R2 UI, scripts/wsl-build-deploy.sh, docs/research/baas-foundation/, prisma/schema.prisma, package.json, ...)은 본 commit 에서 분리.
+2. commit message 예: `fix(als): sticky-notes ALS 함정 회피 — 31 라우트 + 모바일 드래그 PointerEvent 전환`
+3. `/ypserver` 스킬로 빌드+배포+PM2 재시작
+4. 폰에서 stylelucky4u.com → /memo → 헤더 드래그 실측 (헤더만 드래그 활성, 텍스트 영역 편집 정상)
+5. **회귀 검증**: 자주 안 쓰는 라우트(log-drains/test, webhooks/[id]/trigger, cron/[id] PATCH/DELETE, admin/users/[id]/{sessions,mfa/reset}) 한 번씩 ping smoke
+
+### S75-B. **세션 72/73 미커밋 R2 V1 + R2 UI 영역 정리** (P0, ~30분)
+
+- 세션 72 handover 가 commit `275464c` 주장하나 실제 git log 부재 → R2 V1 영역 (src/lib/r2.ts, src/app/api/v1/filebox/files/r2-{presigned,confirm}/, prisma/migrations/20260501100000_..., prisma/schema.prisma 등) 미커밋 상태 검증 후 commit.
+- 세션 73 R2 UI 영역 (FileUploadZone 50MB 분기, [id]/route.ts 다운로드 302, lib/filebox-db.ts deleteFile R2 분기 TODO 등) 미커밋 상태 검증 후 commit.
+- 본 세션 74 commit과 영역 분리하여 별개 commit (3 PR 또는 영역별 chained commit).
+
+### S75-C. **R2 콘솔 CORS 적용 + 브라우저 실측** (P0, ~10분 + 검증 5분)
 
 세션 73 종료 시점 R2 백엔드/UI/다운로드 모두 코드 완료. 마지막 1마일 = R2 버킷 CORS 정책 적용.
 
@@ -107,7 +134,7 @@ npm run dev
    - (b) HTTP 403 + signature mismatch → Content-Type 헤더 불일치 (presign vs PUT)
    - (c) HTTP 400 expired → presigned URL 만료 (300초)
 
-### S74-B. **R2 객체 cleanup 부채 정리** (P1, ~3h, 같은 PR 권고)
+### S75-D. **R2 객체 cleanup 부채 정리** (P1, ~3h, 같은 PR 권고)
 
 세션 73에서 deleteFile 이 R2 파일은 DB row 만 삭제 (TODO 주석 명시).
 
@@ -213,41 +240,71 @@ spec 의 10 모듈을 multi-tenant adaptation 으로 이식:
 
 ---
 
-## 세션 71 미커밋 변경 (다음 세션 진입 시 처리 필요)
+## 세션 74 미커밋 변경 (다음 세션 진입 시 commit 필요)
 
-**본 터미널 (docs/ + memory) — 세션 71 종료 시 commit 시도**:
-```
-[신규]
-docs/research/decisions/ADR-032-filebox-large-file-uploads.md
-docs/research/spikes/spike-032-filebox-large-file-uploads.md
-docs/research/spikes/spike-032-prepared-code/{README,migration.sql,r2-client.ts,route-r2-presigned.ts,route-r2-confirm.ts,env.example,package-deps}.txt + README.md
-docs/handover/260501-session71-r2-spike-adr-032.md
+**본 세션 74 영역 (32 파일 + 메모리 1)** — 모바일 드래그 + ALS 마이그레이션:
 
-[수정]
-docs/research/_SPIKE_CLEARANCE.md
-docs/research/spikes/spike-013-wal2json-slot-result.md
-docs/research/spikes/spike-016-seaweedfs-50gb-result.md
-docs/solutions/2026-05-01-cloudflare-tunnel-100mb-body-limit-large-upload.md
-docs/handover/_index.md
-docs/handover/next-dev-prompt.md
-docs/status/current.md
+```
+[수정] src/components/sticky-notes/sticky-note-card.tsx
+
+[수정] 운영 콘솔 22:
+  src/app/api/v1/members/route.ts
+  src/app/api/v1/members/[id]/route.ts
+  src/app/api/v1/members/[id]/role/route.ts
+  src/app/api/v1/sql/queries/route.ts
+  src/app/api/v1/sql/queries/[id]/route.ts
+  src/app/api/v1/webhooks/route.ts
+  src/app/api/v1/webhooks/[id]/route.ts
+  src/app/api/v1/webhooks/[id]/trigger/route.ts
+  src/app/api/v1/cron/route.ts
+  src/app/api/v1/cron/[id]/route.ts
+  src/app/api/v1/functions/route.ts
+  src/app/api/v1/functions/[id]/route.ts
+  src/app/api/v1/functions/[id]/run/route.ts
+  src/app/api/v1/functions/[id]/runs/route.ts
+  src/app/api/v1/log-drains/route.ts
+  src/app/api/v1/log-drains/[id]/route.ts
+  src/app/api/v1/log-drains/[id]/test/route.ts
+  src/app/api/v1/api-keys/route.ts
+  src/app/api/v1/api-keys/[id]/route.ts
+  src/app/api/settings/users/route.ts
+  src/app/api/admin/users/[id]/sessions/route.ts
+  src/app/api/admin/users/[id]/mfa/reset/route.ts
+
+[수정] 테넌트 라우트 5:
+  src/app/api/v1/t/[tenant]/categories/route.ts
+  src/app/api/v1/t/[tenant]/sources/route.ts
+  src/app/api/v1/t/[tenant]/today-top/route.ts
+  src/app/api/v1/t/[tenant]/items/[slug]/route.ts
+  src/app/api/v1/t/[tenant]/contents/route.ts
+
+[수정] 메신저 라이브러리 4:
+  src/lib/messenger/reports.ts
+  src/lib/messenger/messages.ts
+  src/lib/messenger/conversations.ts
+  src/lib/messenger/blocks.ts
+
+[메모리] ~/.claude/projects/.../memory/project_workspace_singleton_globalthis.md (함정 2 마이그레이션 완료 사실 추가)
+
+[신규/수정] docs/handover/_index.md (세션 74 row)
+            docs/handover/next-dev-prompt.md (세션 75용 갱신)
+            docs/handover/260501-session74-als-migration-mobile-drag.md (신규)
+            docs/logs/2026-05.md (세션 74 항목)
+            docs/logs/journal-2026-05-01.md (세션 74 토픽 8개)
+            docs/status/current.md (세션 74 row)
 ```
 
-**다른 터미널 (src/+prisma/+package.json) — 별도 commit 또는 그쪽 세션에서**:
-```
-[수정] package.json, package-lock.json, prisma/schema.prisma
-[신규] prisma/migrations/20260501100000_add_file_storage_type/
-       src/app/api/v1/filebox/files/r2-{presigned,confirm}/route.ts
-       src/lib/r2.ts
-```
-
-**세션 70 잔여 (본 세션 손대지 않음)**: `.claude/settings.json`, `scripts/wsl-build-deploy.sh`, `.claude/scheduled_tasks.lock`, `.kdyswarm/`, `.claude/worktrees/`, `docs/research/baas-foundation/05-aggregator-migration/`
+**다른 무관한 미커밋 영역 (분리 필요)**:
+- 세션 72 R2 V1: `src/lib/r2.ts`, `src/app/api/v1/filebox/files/r2-{presigned,confirm}/route.ts`, `prisma/migrations/20260501100000_...`, `prisma/schema.prisma`, `package.json`+`package-lock.json`, `scripts/r2-poc.mjs`, `docs/research/decisions/ADR-032-...`, `docs/research/spikes/spike-032-*`
+- 세션 73 R2 UI: `src/components/filebox/file-upload-zone.tsx`, `src/app/api/v1/filebox/files/[id]/route.ts`, `src/lib/filebox-db.ts` (deleteFile R2 분기), `scripts/wsl-build-deploy.sh` (.env exclude 보강), `scripts/r2-cors-apply.mjs`
+- 다른 무관: `.claude/settings.json`, `.kdyswarm/`, `.claude/worktrees/`, `docs/research/baas-foundation/05-aggregator-migration/`, `docs/research/spikes/spike-013, 016`, `docs/solutions/2026-05-01-cloudflare-tunnel-100mb-body-limit-large-upload.md`
 
 ---
 
 ## 세션 시작 시 첫 행동
 
-1. `git status` 로 다른 터미널 트랙 A 진행 결과 확인
-2. ADR-032 PROPOSED → ACCEPTED 승격 가능 여부 확인 (PoC 결과 기록 있나)
-3. **베이스라인 검증 룰 발동** — current.md + next-dev-prompt + 최근 handover 5개 + 실제 코드 4개 점검
-4. 사용자 명시 작업 또는 위 추천 중 자율 진행
+1. `git status` 로 미커밋 영역 확인 — 세션 74 + 다른 무관 영역 분리 완성도 점검
+2. **S75-A 우선 (세션 74 commit + 배포 + 모바일 실측)** — ALS 마이그레이션 회귀 위험 + 모바일 드래그 검증 보류 상태
+3. **S75-B (세션 72/73 미커밋 정리)** — 영역 분리 별개 commit
+4. **베이스라인 검증 룰 발동** — current.md + next-dev-prompt + 최근 handover 5개 + 실제 코드 4개 점검
+5. S75-C (R2 CORS) → S75-D (R2 cleanup) 순차 또는 사용자 명시 작업

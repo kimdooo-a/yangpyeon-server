@@ -1,15 +1,16 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { writeAuditLog } from "@/lib/audit-log";
 import { fetchDateFieldsText, toIsoOrNull } from "@/lib/date-fields";
 
 // 글로벌 운영자 콘솔 — default tenant UUID 사용 (ADR-023 §5)
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID } as const;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -39,9 +40,7 @@ const patchSchema = z.object({
 
 export const GET = withRole(["ADMIN"], async (_req, _user, context) => {
   const { id } = await (context as RouteContext).params;
-  const drain = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
-    return prismaWithTenant.logDrain.findUnique({ where: { id } });
-  });
+  const drain = await tenantPrismaFor(OPS_CTX).logDrain.findUnique({ where: { id } });
   if (!drain) return errorResponse("NOT_FOUND", "로그 드레인을 찾을 수 없습니다", 404);
   return successResponse(await withLogDrainDates(drain));
 });
@@ -58,9 +57,8 @@ export const PATCH = withRole(["ADMIN"], async (request: NextRequest, user, cont
   if (!parsed.success) {
     return errorResponse("VALIDATION_ERROR", parsed.error.issues[0]?.message ?? "입력 오류", 400);
   }
-  const existing = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
-    return prismaWithTenant.logDrain.findUnique({ where: { id } });
-  });
+  const db = tenantPrismaFor(OPS_CTX);
+  const existing = await db.logDrain.findUnique({ where: { id } });
   if (!existing) return errorResponse("NOT_FOUND", "로그 드레인을 찾을 수 없습니다", 404);
 
   const { filters, ...rest } = parsed.data;
@@ -68,9 +66,7 @@ export const PATCH = withRole(["ADMIN"], async (request: NextRequest, user, cont
     ...rest,
     ...(filters !== undefined ? { filters: filters as Prisma.InputJsonValue } : {}),
   };
-  const updated = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
-    return prismaWithTenant.logDrain.update({ where: { id }, data });
-  });
+  const updated = await db.logDrain.update({ where: { id }, data });
 
   writeAuditLog({
     timestamp: new Date().toISOString(),
@@ -86,13 +82,10 @@ export const PATCH = withRole(["ADMIN"], async (request: NextRequest, user, cont
 
 export const DELETE = withRole(["ADMIN"], async (request, user, context) => {
   const { id } = await (context as RouteContext).params;
-  const existing = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
-    return prismaWithTenant.logDrain.findUnique({ where: { id } });
-  });
+  const db = tenantPrismaFor(OPS_CTX);
+  const existing = await db.logDrain.findUnique({ where: { id } });
   if (!existing) return errorResponse("NOT_FOUND", "로그 드레인을 찾을 수 없습니다", 404);
-  await runWithTenant({ tenantId: DEFAULT_TENANT_UUID }, async () => {
-    return prismaWithTenant.logDrain.delete({ where: { id } });
-  });
+  await db.logDrain.delete({ where: { id } });
 
   writeAuditLog({
     timestamp: new Date().toISOString(),

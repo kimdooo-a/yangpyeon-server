@@ -20,7 +20,8 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
-import { withTenant, prismaWithTenant } from "@/lib/api-guard-tenant";
+import { withTenant } from "@/lib/api-guard-tenant";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { writeAuditLog, extractClientIp } from "@/lib/audit-log";
 
@@ -95,7 +96,7 @@ function buildCorsHeaders(request: NextRequest): Record<string, string> {
   return {};
 }
 
-export const GET = withTenant(async (request, user, _tenant) => {
+export const GET = withTenant(async (request, user, tenant) => {
   try {
     const { searchParams } = new URL(request.url);
     const parsed = querySchema.safeParse(Object.fromEntries(searchParams));
@@ -150,7 +151,9 @@ export const GET = withTenant(async (request, user, _tenant) => {
 
     const parsedCursor = cursor ? parseCursor(cursor) : null;
 
-    const items = await prismaWithTenant.contentItem.findMany({
+    // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+    const db = tenantPrismaFor({ tenantId: tenant.id });
+    const items = await db.contentItem.findMany({
       where,
       orderBy,
       take: limit + 1,

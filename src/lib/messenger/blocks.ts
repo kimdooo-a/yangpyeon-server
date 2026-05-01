@@ -11,7 +11,8 @@
  * 모든 호출은 withTenant() 가드 내부 — TenantContext 가 이미 주입되어 있다.
  * prismaWithTenant 가 SET LOCAL app.tenant_id 를 자동 적용하므로 명시 tenantId where 불필요.
  */
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
+import { getCurrentTenant } from "@yangpyeon/core/tenant/context";
 import type { UserBlock } from "@/generated/prisma/client";
 import { MessengerError } from "./types";
 
@@ -28,7 +29,9 @@ export async function isBlocked(input: {
   userIdB: string;
 }): Promise<boolean> {
   if (input.userIdA === input.userIdB) return false;
-  const row = await prismaWithTenant.userBlock.findFirst({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const row = await db.userBlock.findFirst({
     where: {
       OR: [
         { blockerId: input.userIdA, blockedId: input.userIdB },
@@ -55,8 +58,10 @@ export async function blockUser(input: {
   if (input.blockerId === input.blockedId) {
     throw new MessengerError("BLOCK_SELF", "자기 자신은 차단할 수 없습니다");
   }
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
   // UNIQUE (blockerId, blockedId) — 중복은 사전 lookup 으로 친화적 에러 반환.
-  const existing = await prismaWithTenant.userBlock.findFirst({
+  const existing = await db.userBlock.findFirst({
     where: { blockerId: input.blockerId, blockedId: input.blockedId },
     select: { id: true },
   });
@@ -67,7 +72,7 @@ export async function blockUser(input: {
       { existingBlockId: existing.id },
     );
   }
-  return prismaWithTenant.userBlock.create({
+  return db.userBlock.create({
     data: {
       blockerId: input.blockerId,
       blockedId: input.blockedId,
@@ -86,14 +91,16 @@ export async function unblockUser(input: {
   blockerId: string;
   blockId: string;
 }): Promise<void> {
-  const row = await prismaWithTenant.userBlock.findUnique({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const row = await db.userBlock.findUnique({
     where: { id: input.blockId },
     select: { id: true, blockerId: true },
   });
   if (!row || row.blockerId !== input.blockerId) {
     throw new MessengerError("NOT_FOUND", "차단 정보를 찾을 수 없습니다");
   }
-  await prismaWithTenant.userBlock.delete({ where: { id: input.blockId } });
+  await db.userBlock.delete({ where: { id: input.blockId } });
 }
 
 /**
@@ -102,7 +109,9 @@ export async function unblockUser(input: {
 export async function listMyBlocks(input: {
   blockerId: string;
 }): Promise<UserBlock[]> {
-  return prismaWithTenant.userBlock.findMany({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  return db.userBlock.findMany({
     where: { blockerId: input.blockerId },
     orderBy: { createdAt: "desc" },
   });

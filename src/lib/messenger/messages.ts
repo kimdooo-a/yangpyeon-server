@@ -18,7 +18,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import type { Message } from "@/generated/prisma/client";
 import {
-  prismaWithTenant,
+  tenantPrismaFor,
   withTenantTx,
 } from "@/lib/db/prisma-tenant-client";
 import { getCurrentTenant } from "@yangpyeon/core/tenant/context";
@@ -81,7 +81,9 @@ async function fetchByCgid(input: {
   conversationId: string;
   clientGeneratedId: string;
 }): Promise<MessageWithRelations | null> {
-  const row = await prismaWithTenant.message.findUnique({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor({ tenantId: input.tenantId });
+  const row = await db.message.findUnique({
     where: {
       tenantId_conversationId_clientGeneratedId: {
         tenantId: input.tenantId,
@@ -118,9 +120,11 @@ export async function sendMessage(input: SendMessageInput): Promise<{
   message: MessageWithRelations;
   created: boolean;
 }> {
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
   const ctx = getCurrentTenant();
+  const db = tenantPrismaFor(ctx);
 
-  const conv = await prismaWithTenant.conversation.findUnique({
+  const conv = await db.conversation.findUnique({
     where: { id: input.conversationId },
     select: { id: true, kind: true, archivedAt: true },
   });
@@ -129,7 +133,7 @@ export async function sendMessage(input: SendMessageInput): Promise<{
   }
 
   const senderMembership =
-    await prismaWithTenant.conversationMember.findUnique({
+    await db.conversationMember.findUnique({
       where: {
         conversationId_userId: {
           conversationId: input.conversationId,
@@ -157,7 +161,7 @@ export async function sendMessage(input: SendMessageInput): Promise<{
 
   // DIRECT 차단 검증.
   if (conv.kind === "DIRECT") {
-    const other = await prismaWithTenant.conversationMember.findFirst({
+    const other = await db.conversationMember.findFirst({
       where: {
         conversationId: input.conversationId,
         userId: { not: input.senderId },
@@ -180,7 +184,7 @@ export async function sendMessage(input: SendMessageInput): Promise<{
 
   // replyTo 검증.
   if (input.replyToId) {
-    const reply = await prismaWithTenant.message.findUnique({
+    const reply = await db.message.findUnique({
       where: { id: input.replyToId },
       select: { conversationId: true },
     });
@@ -198,7 +202,7 @@ export async function sendMessage(input: SendMessageInput): Promise<{
   // attachments 소유 검증.
   if (input.attachments && input.attachments.length > 0) {
     for (const a of input.attachments) {
-      const file = await prismaWithTenant.file.findUnique({
+      const file = await db.file.findUnique({
         where: { id: a.fileId },
         select: { ownerId: true },
       });
@@ -300,7 +304,9 @@ export async function editMessage(input: {
   editorId: string;
   newBody: string;
 }): Promise<MessageWithRelations> {
-  const msg = await prismaWithTenant.message.findUnique({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const msg = await db.message.findUnique({
     where: { id: input.messageId },
     select: {
       id: true,
@@ -322,7 +328,7 @@ export async function editMessage(input: {
     );
   }
 
-  const updated = await prismaWithTenant.message.update({
+  const updated = await db.message.update({
     where: { id: input.messageId },
     data: {
       body: input.newBody,
@@ -353,7 +359,9 @@ export async function recallMessage(input: {
   actorId: string;
   actorIsAdmin: boolean;
 }): Promise<Message> {
-  const msg = await prismaWithTenant.message.findUnique({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const msg = await db.message.findUnique({
     where: { id: input.messageId },
     select: {
       id: true,
@@ -385,7 +393,7 @@ export async function recallMessage(input: {
     deletedBy = "self";
   }
 
-  return prismaWithTenant.message.update({
+  return db.message.update({
     where: { id: input.messageId },
     data: {
       deletedAt: new Date(),
@@ -432,8 +440,10 @@ export async function listMessages(input: {
     }
   }
 
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
   // limit + 1 fetch → hasMore 판정.
-  const rows = await prismaWithTenant.message.findMany({
+  const rows = await db.message.findMany({
     where: {
       conversationId: input.conversationId,
       ...(cursorFilter ?? {}),
@@ -503,7 +513,9 @@ export async function searchMessages(input: {
     }
   }
 
-  const rows = await prismaWithTenant.message.findMany({
+  // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+  const db = tenantPrismaFor(getCurrentTenant());
+  const rows = await db.message.findMany({
     where: {
       body: { contains: input.q, mode: "insensitive" },
       deletedAt: null,

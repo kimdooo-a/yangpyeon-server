@@ -24,7 +24,8 @@
  */
 import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { withTenant, prismaWithTenant } from "@/lib/api-guard-tenant";
+import { withTenant } from "@/lib/api-guard-tenant";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 export const runtime = "nodejs";
@@ -68,7 +69,9 @@ export const GET = withTenant(async (request, _user, tenant, context) => {
     }
     const slug = parsed.data;
 
-    const item = await prismaWithTenant.contentItem.findUnique({
+    // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
+    const db = tenantPrismaFor({ tenantId: tenant.id });
+    const item = await db.contentItem.findUnique({
       where: {
         tenantId_slug: {
           tenantId: tenant.id,
@@ -95,7 +98,7 @@ export const GET = withTenant(async (request, _user, tenant, context) => {
       return errorResponse("NOT_FOUND", "콘텐츠 없음", 404);
     }
 
-    void prismaWithTenant.contentItem
+    void db.contentItem
       .update({
         where: { id: item.id },
         data: { viewCount: { increment: 1 } },

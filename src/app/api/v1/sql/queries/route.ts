@@ -2,13 +2,14 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { withRole } from "@/lib/api-guard";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 
 export const runtime = "nodejs";
 
 // 운영 콘솔 — default tenant 로 RLS bypass (ADR-023 §5 운영자 BYPASS_RLS)
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 type QueryScope = "PRIVATE" | "SHARED" | "FAVORITE";
 
@@ -41,22 +42,20 @@ export const GET = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, u
     where.OR = [{ ownerId: user.sub }, { scope: "SHARED" as QueryScope }];
   }
 
-  const rows = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
-    prismaWithTenant.sqlQuery.findMany({
-      where,
-      orderBy: { updatedAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        sql: true,
-        scope: true,
-        ownerId: true,
-        lastRunAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    })
-  );
+  const rows = await tenantPrismaFor(OPS_CTX).sqlQuery.findMany({
+    where,
+    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      sql: true,
+      scope: true,
+      ownerId: true,
+      lastRunAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
   return successResponse(rows);
 });
@@ -76,25 +75,23 @@ export const POST = withRole(["ADMIN", "MANAGER"], async (request: NextRequest, 
     return errorResponse("VALIDATION_ERROR", message, 400);
   }
 
-  const created = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
-    prismaWithTenant.sqlQuery.create({
-      data: {
-        name: parsed.data.name,
-        sql: parsed.data.sql,
-        scope: parsed.data.scope as QueryScope,
-        ownerId: user.sub,
-      },
-      select: {
-        id: true,
-        name: true,
-        sql: true,
-        scope: true,
-        ownerId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    })
-  );
+  const created = await tenantPrismaFor(OPS_CTX).sqlQuery.create({
+    data: {
+      name: parsed.data.name,
+      sql: parsed.data.sql,
+      scope: parsed.data.scope as QueryScope,
+      ownerId: user.sub,
+    },
+    select: {
+      id: true,
+      name: true,
+      sql: true,
+      scope: true,
+      ownerId: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
 
   return successResponse(created, 201);
 });

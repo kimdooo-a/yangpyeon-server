@@ -2,11 +2,12 @@ import { NextRequest } from "next/server";
 import { withRole } from "@/lib/api-guard";
 import { changeRoleSchema } from "@/lib/schemas/member";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 
 // 운영 콘솔 — default tenant 로 RLS bypass (ADR-023 §5 운영자 BYPASS_RLS)
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -32,16 +33,15 @@ export const PUT = withRole(
       return errorResponse("VALIDATION_ERROR", message, 400);
     }
 
-    const updated = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, async () => {
-      const existing = await prismaWithTenant.user.findUnique({ where: { id } });
-      if (!existing) return null;
-
-      return prismaWithTenant.user.update({
-        where: { id },
-        data: { role: parsed.data.role },
-        select: { id: true, email: true, name: true, role: true },
-      });
-    });
+    const db = tenantPrismaFor(OPS_CTX);
+    const existing = await db.user.findUnique({ where: { id } });
+    const updated = existing
+      ? await db.user.update({
+          where: { id },
+          data: { role: parsed.data.role },
+          select: { id: true, email: true, name: true, role: true },
+        })
+      : null;
 
     if (!updated) {
       return errorResponse("NOT_FOUND", "회원을 찾을 수 없습니다", 404);

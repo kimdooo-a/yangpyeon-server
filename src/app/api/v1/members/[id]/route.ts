@@ -2,11 +2,12 @@ import { NextRequest } from "next/server";
 import { withRole } from "@/lib/api-guard";
 import { updateMemberSchema } from "@/lib/schemas/member";
 import { successResponse, errorResponse } from "@/lib/api-response";
-import { runWithTenant } from "@yangpyeon/core/tenant/context";
-import { prismaWithTenant } from "@/lib/db/prisma-tenant-client";
+import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 
 // 운영 콘솔 — default tenant 로 RLS bypass (ADR-023 §5 운영자 BYPASS_RLS)
+// 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
 const DEFAULT_TENANT_UUID = "00000000-0000-0000-0000-000000000000";
+const OPS_CTX = { tenantId: DEFAULT_TENANT_UUID, bypassRls: true } as const;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -28,17 +29,16 @@ export const GET = withRole(
       created_at_text: string;
       updated_at_text: string;
     };
-    const rows = (await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, () =>
-      prismaWithTenant.$queryRaw`
-        SELECT id, email, name, phone, role, is_active,
-          (last_login_at::text) AS last_login_at_text,
-          (created_at::text)    AS created_at_text,
-          (updated_at::text)    AS updated_at_text
-        FROM users
-        WHERE id = ${id}
-        LIMIT 1
-      `
-    )) as UserRow[];
+    const db = tenantPrismaFor(OPS_CTX);
+    const rows = (await db.$queryRaw`
+      SELECT id, email, name, phone, role, is_active,
+        (last_login_at::text) AS last_login_at_text,
+        (created_at::text)    AS created_at_text,
+        (updated_at::text)    AS updated_at_text
+      FROM users
+      WHERE id = ${id}
+      LIMIT 1
+    `) as UserRow[];
     const row = rows[0];
     if (!row) {
       return errorResponse("NOT_FOUND", "회원을 찾을 수 없습니다", 404);
@@ -75,34 +75,34 @@ export const PUT = withRole(
       return errorResponse("VALIDATION_ERROR", message, 400);
     }
 
-    const row = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, async () => {
-      const existing = await prismaWithTenant.user.findUnique({ where: { id } });
-      if (!existing) return null;
-
-      await prismaWithTenant.user.update({
+    type UpdatedRow = {
+      id: string;
+      email: string;
+      name: string | null;
+      phone: string | null;
+      role: string;
+      is_active: boolean;
+      updated_at_text: string;
+    };
+    const db = tenantPrismaFor(OPS_CTX);
+    const existing = await db.user.findUnique({ where: { id } });
+    let row: UpdatedRow | null = null;
+    if (existing) {
+      await db.user.update({
         where: { id },
         data: parsed.data,
       });
 
       // 세션 43: update 직후 Date 는 raw SELECT ::text 로 재조회 (parsing-side 시프트 회피).
-      type UpdatedRow = {
-        id: string;
-        email: string;
-        name: string | null;
-        phone: string | null;
-        role: string;
-        is_active: boolean;
-        updated_at_text: string;
-      };
-      const rows = (await prismaWithTenant.$queryRaw`
+      const rows = (await db.$queryRaw`
         SELECT id, email, name, phone, role, is_active,
           (updated_at::text) AS updated_at_text
         FROM users
         WHERE id = ${id}
         LIMIT 1
       `) as UpdatedRow[];
-      return rows[0] ?? null;
-    });
+      row = rows[0] ?? null;
+    }
 
     if (!row) {
       return errorResponse("NOT_FOUND", "회원을 찾을 수 없습니다", 404);
@@ -129,20 +129,16 @@ export const DELETE = withRole(
       return errorResponse("SELF_DELETE", "자기 자신을 비활성화할 수 없습니다", 400);
     }
 
-    const found = await runWithTenant({ tenantId: DEFAULT_TENANT_UUID, bypassRls: true }, async () => {
-      const existing = await prismaWithTenant.user.findUnique({ where: { id } });
-      if (!existing) return false;
-
-      await prismaWithTenant.user.update({
-        where: { id },
-        data: { isActive: false },
-      });
-      return true;
-    });
-
-    if (!found) {
+    const db = tenantPrismaFor(OPS_CTX);
+    const existing = await db.user.findUnique({ where: { id } });
+    if (!existing) {
       return errorResponse("NOT_FOUND", "회원을 찾을 수 없습니다", 404);
     }
+
+    await db.user.update({
+      where: { id },
+      data: { isActive: false },
+    });
 
     return successResponse({ message: "회원이 비활성화되었습니다" });
   }
