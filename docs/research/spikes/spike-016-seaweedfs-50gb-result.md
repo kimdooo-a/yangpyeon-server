@@ -92,6 +92,33 @@ WSL2 환경은 공식 수치의 50~70% 수준 예상:
 - restart failure > 1건/주 → Garage (Rust, BSD-3-Clause) PoC 착수
 - 재시작 후 메타데이터 손실 발생 → 즉시 대체
 
+### 4.1 정량 Go/No-Go 임계 (실측 시 적용)
+
+| 메트릭 | Go | Conditional Go | No-Go (Garage 재평가) |
+|--------|----|----|----|
+| 50GB 업로드 throughput (filer 경유) | > 50MB/s | 30~50MB/s | < 30MB/s |
+| 50GB 적재 후 메모리 | < 1GB | 1~2GB | > 2GB |
+| SIGKILL 후 재시작 시간 | < 2분 | 2~5분 | > 5분 |
+| md5sum 무결성 (5/500 sample) | 100% | n/a | < 100% (즉시 No-Go) |
+| filer leveldb 50만 엔트리 응답 | < 100ms | 100~500ms | > 500ms |
+| B2 오프로드 1GB throughput | > 30MB/s | 10~30MB/s | < 10MB/s |
+
+### 4.2 ADR-032 (filebox R2 hybrid)와의 결정 트리거
+
+본 spike(SP-016 Storage)와 [ADR-032](../decisions/ADR-032-filebox-large-file-uploads.md)(filebox)는 **동일한 객체 스토리지 추상의 양 측면**:
+- **SP-016 영역**: Phase 17 Storage 카테고리 (사용자/콘텐츠 업로드 범용 BaaS 스토리지)
+- **ADR-032 영역**: 운영자 파일박스 (1.4GB+ 단일 파일 이송)
+
+**SeaweedFS → R2 결정 매트릭스**:
+
+| 시나리오 | 채택 |
+|---------|------|
+| 운영자 단독 / 50GB 미만 / R2 비용 < $5/월 | **R2** (ADR-032 옵션 B 유지) |
+| 외부 컨슈머 다수 / 50GB+ 누적 / R2 비용 ≥ $5/월 | **SeaweedFS** (SP-016 본격 검증 → ADR-008 ACCEPTED 후 ADR-032 옵션 E 마이그레이션) |
+| filebox(운영자) + 컨슈머 스토리지(BaaS) 분리 | **R2(filebox) + SeaweedFS(BaaS)** 병존 |
+
+**드롭인 마이그레이션 경로** (R2 → SeaweedFS): 둘 다 S3 호환 API. 코드 변경: `R2_PUBLIC_BASE_URL` env + `r2.client` → `seaweedfs.client` 교체. 객체 키 그대로 이전 가능 (rsync 또는 mc mirror).
+
 ---
 
 ## 5. 실측 세션 체크리스트 (다음 세션용)

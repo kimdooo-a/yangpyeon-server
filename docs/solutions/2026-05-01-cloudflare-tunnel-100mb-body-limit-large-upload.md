@@ -80,6 +80,10 @@ Get-Process | Where-Object { $_.Name -match "OneDrive|Dropbox|Google|sync|naver|
 
 본 세션에서는 코드 변경 0, 진단/권고만.
 
+> **세션 71 후속 (2026-05-01)**: 본 권고 4단 게이트 해소를 위한 spike + ADR 작성 완료.
+> - Spike: [`docs/research/spikes/spike-032-filebox-large-file-uploads.md`](../research/spikes/spike-032-filebox-large-file-uploads.md) — 옵션 매트릭스(A R2 단일 / B R2 multipart / C TUS / D Web Stream / E SeaweedFS) + R2 PoC 사양(4h)
+> - ADR: [`docs/research/decisions/ADR-032-filebox-large-file-uploads.md`](../research/decisions/ADR-032-filebox-large-file-uploads.md) — PROPOSED, 옵션 B 채택(V1=A 16h / V2=B 3개월 진화), local+R2 hybrid(50MB 경계). 승격 게이트 = R2 키 발급 + PoC 6항목 합격.
+
 ## 교훈
 
 - **Cloudflare Tunnel 무료/Pro 의 request body 100MB 는 hard limit** — Pro 플랜 업그레이드도 동일. Business($200/mo) = 200MB, Enterprise(영업) = 500MB. 1GB+ 는 어떤 플랜이든 단일 요청으로 못 넣음 → presigned URL + Cloudflare 우회가 필수.

@@ -77,13 +77,35 @@ type PresenceDiff = {
 - `max_slot_wal_keep_size = 2GB` 기본 설정
 - Consumer 헬스 감시 cron 1분 주기 (WAL lag 50% 도달 시 알림)
 
+### 4.1 정량 Go/No-Go 임계 (실측 시 적용)
+
+| 메트릭 | Go | Conditional Go | No-Go (Garage·Debezium 재평가) |
+|--------|----|----|----|
+| Consumer 30분 다운 시 WAL lag | < 1GB | 1~2GB (max_slot_wal_keep_size 도달 직전) | > 2GB (슬롯 invalidated) |
+| 슬롯 손상 후 recovery 시간 | < 1분 | 1~5분 | > 5분 |
+| `pg_replication_slots.wal_status` non-`reserved` 빈도 (24h) | 0회 | 1~2회 | > 2회 |
+| Consumer 메모리 누수 (10MB DML/min × 30분) | < 200MB 증가 | 200~500MB | > 500MB |
+| presence_diff RTT (서버 → 클라이언트) | < 200ms p95 | 200~500ms | > 500ms |
+
+### 4.2 ADR-032 (filebox R2)와의 관계
+
+- **독립 영역**: SP-013은 PostgreSQL → 외부 Consumer (Realtime SSE 채널) 흐름. ADR-032는 클라이언트 → R2 직접 PUT. 데이터 경로 무관.
+- **공통점**: 둘 다 "큰 데이터를 메인 Next.js 프로세스 메모리 밖으로 빼는" 패턴.
+- **연동 가능성**: Phase 19 Realtime 도입 시 filebox 업로드 이벤트도 wal2json → SSE 로 푸시 가능 (옵션 사항, ADR-032 본문에는 미포함).
+
 ---
 
 ## 5. 실측 세션 체크리스트 (다음 세션용)
 
+### 5.1 단일 실행 스크립트 (작성 예정 위치)
+
+`scripts/spikes/sp-013-wal2json-measure.sh` (미작성, 측정 트리거 시 본 spike의 §5.2 절차를 자동화). 실행 시간 ~70분 (extension 설치 5m + DML 주입 30m + Consumer 다운 30m + 무결성 5m).
+
+### 5.2 수동 절차 (자동화 스크립트 작성 전)
+
 ```bash
-# Phase 1: extension 설치 (WSL2)
-sudo apt install postgresql-16-wal2json
+# Phase 1: extension 설치 (WSL2, sudo 1회 필요)
+sudo apt install -y postgresql-16-wal2json
 sudo systemctl restart postgresql
 
 # Phase 2: GUC 설정 (postgresql.conf)
@@ -92,16 +114,30 @@ max_replication_slots = 10
 max_wal_senders = 10
 max_slot_wal_keep_size = 2GB
 
-# Phase 3: 실험 DB 생성
+# Phase 3: 실험 DB 생성 (프로덕션 DB 영향 0)
 createdb -U postgres sp013_test
 psql -U postgres -d sp013_test -c "CREATE EXTENSION wal2json;"
 
 # Phase 4: 슬롯 + Consumer (테스트 스크립트)
-# - 공유 방식 1 슬롯
-# - 분리 방식 2 슬롯
-# - 각각 30분 DML 주입
-# - Consumer 다운 시나리오 5분 단위 WAL lag 측정
+psql -U postgres -d sp013_test -c "SELECT pg_create_logical_replication_slot('sp013_slot', 'wal2json');"
+
+# Phase 5: 30분 DML 주입 (10MB/분 = 300MB total, lag 추적)
+# (별도 터미널) Consumer ON 상태에서 30분 DML
+# (별도 터미널) Consumer OFF 후 30분 DML — WAL lag 측정
+
+# Phase 6: 슬롯 손상 시뮬레이션
+sudo -u postgres pg_ctl stop -D /var/lib/postgresql/16/main -m immediate
+sudo systemctl start postgresql
+psql -U postgres -d sp013_test -c "SELECT slot_name, wal_status, active FROM pg_replication_slots;"
+
+# Phase 7: 정량 측정 결과 → §4.1 임계 매트릭스 매칭
+
+# Phase 8: 정리
+psql -U postgres -d sp013_test -c "SELECT pg_drop_replication_slot('sp013_slot');"
+dropdb -U postgres sp013_test
 ```
+
+**외부 setup 필요**: Phase 1의 `sudo apt install` 만 — Claude 자율 실행 시 sudo 비번 입력 필요. 나머지는 Claude 직접 실행 가능.
 
 ---
 
