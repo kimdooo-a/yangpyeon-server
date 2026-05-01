@@ -1,7 +1,91 @@
-# 다음 세션 프롬프트 (세션 77)
+# 다음 세션 프롬프트 (세션 78)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 77 종료)
+
+- **세션 77 핵심 (비대칭 분할 → 운영자 가치관 충돌 표면화 → 옵션 C SeaweedFS 자가호스팅 전환 결정)**:
+  1. **S77-W 배포 통과** (코드 변경 0): `/ypserver` 8단계 / PM2 ypserver pid 190213 → 192531 (restart 14→15) / ELF Linux x86-64 / curl localhost:3000 → HTTP 307×3 / 회귀 ping 7 라우트 (405×6 + 401×1) / 신규 에러 0건. **단 ALS 진짜 회귀 검증은 인증 50MB+ PUT 실측 (S78-C) 에 의존** (저널 [3] 사용자 직접 분석: "11:03~11:12 KST 의 ALS 73건 → 0건 이행은 빌드 전후 결정적이 아닌 traffic 중단 효과 가능").
+  2. **S77-B Step 2 R2 청구 알람** (운영자 적용 완료): Cloudflare Notifications UI 가 USD 가 아닌 bytes only 발견 → T1 정수 매핑 `10737418240` (10 GiB, 무료 티어 끝) 채택. 가이드 §2.1 정정 + USD↔bytes 변환표 신규 + 메모리 룰 `reference_r2_alarm_threshold.md` 등록 (T2 50GB = `53687091200` 사전 변환 포함).
+  3. **운영자 핵심 질문 → 가치관 충돌 표면화** (저널 [4]): 사용자 "왜 R2 같은 지출 서비스를 쓰게 만들었나? 내 컴퓨터, 돈 안 쓰는 자가 서버." → ADR-032 §"결정자" = 운영자 본인 (s71~72 토큰 직접 발급) 인정 + **결정 시점 가치관 충돌 점검 누락 인정**. 4 옵션 (A 유지 / B 외부 채널 / C SeaweedFS / D 보류) 제시.
+  4. **옵션 C 채택** → 새 터미널용 7 PHASE 풀 패키지 프롬프트 작성 (저널 [5]): PHASE 0 S77-A 캔슬 / 1 SP-016 50GB 정량 검증 / 2 SeaweedFS 운영 모드 / 3 R2 → SeaweedFS endpoint 교체 (~10줄, S3 API 호환) / 4 빌드+배포+인증 50MB PUT 실측 / 5 ADR-032 supersede + ADR-033 ACCEPTED + SP-016 ACCEPTED + 가이드/메모리 supersede / 6 운영자 R2 콘솔 정리 / 7 /cs.
+  5. **CK 신규**: `docs/solutions/2026-05-01-external-service-adr-value-alignment-gap.md` — 외부 서비스 도입 ADR 결정 시 운영자 가치관 점검 누락 패턴. 향후 ADR-034 부터 §"운영자 가치관 정합성 점검" 6 항목 신설 권장.
+  6. **검증**: 코드 변경 0 → tsc/build 영향 X. PM2 ypserver online (pid 192531). 회귀 ping 통과. cloudflared 5D uptime.
+  7. **세션 78 첫 작업** = S78-A (옵션 C 새 터미널 결과 통합) 또는 S78-B (본 세션 직접 진행) 또는 S78-C (인증 50MB PUT 실측) 중 선택.
+
+---
+
+## ⭐ 세션 78 추천 작업
+
+### S78-A. **옵션 C 새 터미널 결과 통합** (P0, 의존: 새 터미널 PHASE 0~7 완료)
+
+새 터미널이 SeaweedFS 마이그레이션 풀 패키지 (저널 [5] / handover 260501-session77-* §"옵션 C 새 터미널 프롬프트") 진행 중이면 본 세션은:
+
+1. 통합 검증 — 새 터미널의 ADR-033 / SP-016 ACCEPTED / supersede notes 정합성
+2. 운영자 R2 콘솔 정리 (PHASE 6) 완료 확인
+3. 전체 git push 통합 점검
+
+새 터미널 미실행 시 → S78-B.
+
+### S78-B. **옵션 C 본 세션 직접 진행** (P0 alt, ~3.5h, 새 터미널 미실행 시)
+
+저널 [5] 의 7 PHASE 를 본 세션이 직접 수행:
+
+| PHASE | 작업 | 소요 |
+|---|---|---|
+| 0 | S77-A R2_CLEANUP cron 작업 캔슬 통보 | 5분 |
+| 1 | SP-016 SeaweedFS 50GB 정량 검증 6종 임계 | ~70분 |
+| 2 | SeaweedFS 운영 모드 (filer leveldb + S3 API + PM2) | 10분 |
+| 3 | R2 → SeaweedFS endpoint 교체 (~10줄) | 45분 |
+| 4 | 빌드+배포+회귀 검증 + 인증 50MB PUT 실측 | 15분 |
+| 5 | ADR-032 supersede + ADR-033 ACCEPTED + SP-016 ACCEPTED + 가이드/메모리 supersede | 60분 |
+| 6 | 운영자 본인 R2 콘솔 정리 | 5분 |
+| 7 | /cs 의식 + push | 10분 |
+
+상세 절차: `docs/handover/260501-session77-r2-questioning-seaweedfs-pivot.md` §"토픽 5: 옵션 C 채택" + 저널 [5].
+
+### S78-C. **인증 50MB+ PUT 실측 (ALS 진짜 회귀 검증)** (P0, ~10분)
+
+S77-W 회귀 ping 의 한계 (auth gate 까지만) 보완. 옵션 C 적용 후 SeaweedFS 환경에서 인증 50MB+ PUT 으로 라우트 핸들러 진입 후 prismaWithTenant 호출 시점의 ALS 회귀 여부 결정적 검증.
+
+운영자 본인 작업: stylelucky4u.com → /filebox 로그인 → 60MB 파일 드래그 → DevTools Network 탭 + Console + PM2 로그 (`pm2 logs ypserver --lines 50 --nostream`) 동시 모니터링.
+
+### S78-D. **폰 모바일 드래그 실측** (P1, 보너스, ~5분)
+
+c7f1c39 PointerEvent 마이그레이션 검증. 폰 → /memo → 헤더 드래그 / 본문 편집 / 페이지 스크롤 owner-only 차단.
+
+### S78-E. **Almanac aggregator 비즈니스 로직** (P0 본진, ~28h)
+
+spec 의 10 모듈 multi-tenant adaptation 이식. 위치: `packages/tenant-almanac/aggregator/` (T2.5 plugin) 또는 `src/lib/aggregator/` (M3 게이트 이전 임시).
+
+cron 6종 등록 (rss-fetch / html-scrape / api-poll / classify / promote / cleanup) → 소스 5개 점진 활성화 → 24h 관찰 → 첫 카드.
+
+### S78-F. **메신저 M2-Step1** (P0 Track B, 병행 가능)
+
+`docs/research/messenger/m2-detailed-plan.md` §3 도메인 헬퍼 4개 시그니처 그대로.
+
+---
+
+## ~~세션 77 컨텍스트~~ (S77-A/B/W 흡수)
+
+### ~~S77-A.~~ **24h pending cleanup cron** ❌ **옵션 C 채택으로 SUPERSEDED 2026-05-01**
+
+SeaweedFS 자가호스팅 전환으로 R2_CLEANUP cron 자체가 무용. S78-B PHASE 0 에서 다른 터미널 진행 여부 git log 점검 + 작업 폐기.
+
+### ~~S77-W.~~ **WSL 배포 + ALS 회귀 ping** ✅ **세션 77 완료** (코드 변경 0)
+
+`/ypserver` 8단계 통과 + 회귀 ping 7 라우트 500 0건. 단 인증 50MB+ PUT 실측은 S78-C 로 이월.
+
+### ~~S77-B Step 2.~~ **R2 청구 알람** ✅ **세션 77 완료** (운영자 적용)
+
+운영자가 본인 콘솔에서 적용 완료 (`R2 $5/월 임계 알람`, threshold=`10737418240`, email=smartkdy7@). 옵션 C 채택으로 PHASE 6 에서 삭제 예정.
+
+### ~~S77-B Step 1·3·4.~~ **R2 CORS / 50MB 실측 / 폰 드래그** ❌ **옵션 C 채택으로 SUPERSEDED**
+
+R2 자체 폐기 예정 → CORS 무용. 50MB 실측은 SeaweedFS 환경 PHASE 4 진행. 폰 드래그는 S78-D 로 이월.
 
 ---
 
