@@ -1,7 +1,38 @@
-# 다음 세션 프롬프트 (세션 78)
+# 다음 세션 프롬프트 (세션 80)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 79 종료)
+
+- **세션 79 핵심 (S78-C 본진 검증 → multipart truncation 회귀 발견 → fix + 재검증)**:
+  1. **S78-C 1차 시도 (운영자 71.3MB 업로드, 20:27 KST)** — 실패. PM2 err.log: `Request body exceeded 10MB for /api/v1/filebox/files/upload-multipart/part?...&partNumber={1,2}` 두 건. multipart 4 라우트 (s78 commit `963eba5`) 가 인증 후 진입 자체는 성공했으나 part 가 10MB 로 truncate 되어 SeaweedFS UploadPart 실패.
+  2. **회귀 진단** — Next.js 16 standalone router-server proxy 가 모든 request 에 `cloneBodyStream(default 10MB)` attach. middleware/proxy layer 의 `finalize()` 가 truncated PassThrough 로 원본 request body 를 replace → route handler 의 `request.arrayBuffer()` 가 잘린 데이터 수신. 위치: `node_modules/next/dist/server/body-streams.js:73,85` + `next-server.js:1274` (`experimental.proxyClientMaxBodySize` 미설정 시 default 적용).
+  3. **fix 적용** (commit `fd4d666`, +6/-0): `next.config.ts` 에 `experimental.proxyClientMaxBodySize: '100mb'` 추가 (route MAX_PART_SIZE 동일값). 신규 권장 setting 이름; deprecated alias `middlewareClientMaxBodySize` (warning 메시지 링크) 는 둘 다 set 시 throw.
+  4. **WSL 빌드 + 배포 + PM2 재시작** — pid 210927 → 213048, ELF Linux x86-64, 마이그레이션 0건, 스키마 검증 PASS, 부팅 정상 (20:33:56).
+  5. **S78-C 2차 시도 (운영자 동일 71.3MB 재업로드, 20:39 KST)** — **PASS**. DB `files.size = 74,724,323 bytes` (71.265 MB, client 원본 기록), SeaweedFS `yangpyeon-filebox_8.dat = 74,724,808 bytes` (volume header 485B 포함). `original_name = '260117 heath-infer-step01.zip'`, `created_at = 2026-05-01 11:39:23.499+09 (KST 20:39:23)`. multipart 4 라우트 (init→part×2→complete) + ADR-033 X1 server proxy 가 본격 production 트래픽에서 정상 작동.
+  6. **새 memory 등록** — `reference_nextjs_proxy_body_limit.md`. Next.js 16 standalone proxyClientMaxBodySize 함정 메커니즘 + 처리 + setting 이름 변천 + 검증 임계.
+  7. **검증 패턴 실증** — s77 직후 등록된 `feedback_verification_scope_depth.md` (auth-gate ping ≠ actual flow 검증) 가 정확히 한 세션 만에 실증. 동일 함정 4-step 패턴 (기능 X 추가 → X 자체 정확 → 빌드/번들/런타임 layer 가 silently 변형 → 표면 응답만 검증) 발견됨. 방어책 = "데이터 보존 검증" (응답 status 가 아니라 client byte 가 server 까지 도달했는지 비교).
+  8. **세션 80 첫 작업** = S78-H multipart cleanup cron (P1, ~30분, abandoned upload 회수) 또는 S78-E Almanac aggregator 비즈니스 로직 (P0 본진, ~28h) 또는 S78-D 폰 모바일 드래그 실측 (P1 보너스, ~5분) 중 선택.
+
+---
+
+## ⭐ 세션 80 첫 작업 우선순위 (세션 79 종료 시점, 2026-05-01)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 |
+|---|------|------|------|----------|
+| **S78-E** | Almanac aggregator 비즈니스 로직 (spec 10 모듈 multi-tenant 이식) | **P0 본진** | ~28h | filebox 안정화 후 본격 진행 |
+| S78-H | multipart cleanup cron (`s3.clean.uploads -timeAgo=24h` 주 1회) | P1 | ~30분 | abandoned upload 회수, s78 1차 시도 부산물 포함 |
+| S78-D | 폰 모바일 드래그 실측 (c7f1c39 PointerEvent) | P1 | ~5분 | 보너스 |
+| S78-I | filer leveldb 전환 | P2 | ~30분 | 50만 entry 도달 시만 |
+| S78-J | PM2 startup 자동화 | P2 | 운영자 결정 | "내 컴퓨터" 정합성 영향 별개 |
+| S78-F | 메신저 M2-Step1 도메인 헬퍼 4개 | P0 Track B | ~ | S78-E 와 병행 가능 |
+
+### S78-C ✅ 완료 — 결정적 회귀 검증 통과
+
+71.3MB 업로드 PASS. multipart upload 의 architectural 계층 (s78 → s79) 모두 검증 완료. 동일 패턴 (폰/태블릿/큰 파일/ZIP/MP4 등) 으로 추가 실측 시 회귀 가능성 매우 낮음.
 
 ---
 
@@ -18,31 +49,11 @@
 
 ---
 
-## ⭐ 세션 79 첫 작업 우선순위 (세션 78 종료 시점, 2026-05-01)
+## 세션 78~79 추천 작업 (이미 처리)
 
-| # | 작업 | 우선 | 소요 | 차단 사항 |
-|---|------|------|------|----------|
-| **S78-C** | 인증 50MB+ PUT 실측 (운영자 본인 60MB 파일 → /filebox 드래그) | **P0** | ~10분 | C1 + S78-G 두 머지 후 결정적 회귀 검증 — 아무것도 검증 안 됨 (auth-gate 까지) |
-| S78-H | multipart cleanup cron (`s3.clean.uploads -timeAgo=24h` 주 1회) | P1 | ~30분 | S78-C 통과 후 |
-| S78-I | filer leveldb 전환 | P2 | ~30분 | 50만 entry 도달 시만 |
-| S78-J | PM2 startup 자동화 | P2 | 운영자 결정 | "내 컴퓨터" 정합성 영향 |
-| (다른 트랙) S78-D | 폰 모바일 드래그 실측 (c7f1c39) | P1 | ~5분 | 보너스 |
-| (본진) S78-E | Almanac aggregator 비즈니스 로직 (~28h) | P0 | ~28h | spec 10 모듈 multi-tenant 이식 |
+### ~~S78-C.~~ **인증 50MB+ PUT 실측 (ALS + multipart 결정적 회귀 검증)** ✅ **완료 2026-05-01 세션 79** (commit `fd4d666`)
 
-### ⚠️ S78-C 가 미실행 시 — 다음 머지 직전까지 회귀 회수 X
-
-S78-A (X1 server proxy multipart) + s77 C1 (SeaweedFS endpoint 교체) 모두 auth-gate 회귀 ping 까지만 자동 검증. 인증 핸들러 진입 후 prismaWithTenant 호출 + multipart 50MB part PUT 흐름 = **운영자 본인 브라우저 1회 60MB 업로드** 가 결정적 검증.
-
-운영자 본인 작업 (10분):
-1. `wsl -- bash -lic 'pm2 logs ypserver --lines 50 --nostream'` 띄워두기
-2. https://stylelucky4u.com/filebox 로그인 → 60MB 파일 1개 드래그
-3. DevTools Network 탭에서:
-   - upload-multipart/init → 200 (uploadId, key, partSize=52428800, partCount=2)
-   - upload-multipart/part?partNumber=1 → 200 (etag) + part 2 → 200 (etag) — 동시 또는 순차
-   - upload-multipart/complete → 201 (file metadata)
-4. PM2 로그 검사:
-   - "Tenant context missing" 0건 = ALS 회귀 없음 ✅
-   - 발견 시 = T1.5 마이그레이션 후속 patch 필요
+운영자 본인 71.3MB ZIP 업로드 → 1차 실패 (10MB body truncation) → fix → 2차 PASS. DB files.size 74,724,323 + SeaweedFS yangpyeon-filebox_8.dat 74,724,808. 상세 = 세션 79 §1~7.
 
 ---
 
@@ -112,11 +123,7 @@ WSL2 자체 crash 후 수동 `pm2 resurrect` 부담 — `pm2 startup` 적용 시
 
 상세 절차: `docs/handover/260501-session77-r2-questioning-seaweedfs-pivot.md` §"토픽 5: 옵션 C 채택" + 저널 [5].
 
-### S78-C. **인증 50MB+ PUT 실측 (ALS 진짜 회귀 검증)** (P0, ~10분)
-
-S77-W 회귀 ping 의 한계 (auth gate 까지만) 보완. 옵션 C 적용 후 SeaweedFS 환경에서 인증 50MB+ PUT 으로 라우트 핸들러 진입 후 prismaWithTenant 호출 시점의 ALS 회귀 여부 결정적 검증.
-
-운영자 본인 작업: stylelucky4u.com → /filebox 로그인 → 60MB 파일 드래그 → DevTools Network 탭 + Console + PM2 로그 (`pm2 logs ypserver --lines 50 --nostream`) 동시 모니터링.
+### ~~S78-C (구).~~ **인증 50MB+ PUT 실측** ✅ **세션 79 완료** (위 §S78-C 참조)
 
 ### S78-D. **폰 모바일 드래그 실측** (P1, 보너스, ~5분)
 
