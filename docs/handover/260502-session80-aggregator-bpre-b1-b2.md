@@ -1,13 +1,14 @@
-# 인수인계서 — 세션 80 (Track B Aggregator B-pre + B1 + B2)
+# 인수인계서 — 세션 80 (Track B Aggregator B-pre + B1 + B2 + B3)
 
-> 작성일: 2026-05-02
+> 작성일: 2026-05-02 (B-pre+B1+B2 1차 작성, B3 후기 동일일 추가)
 > 이전 세션: [session79](./260501-session79-multipart-body-truncation-fix.md)
+> ⚠️ **본 인수인계서는 2회 작성됨**: 다른 터미널이 b46918c 로 1차 /cs 처리 후, 같은 세션 80 에서 B3 (e74f3ef) 가 추가됨. 본 파일 끝 `## 후기 — 동일 세션 B3 추가` 섹션 참조.
 
 ---
 
 ## 작업 요약
 
-Track B (Almanac aggregator P0 본진, ~28h) 첫 진입. wave 진행도 plan 작성 → 베이스라인 검증으로 plan 가정 3건 정정 → s79 leftover 회복 2 commit + B-pre + B1 + B2 = 총 5 commit. spec dedupe.ts 의 multi-value bug 1건 TDD 로 발견 + fix.
+Track B (Almanac aggregator P0 본진, ~28h) 첫 진입. wave 진행도 plan 작성 → 베이스라인 검증으로 plan 가정 3건 정정 → s79 leftover 회복 2 commit + B-pre + B1 + B2 = **소계 5 commit (b46918c /cs 의식 포함 6 commit)**. 동일 세션에 **B3 (classify.ts port + TDD 40 케이스, e74f3ef) 추가** = 총 **7 commits / +2,835 LOC**. spec port-time bug 2건 TDD 로 발견 + fix (dedupe multi-value, classify 한글 \\b boundary).
 
 ## 대화 다이제스트
 
@@ -238,6 +239,90 @@ DB 시드 (`prisma/seeds/almanac-aggregator-categories.sql`) 37 슬러그 ↔ sp
 ### 회복 (s79 leftover)
 - `docs/logs/journal-2026-05-01.md` (+188)
 - `docs/logs/2026-05.md` (+55)
+
+---
+
+## 후기 — 동일 세션 B3 추가 (e74f3ef)
+
+> b46918c "/cs 의식" (다른 터미널) 처리 후 같은 세션 80 안에서 B3 (classify.ts port) 가 추가됨. 본 섹션이 정합화 후기.
+
+### 토픽 6: B3 진입 — classify.ts port (TDD 40 + 한글 \\b boundary spec bug 차단)
+
+> **사용자**: "b3 진행"
+
+본 인수인계서가 1차 작성된 직후, 같은 conversation 에서 사용자가 B3 작업을 즉시 지시. 메모리 룰 `feedback_concurrent_terminal_overlap` 적용 — `git log --oneline -5` 점검 시 HEAD=`b46918c` (다른 터미널이 작성한 next-dev-prompt 가 "B3 = 세션 81 첫 작업" 으로 표시 중). 같은 세션에서 B3 진행하기로 결정 (작업 단위는 이미 plan 에 명시되어 있고 ~3h 추정으로 적당).
+
+**B3-1 (RED, TDD 40 케이스 작성)**:
+- `tests/aggregator/classify.test.ts` 신규 (40 케이스 9 그룹):
+  - A. getAvailableCategorySlugs DB 시드 37 슬러그 정합 (5)
+  - B. classifyItem 트랙 매처 (10)
+  - C. 서브카테고리 build 7 (8 — rag-agents 병합 2건 포함)
+  - D. work 6 (3) / E. hustle 6 (2) / F. invest 6 (3) / G. learn 6 (3) / H. community 6 (3)
+  - I. 한국어 + matched 배열 (3)
+- 한글 케이스 12개 강제 포함 (test 18/22/25/26/27/28/30/31/33/34/36/37/38).
+- 1차 RED: classify.ts 미존재 → import 실패 (기대대로 RED).
+
+**B3-2 (GREEN, classify.ts port + 41 항목 매핑 변경)**:
+
+`src/lib/aggregator/classify.ts` 신규 (308 LOC, spec 317 LOC).
+
+DB 시드 매핑 적용 (`slug-mapping-db-vs-spec.md` 기준, **41 항목 변경**):
+- **drop 14**: marketing-growth, automation, model-releases, fine-tuning, ai-safety, benchmarks, valuation, earnings, courses, guides, case-studies, explainers, meetups, open-positions
+- **단/복수 정정 7**: side-project, indie-hacker, tutorial, deep-dive, conference, hackathon, layoff-restructure
+- **의미 정정 7**: saas-bootstrap (← saas-business), productivity (← productivity-tools), team-ops (← team-collaboration), ai-workflow (← ai-at-work), knowledge-mgmt (← knowledge-management), infrastructure (← ai-infrastructure), funding (← ai-funding), paper-summary (← research-papers)
+- **병합 3**: rag-agents (rag-vector + agents 통합), public-markets (← earnings 흡수), layoff-restructure (← layoffs 정정 + 정리해고/구조조정 병합)
+- **DB 신규 11**: no-code, remote-work, korean-tech, data-science, system-design, career-growth, discussion, korean-community, macro-economy, market-analysis, research-paper
+
+**한글 \\b boundary spec bug 차단** (B2 multi-value bug 자매):
+
+spec 의 `compilePattern` 이 `\\b` 사용. JS 의 `\\b` 는 `\\w` (=[A-Za-z0-9_]) 전용 ASCII boundary. 가-힣 음절은 non-word 로 취급되어 한글 키워드 양쪽 boundary 가 잡히지 않음 → spec 의 모든 한글 키워드 (TRACK_RULES 6+ + 서브카테고리 매처 다수) 가 production 에서 매치되지 않을 silent regression.
+
+**fix**: `compilePattern` 을 lookbehind/lookahead 로 교체 — `(?<![\\w가-힣])(?:키워드)(?![\\w가-힣])`. ASCII/한글 통합 word-class 정의. 한글 12개 케이스 강제로 검증.
+
+**iteration order 결정**: 한글 fix 적용 시 '인프라' 같은 일반 한글 키워드가 양쪽 매처(korean-tech, infrastructure)에 동시 노출. first-match-wins 룰에서 한국 회사명 텍스트가 한국 매처를 우선 채택하도록 build 트랙 SUBCATEGORY 순서를 `open-source-llm → ai-companies → korean-tech → infrastructure → rag-agents → devtools → research-paper` 로 결정. test 22 ("네이버 카카오 AI 모델 출시 / 라인 우아한 인프라" → korean-tech) 가 강제 검증.
+
+**B3-3 (검증 + commit)**:
+- `npx tsc --noEmit` exit 0
+- `npx vitest run tests/aggregator/classify.test.ts` 40/40 PASS
+- `npx vitest run` (전체) **437/497 pass** (B2 397 + B3 40, 회귀 0)
+- `b46918c` 다른 터미널 commit 의 산출물 (docs only) 과 충돌 0 — B3 코드 (classify.ts/.test.ts) 는 신규 코드 2 파일
+
+**Commit**: `e74f3ef feat(aggregator): port classify with DB slug mapping (TDD 40, B3)` — 769 insertions (308 + 461 LOC).
+
+### 토픽 7: /cs 정합화
+
+본 인수인계서 + 다른 터미널이 작성한 6 파일 (`current.md` row 80, `logs/2026-05.md` s80 entry, `journal-2026-05-02.md`, `next-dev-prompt.md`, `_index.md`, `2026-05-02-spec-port-tdd-multivalue-bug.md`) 모두 "B-pre+B1+B2 만 완료" 가정으로 작성됨. B3 추가에 따라 ~7 파일 갱신 필요:
+- 본 파일 (## 후기 섹션 — 본 섹션)
+- `docs/logs/journal-2026-05-02.md` 끝에 [7]/[8] entry append
+- `docs/logs/2026-05.md` s80 entry 갱신 (5 commits → 6 commits, 검증 결과 397→437, 토픽 6/7/8 추가)
+- `docs/status/current.md` row 80 정정 (5 commits → 6 commits)
+- `docs/handover/_index.md` row 80 정정
+- `docs/handover/next-dev-prompt.md` (B3 ✅ 완료 마킹, B4 가 세션 81 첫 작업으로 승격)
+- `docs/solutions/2026-05-02-classify-korean-boundary-spec-bug.md` (CK 신규, B3 한글 boundary fix)
+
+## 후기 의사결정 (B3)
+
+| # | 결정 | 검토한 대안 | 선택 이유 |
+|---|------|-------------|----------|
+| 8 | spec `\\b` boundary → lookbehind/lookahead 로 교체 | A. spec 그대로 + 한글 keywords drop / B. spec 그대로 + 한글 keywords 만 별도 regex / C. lookbehind+lookahead `[\\w가-힣]` (선택) | 한글 keywords 보존 + ASCII keywords 동작 동일 + Node 24 lookbehind 지원 + 매처 코드 단일 (분기 0). 메모리 룰 `feedback_baseline_check_before_swarm` 정신 (한글 케이스가 spec 검증 범위 밖일 가능성을 사전 탐지). |
+| 9 | SUBCATEGORY_RULES build 순서 = `... korean-tech → infrastructure ...` | A. 알파벳 순 / B. 추가 순서 / C. 일반→특수 / D. 특수→일반 (선택) | 한글 fix 부수효과 회피. '인프라' 같은 일반 한글 키워드가 양쪽 매처에 노출될 때 한국 회사명 우선 채택. test 22 가 강제 검증. |
+| 10 | 같은 세션에서 B3 진행 (다른 터미널 /cs 후) | A. 세션 81 로 연기 / B. 같은 세션 진행 + 후기 정합화 (선택) | B3 작업 단위 명확 (~3h plan), 사용자 명시 지시 ("b3 진행"). 정합화 비용 (~7 파일) 감수. 메모리 룰 `feedback_concurrent_terminal_overlap` 후속 강화 사례. |
+
+## 후기 검증 결과 (B3)
+
+- `npx tsc --noEmit` exit 0
+- `npx vitest run tests/aggregator/classify.test.ts` — 40/40 PASS
+- `npx vitest run` (전체) — 437/497 pass (60 skip env-gated DB), B2 397 + B3 40 = 437, 회귀 0
+- git status clean (의도된 untracked + .claude/settings.json drift 제외)
+- `b46918c` 다른 터미널 commit 과 파일 충돌 0
+
+## 후기 다음 작업 제안 (B3 완료 → B4 우선)
+
+**세션 81 첫 작업** = **B4 4 fetchers port** (rss/html/api/firecrawl, ~5h, P0 다음).
+- spec `src/lib/aggregator/{rss,html,api,firecrawl}-fetcher.ts` 4 파일 이식
+- nock/msw mock 패턴 (외부 HTTP 호출 격리)
+- TDD ~30 케이스 (fetcher 별 7~8 케이스: happy path / 빈 응답 / 잘못된 형식 / 인코딩 / 타임아웃 / 한글 title)
+- 한글 fix 후속 효과: fetcher 측 source title/summary 한글 처리도 자동 정상 (classify 가 매치하므로)
 
 ---
 [← handover/_index.md](./_index.md)
