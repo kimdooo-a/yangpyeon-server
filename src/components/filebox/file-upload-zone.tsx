@@ -7,11 +7,122 @@ export interface FileUploadZoneProps {
   onUploadComplete: () => void;
 }
 
+// 임계점: 50MB 이하 = 로컬 multipart POST, 초과 = R2 presigned PUT (ADR-032 V1).
+// 서버 validateFile() 의 MAX_FILE_SIZE (50MB) 와 동일 — 일치 유지 필수.
+const LOCAL_THRESHOLD = 50 * 1024 * 1024;
+// R2 최대 5GB (서버 MAX_R2_FILE_SIZE 와 일치)
+const R2_MAX_SIZE = 5 * 1024 * 1024 * 1024;
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
+
+// 로컬 multipart 업로드 (XHR — 진행률 추적용)
+function uploadLocal(
+  file: File,
+  folderId: string | undefined,
+  onProgress: (pct: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/v1/filebox/files");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        let msg = `상태 ${xhr.status}`;
+        try {
+          const body = JSON.parse(xhr.responseText);
+          if (body?.error?.message) msg = body.error.message;
+        } catch { /* JSON 아님 */ }
+        reject(new Error(msg));
+      }
+    };
+    xhr.onerror = () => reject(new Error("네트워크 오류"));
+    const fd = new FormData();
+    fd.append("file", file);
+    if (folderId) fd.append("folderId", folderId);
+    xhr.send(fd);
+  });
+}
+
+// R2 직업로드 (presigned URL 발급 → R2 PUT → confirm)
+async function uploadR2(
+  file: File,
+  folderId: string | undefined,
+  onProgress: (pct: number) => void,
+): Promise<void> {
+  // mime 빈 문자열 fallback — presigned 발급/PUT 모두 동일하게 사용해야 서명 일치
+  const mimeType = file.type || "application/octet-stream";
+
+  // 1. presigned URL 발급
+  const presignRes = await fetch("/api/v1/filebox/files/r2-presigned", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file.name,
+      fileSize: file.size,
+      mimeType,
+      ...(folderId ? { folderId } : {}),
+    }),
+  });
+  if (!presignRes.ok) {
+    const body = await presignRes.json().catch(() => ({}));
+    throw new Error(body?.error?.message || "presigned URL 발급 실패");
+  }
+  const { data: presignData } = await presignRes.json();
+  const { key, uploadUrl, folderId: resolvedFolderId } = presignData;
+
+  // 2. R2 PUT (브라우저가 R2 endpoint 로 직접 전송 — Cloudflare Tunnel 우회)
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", mimeType);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject(new Error(`R2 PUT 실패 (HTTP ${xhr.status}). CORS 설정을 확인하세요.`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("R2 네트워크 오류 (CORS 또는 네트워크 차단)"));
+    xhr.send(file);
+  });
+
+  // 3. confirm — DB row 생성
+  const confirmRes = await fetch("/api/v1/filebox/files/r2-confirm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      key,
+      originalName: file.name,
+      size: file.size,
+      mimeType,
+      folderId: resolvedFolderId,
+    }),
+  });
+  if (!confirmRes.ok) {
+    const body = await confirmRes.json().catch(() => ({}));
+    throw new Error(body?.error?.message || "R2 등록 확인 실패");
+  }
+}
+
 export function FileUploadZone({ folderId, onUploadComplete }: FileUploadZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState("");
+  const [progressPct, setProgressPct] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const upload = useCallback(async (files: FileList | null) => {
@@ -24,30 +135,30 @@ export function FileUploadZone({ folderId, onUploadComplete }: FileUploadZonePro
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      setProgress(`${file.name} 업로드 중... (${i + 1}/${files.length})`);
-
-      const formData = new FormData();
-      formData.append("file", file);
-      if (folderId) formData.append("folderId", folderId);
+      const route = file.size > LOCAL_THRESHOLD ? "R2" : "로컬";
+      setProgress(`${file.name} 업로드 중 (${i + 1}/${files.length}) · ${route} · ${formatBytes(file.size)}`);
+      setProgressPct(0);
 
       try {
-        const res = await fetch("/api/v1/filebox/files", {
-          method: "POST",
-          body: formData,
-        });
-        if (!res.ok) {
-          const data = await res.json();
-          lastError = data.error?.message || `${file.name} 업로드 실패`;
-        } else {
-          successCount++;
+        if (file.size > R2_MAX_SIZE) {
+          throw new Error(`파일 크기 초과 — 최대 5GB`);
         }
-      } catch {
-        lastError = `${file.name} 업로드 중 오류 발생`;
+        if (file.size > LOCAL_THRESHOLD) {
+          await uploadR2(file, folderId, (p) => setProgressPct(p));
+        } else {
+          await uploadLocal(file, folderId, (p) => setProgressPct(p));
+        }
+        successCount++;
+      } catch (err) {
+        lastError = err instanceof Error
+          ? `${file.name}: ${err.message}`
+          : `${file.name} 업로드 실패`;
       }
     }
 
     setUploading(false);
     setProgress("");
+    setProgressPct(0);
 
     if (successCount > 0) onUploadComplete();
     if (lastError) setError(lastError);
@@ -87,9 +198,13 @@ export function FileUploadZone({ folderId, onUploadComplete }: FileUploadZonePro
       {uploading ? (
         <div>
           <p className="text-gray-700 text-sm font-medium">{progress}</p>
-          <div className="mt-2 h-1 w-48 mx-auto bg-surface-300 rounded-full overflow-hidden">
-            <div className="h-full bg-brand rounded-full animate-pulse" style={{ width: "60%" }} />
+          <div className="mt-2 h-1.5 w-64 mx-auto bg-surface-300 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-brand rounded-full transition-all duration-150"
+              style={{ width: `${progressPct}%` }}
+            />
           </div>
+          <p className="text-gray-500 text-xs mt-1">{progressPct}%</p>
         </div>
       ) : (
         <div className="flex items-center justify-center gap-3">
@@ -102,12 +217,14 @@ export function FileUploadZone({ folderId, onUploadComplete }: FileUploadZonePro
             <p className="text-gray-700 text-sm">
               {isDragOver ? "여기에 놓으세요" : "파일을 드래그하거나 클릭하여 업로드"}
             </p>
-            <p className="text-gray-400 text-xs mt-0.5">PDF, 이미지, 문서, ZIP 등 · 최대 50MB</p>
+            <p className="text-gray-400 text-xs mt-0.5">
+              50MB 이하 로컬 · 50MB~5GB R2 자동 분기 · 실행 파일 차단
+            </p>
           </div>
         </div>
       )}
 
-      {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
+      {error && <p className="text-red-600 text-sm mt-2 break-all">{error}</p>}
     </div>
   );
 }

@@ -112,13 +112,23 @@ export async function headR2Object(key: string): Promise<{
   }
 }
 
-// ── 다운로드용 GET URL (Phase 1.1, 다운로드 라우트에서 사용 예정) ─
-// 본 V1에서는 발급만 가능 (실제 다운로드 라우트는 별도 PR에서)
-export async function presignR2GetUrl(key: string, expiresInSec = 600): Promise<string> {
+// ── 다운로드용 GET URL ─
+// responseContentDisposition: 한국어 파일명 보존용 RFC 5987 attachment 헤더
+//   (R2/S3 가 응답 시 Content-Disposition 으로 그대로 set 함)
+export async function presignR2GetUrl(
+  key: string,
+  expiresInSec = 600,
+  opts?: { responseContentDisposition?: string },
+): Promise<string> {
   const client = getR2Client();
-  // GET 은 표준 S3 GetObjectCommand 사용 — 추가 import 발생 시 본 모듈에 추가
   const { GetObjectCommand } = await import("@aws-sdk/client-s3");
-  const command = new GetObjectCommand({ Bucket: R2_BUCKET!, Key: key });
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET!,
+    Key: key,
+    ...(opts?.responseContentDisposition
+      ? { ResponseContentDisposition: opts.responseContentDisposition }
+      : {}),
+  });
   return getSignedUrl(client, command, { expiresIn: expiresInSec });
 }
 

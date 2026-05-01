@@ -1,7 +1,16 @@
-# 다음 세션 프롬프트 (세션 73)
+# 다음 세션 프롬프트 (세션 74)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 73 종료)
+
+- **세션 73 핵심**: 세션 72 백엔드 위에 **UI 50MB 분기 + XHR 진행률 + 다운로드 302 redirect** 적용 완료. 코드는 운영 검증 가능 상태. 단 **R2 콘솔 CORS 1회 작업 보류** — 현 토큰이 Object Read/Write 한정, bucket-level 정책 변경 시 AccessDenied(403). 콘솔 작업 또는 admin 토큰 발급 필요.
+  1. **변경 5건**: `src/components/filebox/file-upload-zone.tsx` (50MB 분기 + XHR 진행률 + 5GB cap) / `src/lib/filebox-db.ts` (getFileForDownload R2 분기 + deleteFile R2 분기 — R2 객체 잔존 TODO) / `src/lib/r2.ts` (presignR2GetUrl `responseContentDisposition` 옵션) / `src/app/api/v1/filebox/files/[id]/route.ts` (storageType='r2' 시 302 redirect) / `scripts/r2-cors-apply.mjs` (admin 토큰 발급 후 사용 가능).
+  2. **세션 74 첫 작업** = 운영자 R2 콘솔 CORS 적용(아래 §S74-A 1단계, 3분) + 50MB+ 브라우저 PUT 실측(5분).
+  3. **R2 객체 잔존 부채**: deleteFile 가 R2 파일은 DB row 만 삭제. deleteR2Object 추가 + 24h cleanup cron(미등록 객체 회수)이 다음 PR.
 
 ---
 
@@ -69,38 +78,51 @@ npm run dev
 
 ---
 
-## ⭐ 세션 73 추천 작업
+## ⭐ 세션 74 추천 작업
 
-### S73-A. **R2 V1 후속 — 다운로드 + UI + CORS 실측** (P0, ~6h)
+### S74-A. **R2 콘솔 CORS 적용 + 브라우저 실측** (P0, ~10분 + 검증 5분)
 
-S72에서 V1 백엔드 라우트(`r2-presigned` / `r2-confirm`)만 살아있음. 사용자 시나리오 완결 위해:
-1. **다운로드 라우트** `GET /api/v1/filebox/files/[id]/download`:
-   - `prisma.file.findUnique({id})` → `storageType==='r2'` 분기
-   - `presignR2GetUrl(file.storedName, 600)` (10분 유효) → 302 redirect 또는 JSON
-   - 권한 검증: 폴더 소유권 + 공유 정책 (기존 local 라우트 패턴 답습)
-2. **UI 50MB 분기** `src/app/(protected)/filebox/page.tsx`:
-   - 50MB 초과 → R2 경로: presigned 발급 → fetch PUT → confirm 호출 → row 갱신
-   - 50MB 이하 → local 경로 (기존 유지)
-   - 진행률 표시 (XHR upload progress event 또는 Streams API)
-3. **50MB 이하 local 경로 회귀 테스트** (vitest 또는 curl)
-4. **CORS 브라우저 PUT 실측** (Chrome 50MB+ 업로드):
-   - 차단 시 R2 버킷 CORS 정책 추가 (Cloudflare 대시보드 → 버킷 Settings → CORS)
-   - `AllowedOrigins: https://stylelucky4u.com`, `AllowedMethods: PUT,GET,HEAD`
-5. **24h pending 객체 회수 cron** (선택, S73-C 와 묶음): 발급 후 confirm 안 된 R2 객체 cleanup
+세션 73 종료 시점 R2 백엔드/UI/다운로드 모두 코드 완료. 마지막 1마일 = R2 버킷 CORS 정책 적용.
 
-### S73-B. **`wsl-build-deploy.sh` `.env` 보호 패치** (P1, ~10분)
+1. **콘솔 1회 작업** (운영자 본인, 3분):
+   - https://dash.cloudflare.com → R2 → `yangpyeon-filebox-prod` → Settings → CORS Policy
+   - Add CORS policy → JSON paste → Save:
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://stylelucky4u.com", "http://localhost:3000"],
+       "AllowedMethods": ["PUT", "GET", "HEAD"],
+       "AllowedHeaders": ["*"],
+       "ExposeHeaders": ["ETag"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+   - 또는 admin 권한 R2 토큰 발급 → `node scripts/r2-cors-apply.mjs` 실행으로 자동화
+2. **브라우저 실측** (5분):
+   - https://stylelucky4u.com/filebox 로그인 → 60MB 파일 드래그 → "R2" 표기 + 진행률 % 갱신 → 업로드 완료 → 목록 등장
+   - 다운로드 클릭 → Network 탭에서 302 redirect → R2 endpoint 직접 응답 확인
+3. **실패 시 디버깅 순서**:
+   - (a) Browser Console "CORS error" → CORS 정책 불일치 (origins 또는 headers)
+   - (b) HTTP 403 + signature mismatch → Content-Type 헤더 불일치 (presign vs PUT)
+   - (c) HTTP 400 expired → presigned URL 만료 (300초)
 
-S72에서 발견한 함정 근본 fix. [1/8] rsync에 `--exclude '/.env'` 추가:
+### S74-B. **R2 객체 cleanup 부채 정리** (P1, ~3h, 같은 PR 권고)
 
-```diff
- rsync -a --delete \
-+  --exclude '/.env' \
-   --exclude 'node_modules/' \
-   ...
-   "$REPO_WIN_PATH/" "$WSL_BUILD_DIR/"
-```
+세션 73에서 deleteFile 이 R2 파일은 DB row 만 삭제 (TODO 주석 명시).
 
-**검증**: 패치 후 R2 키 추가 → `wsl-build-deploy.sh` 1회 실행 → build측 .env에 R2 키 유지 확인. **메모리 룰** `feedback_env_propagation.md`는 그대로 유지(windows측 truth source 정책 일관성).
+1. **deleteR2Object(key) 추가** (`src/lib/r2.ts`): `DeleteObjectCommand` 호출, NotFound 200(이미 없음) 처리.
+2. **filebox-db.deleteFile 분기 보강**: storageType='r2' 시 `await deleteR2Object(file.storedName)` (DB delete 후 best-effort, 실패해도 row 는 이미 사라짐).
+3. **24h pending cleanup cron** (선택): R2 객체 listObjectsV2 → 24h+ 미참조(DB file row 미존재) 객체 deleteObject. cron 등록 위치는 `src/lib/cron/runner.ts`.
+4. **검증**: 50MB+ 파일 업로드 → 삭제 → R2 콘솔에서 객체 사라짐 확인.
+
+### ~~S73-A.~~ **R2 V1 후속 — 다운로드 + UI 분기** ✅ **세션 73 완료**
+
+S73-A line 1 (다운로드 라우트 storageType='r2' 분기) + line 2 (UI 50MB 분기 + XHR 진행률) + 다운로드 시 R2 redirect + 한국어 파일명 ResponseContentDisposition 모두 적용 commit 대기. line 4 (CORS) 만 S74-A로 남음.
+
+### ~~S73-B.~~ **`wsl-build-deploy.sh` `.env` 보호 패치** ✅ **이미 적용됨**
+
+[1/8] rsync에 `--exclude '/.env'` 추가 + `/data/`, `/logs/` leading `/` 앵커링 보강 모두 본 워킹트리에 적용된 상태(S73 진입 시 미커밋 상태로 발견 → 본 세션 commit에 포함). 검증은 다음 빌드 1회 실행 시 자동.
 
 ### S73-C. **24h cleanup cron — pending R2 객체 회수** (P1, ~3h)
 

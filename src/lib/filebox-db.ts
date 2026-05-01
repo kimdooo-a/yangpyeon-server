@@ -290,10 +290,16 @@ export async function uploadFile(file: File, folderId: string, userId: string, r
 }
 
 // 파일 다운로드 경로 조회
+// R2 파일은 filePath=null 로 반환 — 라우트에서 storageType 분기 후 presigned GET URL 로 redirect
 export async function getFileForDownload(fileId: string, userId: string, isAdmin: boolean) {
   const file = await prisma.file.findUnique({ where: { id: fileId } });
   if (!file) return null;
   if (!isAdmin && file.ownerId !== userId) return null;
+
+  // R2 파일: 로컬 파일시스템 검사 skip — 라우트가 presigned GET URL 로 302 redirect
+  if (file.storageType === "r2") {
+    return { filePath: null as string | null, metadata: file };
+  }
 
   const filePath = path.resolve(path.join(FILES_DIR, file.storedName));
   if (!filePath.startsWith(path.resolve(FILES_DIR))) return null;
@@ -304,17 +310,25 @@ export async function getFileForDownload(fileId: string, userId: string, isAdmin
     return null;
   }
 
-  return { filePath, metadata: file };
+  return { filePath: filePath as string | null, metadata: file };
 }
 
 // 파일 삭제
+// 로컬: DB row 삭제 + 물리 파일 unlink
+// R2: DB row 만 삭제 — R2 객체 cleanup 은 별도 PR 의 24h cron / 즉시 deleteObject 호출에서 처리
+//     (현재는 R2 객체 잔존 → R2 quota 누적. 다음 단계 작업 항목)
 export async function deleteFile(fileId: string, userId: string) {
   const file = await prisma.file.findUnique({ where: { id: fileId } });
   if (!file || file.ownerId !== userId) throw new Error("파일을 찾을 수 없습니다");
 
-  const filePath = path.join(FILES_DIR, file.storedName);
   await prisma.file.delete({ where: { id: fileId } });
 
+  if (file.storageType === "r2") {
+    // R2 객체 잔존 — 별도 PR 에서 deleteR2Object(file.storedName) 호출 추가 필요
+    return;
+  }
+
+  const filePath = path.join(FILES_DIR, file.storedName);
   try { await fs.unlink(filePath); } catch { /* 이미 삭제됨 */ }
 }
 
