@@ -7,13 +7,14 @@
 
 ## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 76 종료)
 
-- **세션 76 핵심 (R2 객체 즉시 삭제 best-effort, S76-D 1·2단계, commit `8bf1b5f`)**:
-  1. **`deleteR2Object(key)` 신규** (`src/lib/r2.ts` +28-1): `DeleteObjectCommand` 호출. NotFound 은 success swallow (호출자가 DB row 먼저 삭제한 정상 케이스), 그 외 에러 throw — 라이브러리는 라이브러리, swallow 정책은 호출자 영역.
-  2. **`deleteFile()` R2 분기 보강** (`src/lib/filebox-db.ts` +10-3): `prisma.file.delete()` 후 `try { await deleteR2Object(file.storedName) } catch { console.warn(...) }` (best-effort). DB row 는 이미 사라졌으므로 R2 잔존 객체는 24h cleanup cron 의 회수 대상 — eventually consistent 모델, 동기 트랜잭션 외부 SDK 확장 회피.
+- **세션 76 핵심 (R2 객체 즉시 삭제 best-effort + 운영 모니터링 가이드, commit `8bf1b5f` + `82fadb1`)**:
+  1. **`deleteR2Object(key)` 신규** (`src/lib/r2.ts` +28-1, commit `8bf1b5f`): `DeleteObjectCommand` 호출. NotFound 은 success swallow (호출자가 DB row 먼저 삭제한 정상 케이스), 그 외 에러 throw — 라이브러리는 라이브러리, swallow 정책은 호출자 영역.
+  2. **`deleteFile()` R2 분기 보강** (`src/lib/filebox-db.ts` +10-3, commit `8bf1b5f`): `prisma.file.delete()` 후 `try { await deleteR2Object(file.storedName) } catch { console.warn(...) }` (best-effort). DB row 는 이미 사라졌으므로 R2 잔존 객체는 24h cleanup cron 의 회수 대상.
   3. **3단계 분리 결정**: 24h pending cleanup cron 은 cron runner `kind` enum (SQL/FUNCTION/WEBHOOK) 가 R2 SDK 호출 미지원 → 새 kind 또는 별도 스케줄러 필요. 별도 PR (§S77-A).
-  4. **검증**: `npx tsc --noEmit` exit 0.
-  5. **본 conversation /cs 산출** (코드 0, 의식 5): journal §"세션 76" / current.md row 76 / logs/2026-05.md s76 entry / handover `260501-session76-r2-deleteobject.md` / 본 prompt 갱신.
-  6. **세션 77 첫 작업** = §S77-A 24h pending cleanup cron 또는 §S77-B R2 콘솔 CORS 적용 (운영자 본인 3분).
+  4. **R2 운영 모니터링 가이드 신규** (`docs/guides/r2-monitoring.md` +101, commit `82fadb1`): §S73-D 운영 절차를 자동 발화 가능 가이드로 문서화. 3종 트리거(T1 $5/월 / T2 50GB / T3 1GB wall-clock >120s) + 트리거별 1주 내 / 1개월 내 액션 매트릭스 + 24h cleanup cron 부채 §6 추적. ADR-032 본체 미수정 (머지 충돌 회피).
+  5. **검증**: `npx tsc --noEmit` exit 0.
+  6. **본 conversation /cs 산출**: journal §"세션 76" 보강 / current.md row 76 보강 / logs/2026-05.md s76 entry 보강 / handover s76 보강 / 본 prompt 보강. 다른 터미널이 row 76 등을 사전 시뮬레이션 작성해 둔 상태였고, 본 /cs 는 commit `82fadb1` 흡수만 보강.
+  7. **세션 77 첫 작업** = §S77-A 24h pending cleanup cron 또는 §S77-B R2 콘솔 CORS 적용 + R2 모니터링 가이드 §2.1 청구 알람 1회 설정 (운영자 본인 8분).
 
 ---
 

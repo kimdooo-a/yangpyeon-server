@@ -11,9 +11,11 @@
 
 next-dev-prompt §S76-D `R2 객체 cleanup 부채 정리` 의 1·2단계 자율 진행. `deleteR2Object()` 함수 신설 + `deleteFile()` R2 분기 보강(best-effort 패턴). 3단계(24h cleanup cron) 는 cron runner kind enum (SQL/FUNCTION/WEBHOOK) 제약으로 별도 PR 분리.
 
-본 세션 코드 변경: **2 파일 +38/-4**, commit `8bf1b5f`. `tsc --noEmit` exit 0.
+추가 산출: **R2 운영 모니터링 가이드 신규** (`docs/guides/r2-monitoring.md`) — next-dev-prompt §S73-D 의 운영 절차를 사람 눈 의존 없이 자동 발화 가능한 가이드로 문서화. 3종 트리거(T1 $5/월 / T2 50GB / T3 1GB wall-clock >120s) + 액션 매트릭스 + 24h cleanup cron 부채 §6 명시. ADR-032 본체 미수정(머지 충돌 회피).
 
-본 conversation 자체의 산출은 본 /cs 의식 문서 5종(저널/logs/current/handover/next-dev-prompt) — 코드 변경 0.
+본 세션 코드 변경: **2 파일 +38/-4** (commit `8bf1b5f`) + **1 파일 +101** (commit `82fadb1`). `tsc --noEmit` exit 0.
+
+본 conversation /cs 의식: 다른 터미널이 row 76 + handover/logs/journal/next-dev-prompt 사전 시뮬레이션 작성해둔 상태였고, 본 /cs 는 commit `82fadb1` 흡수 보강(5개 파일).
 
 ---
 
