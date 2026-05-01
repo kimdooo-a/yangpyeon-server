@@ -1,7 +1,58 @@
-# 다음 세션 프롬프트 (세션 80)
+# 다음 세션 프롬프트 (세션 81)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 80 종료)
+
+- **세션 80 핵심 (Track B Aggregator 첫 진입 — B-pre + B1 + B2, 5 commits +2,066 LOC)**:
+  1. **wave 진행도 plan 작성** (Plan mode + 3 Explore 병렬): Track A BaaS Phase 0~4 (~85%) / Track B Aggregator T1~T9 (0%) / Track C Messenger M0~M6 (~30%) / Track D Filebox (stabilized) 4 트랙 시퀀싱 결정. plan 파일 `C:\Users\smart\.claude\plans\wave-wiggly-axolotl.md`. 결론: Track B 우선 (세션 80~84 직진), Track C 병행 86~.
+  2. **베이스라인 검증 plan 가정 3건 정정** (메모리 룰 `feedback_baseline_check_before_swarm` 적용):
+     - T1.7 audit-metrics tenant 차원 ✅ **이미 구현** (`src/lib/audit-metrics.ts:42` byTenant Map + AuditMetricsTenant 타입 + 6 단위 테스트). 초기 Explore grep 한계로 missed.
+     - R1 withTenantTx ✅ **존재** (`src/lib/db/prisma-tenant-client.ts:188`). plan "정의 위치 미확인" 잘못된 정보.
+     - R2 슬러그 — "3개 부족" 가설 반증, **DB 시드 37 vs spec 40 정확 매치 단 8개**. DB = source of truth 결정 (T1.6 마이그 `20260427140000_t1_6_aggregator_with_tenant` 의 RLS+dbgenerated+composite unique 활성, spec slug 강행 시 promote.ts FK violation → cron consecutiveFailures 자동 비활성화). 매핑표 `docs/research/baas-foundation/05-aggregator-migration/slug-mapping-db-vs-spec.md` 신규 (440 LOC, T4 진입 게이트).
+  3. **s79 leftover 회복** (다른 터미널 동시 push `0647b14` 와 폴더 충돌 0): `journal-2026-05-01.md` (188줄) + `2026-05.md` (55줄) ff05a07 staging 누락분 회복. 2 commits 분리 (`046fce8` + `6a8a9eb`).
+  4. **B-pre commit** (`c20d90d`): aggregator T1~T9 plan staging + 슬러그 매핑 분석 (622 LOC). 코드 변경 0 — 모두 문서.
+  5. **B1 commit** (`0d9a225`): `npm install rss-parser@3.13.0 cheerio@1.2.0 @google/genai@1.51.0` (plan 의 `^0.X` 가정 정정, 1.51.0 latest, peer 충돌 0). `.env.example` 6 vars + 3곳 .env 동기화 (windows + ypserver-build + ypserver, 메모리 룰 `feedback_env_propagation`). secret 4개 빈 값, defaults 2개 명시값. 656 insertions.
+  6. **B2 commit** (`a121289`): types.ts (95) + dedupe.ts (158) + dedupe.test.ts (TDD 25). multi-tenant 적응 = `tenantPrismaFor(ctx)` closure 패턴 (메모리 룰 `project_workspace_singleton_globalthis` 적용 — Prisma 7 ALS propagation 회피). 545 insertions.
+  7. **TDD 가 spec dedupe.ts multi-value bug 1건 발견 + fix**: 케이스 12 (`tag=b&tag=a` → expected `?tag=a&tag=b` / 1차 실제 `?tag=a&tag=a&tag=b&tag=b`). 진단 = spec 의 `URLSearchParams.keys()` 가 동일 키 multi-value 를 별도 entry 로 노출 → keepKeys 중복 → getAll() N×N 복제. spec 주석 "중복 키 보호" 와 정반대 동작 = spec 자체 bug. fix = `Array.from(new Set(keepKeys))` unique 화. 2차 25/25 PASS.
+  8. **검증**: tsc exit 0 / 전체 397/457 pass (60 skip env-gated DB) / 25 신규 PASS / 회귀 0.
+  9. **CK 신규**: `2026-05-02-spec-port-tdd-multivalue-bug.md` — spec port 시 TDD 가 spec 자체 bug 발견 패턴, "Spec 동결판도 source of truth 아님" baked-in. 자매 CK = `2026-05-01-verification-scope-depth-...md` (verification depth) + `2026-05-02-nextjs16-standalone-proxy-body-truncation.md` (infrastructure layer 함정).
+  10. **세션 81 첫 작업** = **B3 classify.ts port** (P0 다음, ~3h, DB 슬러그 매핑 적용 + RLS 통합 테스트 필수).
+
+---
+
+## ⭐ 세션 81 첫 작업 우선순위 (세션 80 종료 시점, 2026-05-02)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 |
+|---|------|------|------|----------|
+| **B3** | classify.ts port — DB 슬러그 매핑 적용 + RLS 통합 테스트 (TDD 40 케이스) | **P0 다음** | ~3h | 매핑표 `slug-mapping-db-vs-spec.md` 정확 적용 필수, FK violation 사전 차단 |
+| B4 | 4 fetchers (rss/html/api/firecrawl) port + mocked 30 케이스 | P0 다음 | ~5h | nock/msw mock 패턴 |
+| B5 | llm.ts + promote.ts port + 27 케이스 | P0 다음 | ~4h | GEMINI_API_KEY 운영자 발급 (graceful 가능) |
+| **S78-H** | multipart cleanup cron (`s3.clean.uploads -timeAgo=24h` 주 1회) | P1 | ~30분 | B5 와 같은 commit 사이클로 묶기 권고 |
+| B6 | runner.ts + cron AGGREGATOR dispatcher (kind union 확장) | P0 다음 | ~6h | `dispatchCron` `kind` literal union 확장 시 caller 시그니처 일괄 수정 — 단일 commit 필수 |
+| B7 | seed 6 cron jobs (disabled) + WSL 빌드 + 배포 | P0 다음 | ~3h | enabled=FALSE 시작 |
+| B8 | 5 소스 점진 활성화 + 24h 관찰 + 첫 카드 | P0 다음 | ~2h | 60 소스 중 5만, 24h 관찰 후 60 점진 확장 |
+| S78-D | 폰 모바일 드래그 실측 (c7f1c39 PointerEvent) | P1 | ~5분 | 보너스, 어느 세션이든 |
+| S78-I | filer leveldb 전환 | P2 | ~30분 | 50만 entry 도달 시만 (현재 0건) |
+| S78-J | PM2 startup 자동화 | P2 | 운영자 결정 | "내 컴퓨터" 정합성 영향 별개 |
+
+### B3 진입 시 게이트 (필수)
+
+1. **매핑표 정확 적용**: `slug-mapping-db-vs-spec.md` §1 (track 별 매핑) 의 DB 슬러그 사용. spec slug 그대로 복사 금지.
+2. **신규 매처 추가**: work 트랙 (no-code, remote-work) + invest (market-analysis, macro-economy) + learn (data-science, system-design, career-growth) + community (discussion, korean-community) — DB 에만 있는 9 신규.
+3. **RLS 통합 테스트**: `getAvailableCategorySlugs()` ↔ DB `content_categories.slug` 동기화 검증 (FK 사전 차단). spec 매핑표 §2.2 참조.
+4. **TDD 40 케이스**: 트랙 7 (hustle/work/build/invest/learn/community + general 폴백) + 서브카테고리 슬러그 별 1~2 케이스 + 한국어 mix 5 이상.
+
+### S81 진입 시 첫 행동
+
+1. `git status` + `git log --oneline -5` 점검 (다른 터미널 동시 작업 여부 — 메모리 룰 `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (필요 시)
+3. plan 파일 `C:\Users\smart\.claude\plans\wave-wiggly-axolotl.md` 와 매핑표 `slug-mapping-db-vs-spec.md` 동시 read
+4. spec classify.ts (`docs/assets/yangpyeon-aggregator-spec/code/src/lib/aggregator/classify.ts`) read
+5. B3 commit 진입
 
 ---
 
