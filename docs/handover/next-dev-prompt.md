@@ -1,26 +1,28 @@
-# 다음 세션 프롬프트 (세션 72)
+# 다음 세션 프롬프트 (세션 73)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 71 종료)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 72 종료)
 
 - **프로젝트명**: 양평 부엌 서버 — **1인 운영자의 멀티테넌트 백엔드 플랫폼** (stylelucky4u.com)
 - **정체성**: closed multi-tenant BaaS (본인 소유 10~20개 프로젝트 공유 백엔드, 외부 가입 없음)
 - **스택**: Next.js 16 + TypeScript + Tailwind CSS 4 + PostgreSQL 16 (Prisma 7) + SQLite (Drizzle)
 - **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — 명시 라우트 5종 가동 + srv_almanac_* 키 발급(s69) + Vercel env 등록 대기. aggregator 비즈니스 로직 ~28h 대기.
 
-- **세션 71 핵심**: docs/+memory 본 터미널 + src/+prisma/ 다른 터미널 병렬 진행.
-  1. **S71-A 파일박스 large-file R2 hybrid — ADR-032 ACCEPTED + V1 옵션 A 적용 완료**. 4단 게이트(Cloudflare 100MB / MAX_FILE_SIZE 50MB / quota 500MB / formData OOM) 해소 옵션 B 채택 (V1=A 단일 PUT / V2=B multipart 3개월 진화). local+R2 hybrid 50MB 경계. R2 egress $0 + 10GB 무료 = 사실상 무료. **PoC 6/6 합격** (presigned avg 1.8ms / 1MB+100MB PUT 100% / fetch PUT 200) → 다른 터미널이 V1 옵션 A 코드 적용 완료 (sub-step 미커밋 가능성 — git status 확인 필요).
-  2. **트랙 A 다른 터미널 적용 영역**: package.json + package-lock.json + prisma/schema.prisma + prisma/migrations/20260501100000_add_file_storage_type/ + src/app/api/v1/filebox/files/r2-{presigned,confirm}/route.ts + src/lib/r2.ts. 본 터미널 docs/ 영역과 충돌 0.
-  3. **트랙 B 두 건 영구 취소** — B-1 Phase 15 Auth Advanced = 이미 s32-34 완료(prod 배포 중), B-2 baas-foundation Phase 3 = M3 게이트 미통과 + 메신저 정책 제외로 후보 부재. supabase-parity Wave5 roadmap(2026-04-18) status 갱신 부재가 원인.
-  4. **베이스라인 검증 메모리 룰 등록** — `feedback_baseline_check_before_swarm.md`. kdyswarm/대규모 발사 전 current.md/next-dev-prompt/최근 handover/실제 코드 4개 사전 점검 강제. (트랙 B outdated 함정 회피 사례에서 도출)
-  5. **D 트랙 ADR 보완 4건** — 이미 세션 30(2026-04-19) 완료된 상태 → `_SPIKE_CLEARANCE` "보완 대기" 표기 갱신만 필요. 베이스라인 룰 적용 사례 1건 추가.
-  6. **SP-013/016 강화** — 정량 Go/No-Go 임계 11 메트릭 + ADR-032 결정 트리거 매트릭스.
+- **세션 72 핵심** (S71-A 트랙 A 의 _실제 작업 트랙_, commit `275464c`):
+  1. **R2 토큰 발급 + V1 옵션 A 적용 완수**: 사용자 메인 Chrome 직접 발급(MCP Chrome 봇 차단 우회) → 4값 수신(`yangpyeon-filebox-prod`, account_id `f8f9dfc7...`) → spike-032-prepared-code/ 6 파일 src/ cp + Prisma `storage_type` 컬럼 + `@aws-sdk/client-s3@3.1040` + WSL 빌드+배포+PM2 재시작.
+  2. **PoC 6/6 PASS** — presigned URL 발급 avg **1.8ms** (목표 <50ms 28× 마진) / 1MB PutObject 749ms / 100MB PutObject 17.3s (~47Mbps) / fetch presigned PUT 200 / DB storage_type 인덱스 + 3 row backfill 검증.
+  3. **ADR-032 + spike-032 PROPOSED → ACCEPTED 동일 세션 승격** — _SPIKE_CLEARANCE Go 판정 + 양 문서 변경 이력 v1.0 추가.
+  4. **단일 commit `275464c`** 18 파일 +6180/-3037. 명시적 `git add` 12 경로로 다른 무관한 미커밋 파일(sticky-notes / cron / members / webhooks 등) 분리.
+  5. **함정 발견 + 메모리 룰 +1**: `wsl-build-deploy.sh` [1/8] rsync에 `--exclude '/.env'` 부재 → windows측 .env가 build측 .env를 덮음. [5/8]은 ypserver측 보호 있음 — 비대칭 정책. **3곳 동기화 정책 채택** + `feedback_env_propagation.md` 메모리 등록.
+  6. **CK +1**: `docs/solutions/2026-05-01-wsl-build-deploy-env-not-protected.md` (workaround/high).
 
-- **세션 70 핵심** (참고): 부팅/종료 매뉴얼 전면 개정 (`dashboard→ypserver`, standalone) + docx 재생성 (v1 인라인 양식 baked-in styles.xml 패턴) + 파일박스 1.4GB 진단 (4단 게이트 모두 차단 확인, 코드 변경 0).
+- **세션 71 핵심** (참고): 트랙 A R2 hybrid spike-032/ADR-032 PROPOSED + V1 사전 코드 6 파일(`spike-032-prepared-code/`) + 트랙 B 두 건 outdated 함정 회피 + `feedback_baseline_check_before_swarm.md` 메모리 룰 + SP-013/016 정량 임계 강화. (S72에서 사전 코드 src/ cp 적용 완료)
+
+- **세션 70 핵심** (참고): 부팅/종료 매뉴얼 전면 개정 + docx 재생성(v1 인라인 양식 baked-in) + 파일박스 1.4GB 진단(4단 게이트, 코드 변경 0).
 
 ## 서버 실행 / 접속 정보
 
@@ -53,40 +55,74 @@ npm run dev
 
 ---
 
-## 운영 상태 (세션 71 종료 시점)
+## 운영 상태 (세션 72 종료 시점)
 
-- **PM2**: ypserver online (~/ypserver/server.js, restart #6, pid 93211) + cloudflared online + pm2-logrotate
-- **PostgreSQL 16**: 38 테이블 RLS enabled + tenant_id 첫 컬럼 + dbgenerated COALESCE fallback
+- **PM2**: ypserver online (~/ypserver/server.js, **pid 187964**, mem 205.9MB) + cloudflared online + pm2-logrotate
+- **PostgreSQL 16**: **39 테이블** RLS enabled + tenant_id 첫 컬럼 + dbgenerated COALESCE fallback (S72에서 `files.storage_type` 컬럼 + `files_tenant_id_storage_type_idx` 인덱스 추가)
 - **Tenants**: 'default' (00000000-0000-0000-0000-000000000000) + 'almanac' (00000000-0000-0000-0000-000000000001) — both `status='active'`
+- **R2 (ADR-032 V1 옵션 A 적용)**: 버킷 `yangpyeon-filebox-prod` / account_id `f8f9dfc7...` / Object Read & Write 토큰 적용 / `~/ypserver/.env` + `~/dev/ypserver-build/.env` + `/mnt/e/.env` 3곳 동기화 / R2 사용량 0건 / 비용 $0.
 - **Almanac 콘텐츠 데이터**: 37 카테고리(6 트랙) + 60 소스 (모두 active=FALSE), ContentItem 0건
 - **API 키**: `srv_almanac_4EJMXSLc...` 발급 완료 (read:contents/sources/categories/items/today-top, owner=kimdooo@). 평문은 운영자 안전 채널 보관.
-- **마이그레이션**: 28 마이그 up to date (세션 71 종료 시점 기준 — 트랙 A R2 마이그 추가 시 29)
-- **ESLint**: 0 / TSC: 0 / Vitest: 372 pass + 33 skipped
+- **마이그레이션**: **29 마이그 up to date** (`20260501100000_add_file_storage_type` S72 적용)
+- **ESLint**: 0 / TSC: 0 (S72 R2 신규 코드 포함) / Vitest: 372 pass + 33 skipped (R2 라우트 E2E 미작성)
+- **Git**: 마지막 commit `275464c feat(filebox): R2 hybrid 업로드 V1 옵션 A 적용 — ADR-032 ACCEPTED` (18 파일 +6180/-3037, 미push 상태 — /cs 단계에서 origin/spec/aggregator-fixes 로 push 예정)
 
 ---
 
-## ⭐ 세션 72 추천 작업
+## ⭐ 세션 73 추천 작업
 
-### S72-A. **트랙 A R2 V1 후속** (P0/P1 — 다른 터미널 적용 결과 확인 + 마무리)
+### S73-A. **R2 V1 후속 — 다운로드 + UI + CORS 실측** (P0, ~6h)
 
-세션 71 종료 시점 다른 터미널이 ADR-032 ACCEPTED + V1 옵션 A 적용 완료. git status 미커밋 영역:
+S72에서 V1 백엔드 라우트(`r2-presigned` / `r2-confirm`)만 살아있음. 사용자 시나리오 완결 위해:
+1. **다운로드 라우트** `GET /api/v1/filebox/files/[id]/download`:
+   - `prisma.file.findUnique({id})` → `storageType==='r2'` 분기
+   - `presignR2GetUrl(file.storedName, 600)` (10분 유효) → 302 redirect 또는 JSON
+   - 권한 검증: 폴더 소유권 + 공유 정책 (기존 local 라우트 패턴 답습)
+2. **UI 50MB 분기** `src/app/(protected)/filebox/page.tsx`:
+   - 50MB 초과 → R2 경로: presigned 발급 → fetch PUT → confirm 호출 → row 갱신
+   - 50MB 이하 → local 경로 (기존 유지)
+   - 진행률 표시 (XHR upload progress event 또는 Streams API)
+3. **50MB 이하 local 경로 회귀 테스트** (vitest 또는 curl)
+4. **CORS 브라우저 PUT 실측** (Chrome 50MB+ 업로드):
+   - 차단 시 R2 버킷 CORS 정책 추가 (Cloudflare 대시보드 → 버킷 Settings → CORS)
+   - `AllowedOrigins: https://stylelucky4u.com`, `AllowedMethods: PUT,GET,HEAD`
+5. **24h pending 객체 회수 cron** (선택, S73-C 와 묶음): 발급 후 confirm 안 된 R2 객체 cleanup
+
+### S73-B. **`wsl-build-deploy.sh` `.env` 보호 패치** (P1, ~10분)
+
+S72에서 발견한 함정 근본 fix. [1/8] rsync에 `--exclude '/.env'` 추가:
+
+```diff
+ rsync -a --delete \
++  --exclude '/.env' \
+   --exclude 'node_modules/' \
+   ...
+   "$REPO_WIN_PATH/" "$WSL_BUILD_DIR/"
 ```
-M  package.json (+ package-lock.json) — @aws-sdk/client-s3 + s3-request-presigner 추가
-M  prisma/schema.prisma — File.storageType 컬럼
-?? prisma/migrations/20260501100000_add_file_storage_type/
-?? src/app/api/v1/filebox/files/r2-{presigned,confirm}/route.ts
-?? src/lib/r2.ts
-```
 
-S72 시작 시:
-1. 다른 터미널 진행 결과 확인 (commit 됐는지 / 미커밋 상태인지) — `git log --oneline -5` + `git status`
-2. 미커밋이면 통합 commit 또는 별도 commit (영역 분리 OK라 한 commit 도 가능)
-3. **다운로드 라우트** (R2 presigned GET URL) 신설 — V1 본체에 미포함이라 보강 PR
-4. UI 50MB 분기 + 진행률 (`src/app/(protected)/filebox/page.tsx`) — 미적용일 가능성 (확인 필요)
-5. E2E 테스트 (50MB local / 1GB R2) — 미적용일 가능성
-6. 30일 R2 사용량 모니터링 시작 + $5/월 알람 설정
+**검증**: 패치 후 R2 키 추가 → `wsl-build-deploy.sh` 1회 실행 → build측 .env에 R2 키 유지 확인. **메모리 룰** `feedback_env_propagation.md`는 그대로 유지(windows측 truth source 정책 일관성).
 
-### S72-B. **S71-B 매뉴얼 docx 시각 검증 추가 패치** (P2, ~30분, 사용자 비교 피드백 필요)
+### S73-C. **24h cleanup cron — pending R2 객체 회수** (P1, ~3h)
+
+`r2-presigned` 발급 후 PUT 안 되거나 confirm 안 된 R2 객체가 누적될 수 있음. cron AGGREGATOR 분기 또는 별도 cron으로:
+1. R2 `ListObjectsV2` (prefix=`tenants/`)
+2. DB `File` row 매핑 (`storedName === key && storageType === 'r2'`)
+3. 매핑 없는 객체 중 `LastModified > 24h` 만 `DeleteObject`
+4. 운영 시 매주 1회 실행 (cron 표 등록)
+
+### S73-D. **R2 사용량 모니터링 + $5/월 알람** (P2, ~30분)
+
+Cloudflare 대시보드 → Billing → Notifications. R2 청구 알람 $5/월 임계 설정. SP-016 SeaweedFS 검증 트리거(50GB 도달 또는 $5월) 발화 자동화.
+
+### S73-E. **(이월 S72-B/C/D/E)** 매뉴얼 docx 사용자 비교, LibreOffice 설치, SP-013 wal2json 실측, SP-016 SeaweedFS 50GB 실측
+
+세션 71 next-dev-prompt §S72-B/C/D/E 그대로 이월. 사용자 우선순위에 따라.
+
+### S73-Z. **(참고)** 세션 72 미사용 추천 항목
+
+(생략 — S72 추천이었으나 S73 설계로 흡수)
+
+### (참고용 빈 자리)
 
 세션 70에서 v1 인라인 양식을 styles.xml 에 baked-in 한 docx 재생성. 사용자가 Word 로 v1 과 비교 후 어색한 부분 보고 시:
 - `_pandoc-ref-v1plus.docx` 의 styles.xml 만 패치
