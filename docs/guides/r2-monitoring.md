@@ -1,8 +1,17 @@
 # R2 운영 모니터링 가이드
 
+> ## ⚠️ SUPERSEDED 2026-05-01 (세션 77 옵션 C)
+>
+> R2 자체 폐기 + SeaweedFS 자가호스팅 전환 ([ADR-033](../research/decisions/ADR-033-seaweedfs-self-hosted-object-storage.md) ACCEPTED).
+> 운영자가 본 가이드 §2.1 청구 알람 적용 직후 (세션 77 토픽 4) 가치관 충돌 표면화 → R2 콘솔 즉시 삭제.
+>
+> 본 가이드는 **역사 보존 목적으로 유지**. R2 청구 알람 / 저장 임계 / 1GB wall-clock 트리거는 모두 무용.
+>
+> **신규 모니터링**: [docs/guides/seaweedfs-monitoring.md](./seaweedfs-monitoring.md) (디스크 사용량 + filer 응답 시간 + PM2 process 모니터링)
+
 > 상위: [CLAUDE.md](../../CLAUDE.md) → [docs/guides/](./README.md) → **여기**
-> 관련 ADR: [ADR-032 R2 hybrid](../research/decisions/ADR-032-filebox-large-file-uploads.md) (ACCEPTED 2026-05-01)
-> 관련 SP: [SP-016 SeaweedFS](../research/spikes/spike-016-seaweedfs-50gb-result.md) (Pending — 트리거 발화 시 진행)
+> 관련 ADR: ~~[ADR-032 R2 hybrid](../research/decisions/ADR-032-filebox-large-file-uploads.md)~~ (SUPERSEDED 2026-05-01) → [ADR-033 SeaweedFS](../research/decisions/ADR-033-seaweedfs-self-hosted-object-storage.md)
+> 관련 SP: [SP-016 SeaweedFS](../research/spikes/spike-016-seaweedfs-50gb-result.md) (**ACCEPTED 2026-05-01** — 4/4 임계 PASS)
 
 ## 1. 목적
 

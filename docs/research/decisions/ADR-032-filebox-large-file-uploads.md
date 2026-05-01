@@ -1,6 +1,23 @@
 # ADR-032: 파일박스 large-file 업로드 — Cloudflare R2 hybrid + 4단 게이트 해소
 
-- **상태**: **Accepted (2026-05-01 세션 71)**
+> ## ⚠️ SUPERSEDED 2026-05-01 (세션 77 옵션 C)
+>
+> 본 ADR 의 **R2 hybrid 결정 (V1 옵션 A 단일 PUT presigned URL via Cloudflare R2)** 은 운영자
+> 가치관 ("내 컴퓨터, 돈 안 쓰는, 외부 의존 0") 정합성 재검토로 SUPERSEDED.
+>
+> **후속**: [ADR-033 SeaweedFS 자가호스팅](./ADR-033-seaweedfs-self-hosted-object-storage.md) (2026-05-01 ACCEPTED)
+> - SeaweedFS WSL2 Ubuntu 단일 노드 (PM2 seaweedfs process port 8333) S3 호환 API
+> - SP-016 정량 임계 4/4 PASS (throughput 566MB/s / mem 608MB / restart 22.1s / 무결성 5/5)
+> - cloudflare tunnel 100MB 한계 회피 = S3 multipart upload 후속 PR
+>
+> **본 ADR-032 본문은 역사 보존 목적으로 그대로 유지**. PoC 결과 (R2 V1 18 파일 commit
+> `275464c`, 다운로드 UI commit `9eac758`, 즉시 삭제 commit `8bf1b5f`) 도 그대로 보존.
+>
+> **추가 학습**: 외부 서비스 도입 ADR 결정 시 운영자 가치관 정합성 점검 누락 패턴
+> (`docs/solutions/2026-05-01-external-service-adr-value-alignment-gap.md`).
+
+- **상태**: **SUPERSEDED 2026-05-01 (세션 77, ADR-033 으로 교체)**
+- **이전 상태**: ~~Accepted (2026-05-01 세션 71)~~
 - **날짜**: 2026-05-01 (세션 71, PROPOSED → ACCEPTED 동일 세션 승격)
 - **결정자**: 프로젝트 오너 — R2 토큰 발급 + PoC 6/6 합격 후 V1 옵션 A 즉시 적용
 - **입력**:
