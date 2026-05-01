@@ -1,15 +1,15 @@
-# SP-016 SeaweedFS 50GB 부하 테스트 — 축약 결과
+# SP-016 SeaweedFS 50GB 부하 테스트 — 실측 결과
 
-- 실행일: 2026-04-19
-- 상태: **Deferred (축약 문서화만 완료)**
-- 판정: **Pending** — 물리 측정 별도 세션 필요
+- 실행일: 2026-04-19 (축약 설계) → **2026-05-01 세션 77 옵션 C 새 터미널 (실측 PASS)**
+- 상태: **ACCEPTED 2026-05-01 (정량 임계 4종 압도적 통과)**
+- 판정: **Go** — SP-016 §4.1 임계 (a)(b)(c)(d) 모두 PASS, (e) sqlite default 측정 후 운영 leveldb 적용 deferred, (f) B2 옵션 C 자가호스팅 단독 결정으로 미적용
 - 스펙: [`02-spike-priority-set.md` §8](../2026-04-supabase-parity/06-prototyping/02-spike-priority-set.md)
-- 관련 ADR: ADR-008 (ASM-4 검증 대기)
-- Phase 블로킹: Phase 17 Storage
+- 관련 ADR: **ADR-033 (옵션 C SeaweedFS 자가호스팅 결정의 정량 근거)** + ADR-008 (ASM-4 검증 완료)
+- Phase 블로킹: Phase 17 Storage (해소)
 
 ---
 
-## 1. 본 세션 미실행 이유
+## 1.1 (HISTORICAL) 본 세션 미실행 이유 — 2026-04-19
 
 SP-016은 다음 필수:
 1. **SeaweedFS binary 설치** — `weed` CLI 미설치 확인됨
@@ -184,3 +184,74 @@ pkill -9 weed
 ---
 
 > SP-016 축약 완료 · 판정: **Pending** (실측 대기) · 별도 세션 + 50GB 랩 환경 필요 · 2026-04-19
+
+---
+
+# §1.2 실측 완료 — 2026-05-01 세션 77 옵션 C 새 터미널
+
+옵션 C (R2 → SeaweedFS 자가호스팅) 결정 후 PHASE 1 으로 SP-016 §4.1 정량 임계 6종 중 4종 자동 측정 실행. 측정 도구: `scripts/sp016-load-test.py` (Python 3, curl PUT 기반 filer HTTP API).
+
+## §5. 실측 결과 표 — 2026-05-01
+
+### 환경
+
+- **Host**: WSL2 Ubuntu (Windows 11 Pro 10.0.26200, /dev/sdd 1007GB ext4 — 944GB 여유)
+- **SeaweedFS**: 4.22 (Apr 27 release, 0b3cc8d), `weed server -dir=/home/smart/seaweedfs/data -s3 -filer -ip=127.0.0.1`
+- **Filer backend**: sqlite (default) — leveldb 운영 적용은 PHASE 2 분리 (임계 (e) 별도 검증 deferred)
+- **Payload**: 100MB × 500 = 48.83 GiB (50GB 명목), `/dev/zero` 단일 파일 재사용 (md5 `2f282b84e7e608d5852449ed940bfc51`)
+- **PM2**: `seaweedfs` process (id 5, fork mode), restart 1회 (SIGKILL 측정용)
+
+### 측정 결과 vs §4.1 정량 임계
+
+| # | 메트릭 | Go 기준 | **실측값** | 결과 | 마진 |
+|---|--------|---------|-----------|------|------|
+| (a) | 50GB upload throughput (filer 경유) | > 50 MB/s | **566.53 MB/s** | ✅ Go | 11.3× |
+| (b) | 50GB 적재 후 weed RSS | < 1024 MB | **608.8 MB** | ✅ Go | 40% 여유 |
+| (c) | SIGKILL → filer port 8888 복귀 | < 120s | **22.1s** (22 attempts) | ✅ Go | 5.4× |
+| (d) | md5 무결성 (5/500 sample: 1, 100, 250, 400, 500) | 5/5 (100%) | **5/5 PASS** + 재시작 후 file-250 재검증 PASS | ✅ Go | exact |
+| (e) | filer leveldb 50만 entry 응답 | < 100ms | **sqlite default 미측정** | ⚠️ Deferred | — |
+| (f) | B2 오프로드 1GB throughput | > 30 MB/s | **n/a** (옵션 C 자가호스팅 단독, 미적용) | n/a | — |
+
+### 시간선 (HH:MM:SS, 2026-05-01)
+
+```
+14:15:32  payload 100MB 생성 (md5=2f28..fc51)
+14:15:32  PUT 시작 (file-1)
+14:15:42  progress 50/500 elapsed=9.0s throughput=554.27 MB/s
+14:15:51  progress 100/500 elapsed=17.8s throughput=562.65 MB/s
+14:16:35  progress 350/500 elapsed=61.5s throughput=568.91 MB/s
+14:17:02  progress 500/500 elapsed=88.3s throughput=566.53 MB/s success=500 fail=0
+14:17:02  memory_b: weed_pid=198723 rss=608.8 MB
+14:17:02  integrity 5/5 OK (file-1, 100, 250, 400, 500)
+14:17:03  SIGKILL weed_pid=198723
+14:17:25  restart_c: 22.1s attempts=22 (port 8888 복귀)
+14:17:28  restart_integrity: OK (file-250 재시작 후 readable)
+14:17:28  DONE
+```
+
+### 판정
+
+- **§4.1 임계 (a)(b)(c)(d) 모두 압도적 통과** → SeaweedFS 채택의 정량 근거 확보
+- **§4.1 임계 (e) sqlite default 미측정**: 본 부하의 500 entry 규모로는 sqlite 도 충분. 운영 모드 (PHASE 2 leveldb 적용) 후 작은 파일 50만 entry 부하 별도 검증 권장. 본 결정에 미영향 (운영 backend 변경은 config 만)
+- **§4.1 임계 (f) 미적용**: 옵션 C 가 자가호스팅 단독 (B2 외주 미사용) 결정. 임계 자체 비활성
+
+→ **최종 판정: Go (ACCEPTED)**. SeaweedFS 채택 유지 + WSL 환경 운영 가능성 입증.
+
+### 운영 권장 (PHASE 2 적용)
+
+1. **filer backend → leveldb** (`filer.toml`): 50만+ entry 시 sqlite 병목 회피. 본 측정은 500 entry 만이라 sqlite 도 통과했으나, 운영 시 누적 entry 증가 대비.
+2. **PM2 process 등록 유지** (이미 본 PHASE 1 진입 시 등록): `seaweedfs` process, ypserver 와 별도 namespace 가 아닌 default. SIGKILL 22초 복귀 검증.
+3. **디스크 사용량 모니터링** (별도 가이드 PHASE 5 신규): 80% / 90% 임계 알림. 외부 청구 부담 0이지만 디스크 full 위험 → 알림 필수.
+
+### No-Go 트리거 (재평가 조건, ADR-033 §위험 섹션)
+
+- restart 시간 평균 > 60s 발생 → Garage(Rust) PoC 착수
+- 50GB 적재 시 SIGKILL 후 metadata 손실 발생 → 즉시 대체
+- WSL 디스크 80% 도달 → cleanup cron 또는 외주 오프로드 정책 필요
+
+### 측정 도구
+
+- `scripts/sp016-load-test.py` — Python 3 자동 측정 도구. curl PUT (filer HTTP API) + md5 무결성 + SIGKILL 후 PM2 자동 재시작 + `/proc/$pid/status` RSS 측정. 본 PR 함께 commit.
+- 로그: `~/seaweedfs/logs/progress.txt` (실시간 timestamp + throughput + 메모리 + 무결성)
+
+> SP-016 ACCEPTED · 정량 임계 4/4 PASS · ADR-033 정량 근거 · 2026-05-01 세션 77 옵션 C 새 터미널
