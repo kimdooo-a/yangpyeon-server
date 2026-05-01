@@ -24,7 +24,17 @@ export interface TenantContext {
   bypassRls?: boolean;
 }
 
-const tenantStorage = new AsyncLocalStorage<TenantContext>();
+// Turbopack 이 본 모듈을 라우트별 chunk 에 인라인 복제 → 각 chunk 가 자체 `new AsyncLocalStorage`
+// 를 가지면 runWithTenant 가 쓰는 storage 와 prismaWithTenant interceptor 가 읽는 storage 가
+// 달라져 "Tenant context missing" 이 발생. globalThis + Symbol.for 로 프로세스 단위 단일 인스턴스
+// 를 강제해 모든 chunk 사본이 동일 storage 를 공유하도록 한다.
+const STORAGE_KEY = Symbol.for("@yangpyeon/core/tenant/context::tenantStorage");
+type GlobalWithStorage = typeof globalThis & {
+  [STORAGE_KEY]?: AsyncLocalStorage<TenantContext>;
+};
+const g = globalThis as GlobalWithStorage;
+const tenantStorage: AsyncLocalStorage<TenantContext> =
+  g[STORAGE_KEY] ?? (g[STORAGE_KEY] = new AsyncLocalStorage<TenantContext>());
 
 /**
  * 현재 요청의 TenantContext 를 반환.

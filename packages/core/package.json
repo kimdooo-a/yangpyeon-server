@@ -9,6 +9,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./tenant": "./src/tenant/index.ts",
+    "./tenant/context": "./src/tenant/context.ts",
     "./cron": "./src/cron/index.ts",
     "./audit": "./src/audit/index.ts"
   },
