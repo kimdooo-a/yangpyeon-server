@@ -1,13 +1,19 @@
-// Cloudflare R2 클라이언트 — S3 호환 API + presigned URL 발급
-// ADR-032 V1 옵션 A 단일 PUT presigned URL.
+// Object Storage 클라이언트 — S3 호환 API + presigned URL 발급
+// 구현체: SeaweedFS 자가호스팅 (ADR-033, 2026-05-01 세션 77 옵션 C).
+// 이전 구현: Cloudflare R2 (ADR-032 V1 옵션 A — SUPERSEDED 2026-05-01).
 //
-// R2 endpoint: https://<account_id>.r2.cloudflarestorage.com
-// 인증: aws-sdk v3 + S3-compatible signature v4
+// 함수명/파일명 R2_/r2.ts 는 옵션 A 의미 재정의 — S3 호환 클라이언트의
+// 일반화된 이름. 외부 컨슈머 추가 시 향후 PR 에서 object-storage.ts 로 rename.
+//
+// Endpoint: WSL2 Ubuntu localhost (PM2 seaweedfs process port 8333)
+// 인증: aws-sdk v3 + S3-compatible signature v4 (SeaweedFS access key)
+// forcePathStyle: true (SeaweedFS S3 가 virtual-host style 미지원)
 //
 // 사용처:
-// - src/app/api/v1/filebox/files/r2-presigned/route.ts (PUT URL 발급)
+// - src/app/api/v1/filebox/files/r2-presigned/route.ts (PUT URL 발급, 50MB ~ 90MB)
 // - src/app/api/v1/filebox/files/r2-confirm/route.ts (HEAD 검증)
-// - 미래: 다운로드 presigned GET URL 발급
+// - src/app/api/v1/filebox/files/[id]/route.ts (다운로드 stream — SeaweedFS localhost only 라 ypserver 경유)
+// - 후속 PR S78-?: multipart upload (90MB+ cloudflare tunnel 100MB 우회)
 import {
   S3Client,
   HeadObjectCommand,
@@ -18,11 +24,11 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
 // ── 환경변수 ───────────────────────────────────────────────────
-const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
+const OBJECT_STORAGE_ENDPOINT = process.env.OBJECT_STORAGE_ENDPOINT;
 const R2_BUCKET = process.env.R2_BUCKET;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL; // optional (custom domain)
+const R2_PUBLIC_BASE_URL = process.env.R2_PUBLIC_BASE_URL; // optional (외부 endpoint, SeaweedFS localhost 환경 미사용)
 
 // ── 한도 ──────────────────────────────────────────────────────
 export const MAX_R2_FILE_SIZE = Number(process.env.MAX_R2_FILE_SIZE) || 5 * 1024 * 1024 * 1024; // 5GB
@@ -35,18 +41,19 @@ let _client: S3Client | null = null;
 
 export function getR2Client(): S3Client {
   if (_client) return _client;
-  if (!R2_ACCOUNT_ID || !R2_BUCKET || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+  if (!OBJECT_STORAGE_ENDPOINT || !R2_BUCKET || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
     throw new Error(
-      "R2 환경변수 누락: R2_ACCOUNT_ID / R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY",
+      "Object Storage 환경변수 누락: OBJECT_STORAGE_ENDPOINT / R2_BUCKET / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY",
     );
   }
   _client = new S3Client({
-    region: "auto", // R2는 region 'auto'
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    region: "us-east-1", // SeaweedFS S3 표준 default
+    endpoint: OBJECT_STORAGE_ENDPOINT,
     credentials: {
       accessKeyId: R2_ACCESS_KEY_ID,
       secretAccessKey: R2_SECRET_ACCESS_KEY,
     },
+    forcePathStyle: true, // SeaweedFS — virtual-host style 미지원
   });
   return _client;
 }

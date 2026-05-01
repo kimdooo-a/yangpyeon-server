@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs/promises";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { withAuth } from "@/lib/api-guard";
 import { errorResponse } from "@/lib/api-response";
 import { getFileForDownload, deleteFile } from "@/lib/filebox-db";
 import { uuidParamSchema } from "@/lib/schemas/filebox";
-import { presignR2GetUrl } from "@/lib/r2";
+import { getR2Client } from "@/lib/r2";
 
 export const runtime = "nodejs";
 
 // 파일 다운로드
 //   storageType='local' → 서버에서 파일 읽어 직접 응답 (Cloudflare Tunnel 통과)
-//   storageType='r2'    → presigned GET URL 발급 후 302 redirect (브라우저가 R2 직다운, Tunnel 우회)
+//   storageType='r2'    → SeaweedFS 객체를 ypserver 가 stream 으로 받아 클라이언트로 forward
+//                         (SeaweedFS endpoint 가 localhost only 라 302 redirect 불가)
+//                         response body 는 cloudflare tunnel 의 chunked transfer 로 통과
 export const GET = withAuth(async (_request: NextRequest, user, context) => {
   const { id } = await (context as { params: Promise<{ id: string }> }).params;
   const idParsed = uuidParamSchema.safeParse({ id });
@@ -22,16 +25,28 @@ export const GET = withAuth(async (_request: NextRequest, user, context) => {
 
   const encodedName = encodeURIComponent(result.metadata.originalName);
 
-  // R2 파일: presigned GET URL → 302 redirect
+  // SeaweedFS 객체 (storageType='r2' 의미 재정의): ypserver 경유 stream
   if (result.metadata.storageType === "r2") {
     try {
-      const url = await presignR2GetUrl(result.metadata.storedName, 600, {
-        responseContentDisposition: `attachment; filename*=UTF-8''${encodedName}`,
+      const client = getR2Client();
+      const cmd = new GetObjectCommand({
+        Bucket: process.env.R2_BUCKET!,
+        Key: result.metadata.storedName,
       });
-      return NextResponse.redirect(url, 302);
+      const s3Resp = await client.send(cmd);
+      if (!s3Resp.Body) return errorResponse("STORAGE_BODY_EMPTY", "객체 Body 비어있음", 500);
+      const webStream = s3Resp.Body.transformToWebStream();
+      return new NextResponse(webStream, {
+        status: 200,
+        headers: {
+          "Content-Type": result.metadata.mimeType || "application/octet-stream",
+          "Content-Disposition": `attachment; filename*=UTF-8''${encodedName}`,
+          "Content-Length": String(result.metadata.size),
+        },
+      });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "R2 다운로드 URL 발급 실패";
-      return errorResponse("R2_PRESIGN_GET_FAILED", message, 500);
+      const message = err instanceof Error ? err.message : "SeaweedFS 다운로드 실패";
+      return errorResponse("STORAGE_GET_FAILED", message, 500);
     }
   }
 
