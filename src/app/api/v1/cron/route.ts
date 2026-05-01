@@ -44,7 +44,7 @@ const createSchema = z.object({
     .refine((v) => scheduleRegex.test(v) || v.split(/\s+/).length === 5, {
       message: "schedule 형식이 올바르지 않습니다",
     }),
-  kind: z.enum(["SQL", "FUNCTION", "WEBHOOK"]),
+  kind: z.enum(["SQL", "FUNCTION", "WEBHOOK", "AGGREGATOR"]),
   payload: z.record(z.string(), z.unknown()).default({}),
   enabled: z.boolean().default(true),
 });

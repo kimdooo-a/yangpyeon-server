@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { runReadonly } from "@/lib/pg/pool";
 import { runIsolatedFunction } from "@/lib/runner/isolated";
 import type { CronKindPayload } from "@/lib/types/supabase-clone";
+import { runAggregatorModule } from "@/lib/aggregator/runner";
+import type { AggregatorModule } from "@/lib/aggregator/types";
 
 /**
  * 세션 14 Cluster B: Cron 실행 디스패처.
@@ -156,28 +158,47 @@ async function dispatchWebhookOnMain(
 }
 
 /**
+ * AGGREGATOR kind — main thread 에서 runAggregatorModule 호출 (Track B B6).
+ * tenantId 는 ctx 로 전달되어 aggregator 가 tenantPrismaFor(ctx) 로 격리 사용.
+ * memory rule project_workspace_singleton_globalthis: ALS 사용 X, ctx closure 사용.
+ */
+async function dispatchAggregatorOnMain(
+  payload: Partial<CronKindPayload> & Record<string, unknown>,
+  tenantId: string,
+  started: number,
+): Promise<CronRunResult> {
+  const moduleName = typeof payload.module === "string" ? payload.module : null;
+  if (!moduleName) return failure(started, "payload.module 누락");
+  const batch = typeof payload.batch === "number" ? payload.batch : undefined;
+  return await runAggregatorModule(
+    { tenantId },
+    { module: moduleName as AggregatorModule, batch },
+  );
+}
+
+/**
  * dispatchCron — Phase 1.5 시그니처: (job, tenantId).
  *
  * 라우팅:
  *   - SQL: main thread (07-adr-028-impl-spec §2.3 — connection 안정성).
  *   - FUNCTION/WEBHOOK: 현 PR 에서는 main thread 유지 (현행 회귀 0).
  *     후속 PR 에서 TenantWorkerPool 로 격리 진입.
+ *   - AGGREGATOR: main thread 에서 runAggregatorModule 호출 (B6, multi-tenant
+ *     ctx 전달).
  *
  * 인자 변경 — registry.ts/runNow 가 tenantId 명시 전달.
- * 본 PR 의 worker pool/worker-script 는 별도 PR 에서 통합 (graceful migration).
  *
- * NOTE: tenantId 는 현재 SQL/FUNCTION/WEBHOOK 라우팅 결정에 사용되지 않음 —
- *       후속 PR 에서 TenantCronPolicy 기반 allowedFetchHosts 적용 시 사용.
+ * NOTE: tenantId 는 SQL/FUNCTION/WEBHOOK 라우팅 결정에 사용되지 않음 (후속 PR 에서
+ *       TenantCronPolicy). AGGREGATOR 에서는 ctx.tenantId 로 직접 사용.
  */
 export async function dispatchCron(
   job: {
     id: string;
     name: string;
-    kind: "SQL" | "FUNCTION" | "WEBHOOK";
+    kind: "SQL" | "FUNCTION" | "WEBHOOK" | "AGGREGATOR";
     payload: unknown;
   },
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _tenantId: string,
+  tenantId: string,
 ): Promise<CronRunResult> {
   const started = Date.now();
   try {
@@ -192,6 +213,9 @@ export async function dispatchCron(
     }
     if (job.kind === "WEBHOOK") {
       return await dispatchWebhookOnMain(job, started);
+    }
+    if (job.kind === "AGGREGATOR") {
+      return await dispatchAggregatorOnMain(payload, tenantId, started);
     }
     return failure(started, `지원하지 않는 kind: ${job.kind as string}`);
   } catch (err) {

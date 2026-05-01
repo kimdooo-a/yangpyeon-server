@@ -33,7 +33,7 @@ async function withCronDates<T extends { id: string }>(row: T) {
 const patchSchemaAdmin = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   schedule: z.string().trim().min(1).max(80).optional(),
-  kind: z.enum(["SQL", "FUNCTION", "WEBHOOK"]).optional(),
+  kind: z.enum(["SQL", "FUNCTION", "WEBHOOK", "AGGREGATOR"]).optional(),
   payload: z.record(z.string(), z.unknown()).optional(),
   enabled: z.boolean().optional(),
 });

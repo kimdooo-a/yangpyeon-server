@@ -34,7 +34,7 @@ export interface ScheduledJob {
   tenantId: string;
   name: string;
   schedule: string;
-  kind: "SQL" | "FUNCTION" | "WEBHOOK";
+  kind: "SQL" | "FUNCTION" | "WEBHOOK" | "AGGREGATOR";
   payload: unknown;
 }
 
@@ -148,7 +148,7 @@ function rowToJob(row: CronRow): ScheduledJob {
     tenantId: row.tenantId ?? DEFAULT_TENANT,
     name: row.name,
     schedule: row.schedule,
-    kind: row.kind as "SQL" | "FUNCTION" | "WEBHOOK",
+    kind: row.kind as "SQL" | "FUNCTION" | "WEBHOOK" | "AGGREGATOR",
     payload: row.payload,
   };
 }
@@ -328,7 +328,7 @@ export async function runNow(
     {
       id: row.id,
       name: row.name,
-      kind: row.kind as "SQL" | "FUNCTION" | "WEBHOOK",
+      kind: row.kind as "SQL" | "FUNCTION" | "WEBHOOK" | "AGGREGATOR",
       payload: row.payload,
     },
     tenantId,

@@ -115,7 +115,14 @@ export interface RealtimeMessage {
 export type CronKindPayload =
   | { kind: "SQL"; sql: string }
   | { kind: "FUNCTION"; functionId: string; input?: unknown }
-  | { kind: "WEBHOOK"; webhookId: string };
+  | { kind: "WEBHOOK"; webhookId: string }
+  | {
+      kind: "AGGREGATOR";
+      /** aggregator/runner.ts 의 AggregatorModule literal — 5종 */
+      module: string;
+      /** classifier/promoter batch size (옵션) */
+      batch?: number;
+    };
 
 // ─────────────────────────────────────────────────────────────
 // Webhooks
