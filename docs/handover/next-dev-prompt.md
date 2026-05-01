@@ -1,17 +1,18 @@
-# 다음 세션 프롬프트 (세션 70)
+# 다음 세션 프롬프트 (세션 71)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 69 완료)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 70 완료)
 
 - **프로젝트명**: 양평 부엌 서버 — **1인 운영자의 멀티테넌트 백엔드 플랫폼** (stylelucky4u.com)
 - **정체성**: closed multi-tenant BaaS (본인 소유 10~20개 프로젝트 공유 백엔드, 외부 가입 없음)
 - **스택**: Next.js 16 + TypeScript + Tailwind CSS 4 + PostgreSQL 16 (Prisma 7) + SQLite (Drizzle)
 - **첫 컨슈머**: Almanac (almanac-flame.vercel.app) — Phase 2 / T2.5 양평 측 인프라 100% 가동
-- **세션 69 핵심**: 세션 66 미완 — Almanac aggregator Day 4 잔여 4 endpoint(contents/sources/today-top/items) + srv_almanac_* 키 발급 + 사전 결함 1건(withAuth tenant API key 분기 누락) fix — 모두 마무리. 평문 키 안전 채널 전달과 Almanac Vercel 측 env 등록만 남음.
+- **세션 70 핵심** (문서/도구 작업): (1) `docs/guides/server-boot-manual.md` 전면 개정 (`dashboard→ypserver`, standalone, `wsl-build-deploy.sh`, 종료 시나리오 A~E). (2) docx 재생성 — pandoc 3.1.13 standalone(sudo 없이 ~/.local/bin) + v1 인라인 양식(#1A73E8 + 하단 테두리, #333333, #1B5E20, #CCCCCC, #F0F4FA) styles.xml baked-in 패턴. `scripts/build-pandoc-ref-from-v1.py` + `_pandoc-ref-v1plus.docx` 신설. (3) 파일박스 1.4GB 미수신 진단 — 4단 게이트(Cloudflare 100MB / 50MB MAX_FILE_SIZE / 500MB quota / formData OOM) 모두 차단, 코드 변경 0, LAN 직접 권고.
+- **세션 69 핵심**: Almanac aggregator Day 4 잔여 4 endpoint + srv_almanac_* 키 발급 + withAuth fix. 평문 키 안전 채널 전달과 Almanac Vercel 측 env 등록만 남음.
 - **Track B 병행**: 메신저 M2-Step1 (도메인 헬퍼 4개) — 다른 터미널이 진행 중. 영역 분리 보장됨 (`src/lib/messenger/`, `tests/messenger/`).
 
 ## 서버 실행 / 접속 정보
@@ -59,9 +60,38 @@ npm run dev
 
 ---
 
-## ⭐ 세션 70 우선 작업 P0: Almanac Vercel env 등록 + 가시화 검증
+## ⭐ 세션 70 신규 진입점 — 세션 71 추천 작업
 
-### P0-0 — Almanac 측 env 등록 (양평 측 작업 0)
+### S71-A. **파일박스 large-file 지원 spike + ADR (P1, ~반나절)**
+
+세션 70 진단으로 4단 게이트 모두 차단 확인 (Cloudflare 100MB / 50MB MAX_FILE_SIZE / 500MB quota / formData OOM). 1.4GB 같은 큰 파일을 stylelucky4u.com 파일박스로 받으려면 4개 모두 손봐야 함:
+
+1. **R2/S3 presigned URL 발급 라우트** — 클라이언트가 R2 에 직접 PUT, 서버는 메타만 받음 (Cloudflare Tunnel 우회)
+2. **TUS 또는 자체 chunked upload 프로토콜** — 5~50MB chunk + resumable
+3. **`request.formData()` 제거 → Web Stream chunk 단위 disk write**
+4. **`MAX_FILE_SIZE` env 분리 + ADMIN tier quota 별도 정의**
+
+별도 ADR (예: `docs/research/decisions/ADR-032-filebox-large-file-uploads.md`) + spike 필수. M3 게이트 (2번째 컨슈머) 와 무관 (filebox 는 운영자 전용 영역).
+
+### S71-B. 매뉴얼 docx 사용자 시각 검증 추가 패치 (P2, ~30분)
+
+세션 70 에서 v1 인라인 양식을 styles.xml 에 baked-in 한 docx 재생성. mammoth+CSS 비교는 한계가 있으니 사용자가 Word 로 직접 v1 과 비교해 어색한 부분 보고 시:
+- `_pandoc-ref-v1plus.docx` 의 styles.xml 만 패치
+- `python3 scripts/build-pandoc-ref-from-v1.py` 재실행
+- `pandoc --reference-doc=...` 으로 docx 재생성
+
+### S71-C. LibreOffice 설치 (P2, sudo 필요, 5분)
+
+향후 docx 시각 검증 자동화 기반:
+```bash
+! wsl -d Ubuntu -- bash -ilc 'sudo apt install -y --no-install-recommends libreoffice-core libreoffice-writer'
+```
+
+---
+
+## P0 (이월): Almanac Vercel env 등록 + 가시화 검증
+
+### P0(이월)-0 — Almanac 측 env 등록 (양평 측 작업 0)
 
 세션 69 발급 평문 키를 Almanac Vercel 측에:
 1. Production env 추가: `ALMANAC_TENANT_KEY=srv_almanac_*` (운영자가 갖고 있는 평문)

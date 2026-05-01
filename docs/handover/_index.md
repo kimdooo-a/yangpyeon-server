@@ -14,6 +14,12 @@
 
 <!-- 날짜 그룹별로 정리합니다. 최신이 위로 올라갑니다. -->
 
+### 2026-05-01
+
+| 세션 | 파일 | 주요 작업 |
+|------|------|-----------|
+| 70 | [260501-session70-boot-manual-filebox-diag.md](./260501-session70-boot-manual-filebox-diag.md) | **부팅/종료 매뉴얼 전면 개정 + docx 재생성(v1 인라인 양식 baked-in) + 파일박스 1.4GB 전송 진단** — (1) `docs/guides/server-boot-manual.md` 전체 재작성 — `dashboard→ypserver`, standalone 모드, `wsl-build-deploy.sh`, 종료 시나리오 A~E 신규 추가. (2) docx 변환 — sudo 없이 standalone pandoc 3.1.13 (~/.local/bin/pandoc) + WSL 한글 변수 함정 회피 패턴 / v1 양식 분석 5차 반복 끝에 결정적 발견: v1 양식은 styles.xml 이 아니라 document.xml 인라인 오버라이드 (Heading1=#1A73E8 + 하단 테두리, Heading2=#333333, 코드=#1B5E20, 표 테두리=#CCCCCC, 헤더=#F0F4FA) → pandoc은 인라인 못 만들므로 styles.xml 에 baked-in 해야 함. `scripts/build-pandoc-ref-from-v1.py` 작성 + `_pandoc-ref-v1plus.docx` 생성. (3) 파일박스 1.4GB 전송 진단 — 4단 게이트 모두 차단(Cloudflare 100MB / 50MB MAX_FILE_SIZE / 500MB quota / formData OOM), 코드 변경 0, LAN 직접 권고. **터치 안 함**: 파일박스 코드, Almanac aggregator, 메신저. **이월**(S71+): 파일박스 large-file ADR + spike, docx 사용자 검증 후 추가 패치. |
+
 ### 2026-04-26
 
 | 세션 | 파일 | 주요 작업 |
