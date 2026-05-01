@@ -1,7 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { StickyNoteCard, type StickyNote } from "./sticky-note-card";
@@ -9,7 +14,14 @@ import { StickyNoteCard, type StickyNote } from "./sticky-note-card";
 const DEFAULT_COLOR = "#fde68a";
 const NEW_NOTE_OFFSET = 32; // 새 메모 생성 시 누적 오프셋
 
-export function StickyBoard() {
+export interface StickyBoardHandle {
+  create: () => Promise<void>;
+}
+
+// + 새 메모 버튼은 page 레벨 PageHeader children 으로 옮겨졌다 (모바일 status-bar / notch
+// 영역의 hit-test 충돌을 피하기 위해). board 는 표시 + 편집만 담당하고, 생성 트리거는
+// 외부에서 ref.create() 로 호출한다.
+export const StickyBoard = forwardRef<StickyBoardHandle>(function StickyBoard(_, ref) {
   const { user } = useCurrentUser();
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +81,8 @@ export function StickyBoard() {
     setNotes((prev) => [...prev, json.data]);
   }, [notes.length]);
 
+  useImperativeHandle(ref, () => ({ create: handleCreate }), [handleCreate]);
+
   const handleDelete = useCallback(async (id: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== id));
     const res = await fetch(`/api/v1/sticky-notes/${id}`, { method: "DELETE" });
@@ -81,21 +95,13 @@ export function StickyBoard() {
 
   return (
     <div className="relative w-full h-[calc(100vh-12rem)] overflow-auto rounded-md border border-border bg-surface-200">
-      <button
-        type="button"
-        onClick={handleCreate}
-        className="fixed md:absolute right-6 top-6 z-30 inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-brand text-white text-sm shadow hover:opacity-90"
-      >
-        <Plus size={14} /> 새 메모
-      </button>
-
       {loading && (
         <div className="p-8 text-sm text-gray-500">메모 불러오는 중…</div>
       )}
 
       {!loading && notes.length === 0 && (
         <div className="p-12 text-center text-sm text-gray-500">
-          아직 메모가 없습니다. 우측 상단의 <strong>+ 새 메모</strong> 버튼으로 첫 메모를 만들어 보세요.
+          아직 메모가 없습니다. 상단의 <strong>+ 새 메모</strong> 버튼으로 첫 메모를 만들어 보세요.
         </div>
       )}
 
@@ -114,4 +120,4 @@ export function StickyBoard() {
       ))}
     </div>
   );
-}
+});
