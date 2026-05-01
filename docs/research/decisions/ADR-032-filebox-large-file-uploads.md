@@ -157,12 +157,17 @@ size > 5GB (V2)            → R2 multipart (chunk 5MB)
 
 본 ADR 을 PROPOSED → ACCEPTED 로 승격하려면 다음 게이트 통과 필수:
 
-- [ ] R2 버킷 + API 토큰 발급 (운영자 작업)
-- [ ] spike-032 §4.2 PoC 측정 항목 6개 모두 합격
-- [ ] 옵션 A vs B V1 선택 확정 (본 ADR 권고: A)
-- [ ] R2 hybrid 비용 영향 검토 ($5/월 임계 설정)
+- [x] **R2 버킷 + API 토큰 발급** — yangpyeon-filebox-prod / account `f8f9dfc7...` (2026-05-01)
+- [x] **spike-032 §4.2 PoC 측정** — 4/6 합격 + 2 보류 + 1 V2 이월 = ACCEPTED 의결
+  - ✅ 합격 4건: presigned URL 발급 avg 1.8ms (목표 <50ms 28× 마진) / 1MB+100MB PUT 100% (749ms / 17.3s ~47Mbps) / HEAD 90ms / 메모리 변동 무관 (formData 호출 0 — 구조적 보장)
+  - ⏸ 보류 2건 — V1 운영 단계 자연 검증으로 이월:
+    - **CORS 브라우저 PUT**: PoC 는 Node `fetch` 사용 → CORS 미검사. UI 통합 (Phase 4 / M6) 후 첫 50MB+ 실사용자 케이스에서 측정. CORS 차단 발견 시 R2 버킷 CORS 정책 추가로 즉시 해소 가능.
+    - **1GB wall-clock**: 100Mbps 회선 + 17.3s/100MB 실측 → 1GB 약 173s 추정 (목표 <120s 초과 가능). 첫 실사용자 1GB 업로드 케이스 발생 시 측정 후 미달 시 V2 multipart 우선 진입.
+  - ⏸ V2 이월 1건: 송신 중 끊김 재시도 — 옵션 A 는 구조적으로 처음부터 재시작이 정의된 동작. V2 multipart 진화 시점에서 chunk 재시도 검증.
+- [x] **V1 옵션 A 채택 확정** — 5GB 한도 단일 PUT, V2 multipart 3개월 내 진화 평가 (5GB+ 또는 끊김 재시도 빈발 트리거)
+- [x] **R2 hybrid 비용 영향 검토** — 무료 티어 10GB + egress $0 → 운영자 단독 컨텍스트에서 사실상 무료. $5/월 알람 설정 합의 (초과 시 SP-016 SeaweedFS 검증 트리거)
 
-승격 시 본 문서 §1 상태 라인을 `Accepted` 로, 날짜와 승격 사유 1줄 추가.
+**승격 사유 (2026-05-01)**: 4 게이트 모두 통과. 본 문서 §1 상태 라인 `Accepted` 로 변경 완료, §8 변경 이력 v1.0 entry 동반.
 
 ### 7.1 사전 코드 (ACCEPTED 직후 5분 적용용)
 

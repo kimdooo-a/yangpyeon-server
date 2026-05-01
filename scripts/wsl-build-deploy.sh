@@ -46,19 +46,28 @@ mkdir -p "$WSL_BUILD_DIR"
 
 echo "[1/8] Windows 워킹트리 → WSL 네이티브 빌드 디렉토리 동기화"
 # /mnt/e (NTFS) → ~/dev (ext4): npm install/빌드 I/O 가속을 위해 소스만 복사
+# `data/`, `logs/` 는 leading `/` 로 앵커링 — 루트의 운영 잔재만 보호하고
+# src/app/(protected)/logs, src/app/api/v1/data 같은 코드 디렉토리는 보존.
+# (배포본 rsync 의 동일 함정은 세션 50 에서 패치됐고, 본 빌드 rsync 는
+#  세션 70 2026-04-26 /logs 404 진단 중 동일 패턴으로 패치)
 rsync -a --delete \
   --exclude 'node_modules/' \
   --exclude '.next/' \
   --exclude 'standalone/.next/' \
   --exclude 'standalone/node_modules/' \
   --exclude '.git/' \
-  --exclude 'data/' \
-  --exclude 'logs/' \
+  --exclude '/.env' \
+  --exclude '/data/' \
+  --exclude '/logs/' \
   --exclude '.playwright-mcp/' \
   --exclude '.turbo/' \
   --exclude 'tsconfig.tsbuildinfo' \
   --exclude '*.log' \
   "$REPO_WIN_PATH/" "$WSL_BUILD_DIR/"
+# 주: /.env 는 build/deploy 양쪽 sync 모두 exclude — windows/build/ypserver 3계층
+# .env 파일을 독립 관리한다. 신규 운영 키 추가 시 windows 측 .env 가 build 측을
+# 덮어쓰지 않으므로, build 빌드타임 키와 windows 개발 키를 분리 유지 가능.
+# (memory: feedback_env_propagation, 2026-05-01 세션 72 적용)
 
 cd "$WSL_BUILD_DIR"
 

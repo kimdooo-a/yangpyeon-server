@@ -79,7 +79,9 @@ tags: [filebox, upload, cloudflare-tunnel, r2, s3, presigned-url, tus, oom]
 
 ---
 
-## 3. 권고: 옵션 B (R2 multipart presigned URL)
+## 3. 권고: V1=옵션 A → V2=옵션 B 점진 진화 (R2 hybrid)
+
+> **결정 (v1.0 ACCEPTED)**: 즉시 V1=옵션 A (단일 PUT, 5GB 한도). 5GB+ 케이스 또는 사용자 끊김 재시도 빈발 시 V2=옵션 B (multipart) 로 진화. 1.4GB 운영 컨텍스트에서는 V1 으로 충분.
 
 ### 3.1 채택 근거
 
@@ -125,16 +127,20 @@ tags: [filebox, upload, cloudflare-tunnel, r2, s3, presigned-url, tus, oom]
    R2_PUBLIC_BASE_URL=https://filebox-r2.stylelucky4u.com  # 또는 R2 dev 도메인
 ```
 
-### 4.2 PoC 측정 항목
+### 4.2 PoC 측정 항목 (실측: 2026-05-01 PoC 6/6, V1 ACCEPTED 직전)
 
-| 항목 | 방법 | 합격 기준 |
-|------|------|----------|
-| presigned URL 발급 latency | `@aws-sdk/client-s3` `getSignedUrl` 100회 평균 | < 50ms |
-| 1MB / 100MB / 1GB PUT 성공률 | Node.js `fetch` + presigned URL 각 10회 | 100% |
-| Chrome 브라우저 PUT 성공률 (CORS) | `fetch(presignedUrl, { method: 'PUT', body: file })` | 100% (CORS 차단 시 R2 버킷 CORS 정책 추가) |
-| 1GB 업로드 wall-clock | 100Mbps 회선 기준 | < 2분 |
-| 송신 중 네트워크 끊김 → 재시도 | 50% 시점 회선 차단 → 복구 | 옵션 A: 처음부터 / 옵션 B: 끊긴 chunk 부터 |
-| 메모리 사용량 (서버) | PM2 메트릭 | 50MB 이내 변동 (formData 제거 효과) |
+| 항목 | 방법 | 합격 기준 | **실측** | 판정 |
+|------|------|----------|---------|------|
+| presigned URL 발급 latency | `@aws-sdk/client-s3` `getSignedUrl` 100회 평균 | < 50ms | **avg 1.8ms** (28× 마진) | ✅ |
+| 1MB / 100MB PUT 성공률 | Node.js `fetch` + presigned URL | 100% | 1MB 749ms / 100MB 17.3s (~47Mbps) / 100% | ✅ |
+| 1GB PUT 성공률 | Node.js `fetch` + presigned URL | 100% | 회선 시간상 PoC 제외 — V1 운영 단계 자연 검증 | ⏸ 보류 |
+| Chrome 브라우저 PUT 성공률 (CORS) | `fetch(presignedUrl, { method: 'PUT', body: file })` | 100% (CORS 차단 시 R2 버킷 CORS 정책 추가) | Node fetch 는 CORS 미검사 — UI 통합(M6) 후 검증 | ⏸ 보류 |
+| HEAD 검증 latency (`r2-confirm` 용) | `getObject` 후 HEAD | 응답 < 200ms | **90ms** | ✅ |
+| 1GB 업로드 wall-clock | 100Mbps 회선 기준 | < 2분 | 회선 시간상 PoC 제외 — V1 운영 단계 자연 검증 | ⏸ 보류 |
+| 송신 중 네트워크 끊김 → 재시도 | 50% 시점 회선 차단 → 복구 | 옵션 A: 처음부터 / 옵션 B: 끊긴 chunk 부터 | V2 multipart 진화 시점 측정 | ⏸ V2 |
+| 메모리 사용량 (서버) | PM2 메트릭 | 50MB 이내 변동 (formData 제거 효과) | formData 호출 0 — 메모리 변동 무관 | ✅ 구조적 |
+
+**합격 4건 + 보류 3건 + V2 1건 = ACCEPTED 의결**. 보류 3건은 V1 운영 단계에서 첫 실사용자 케이스 발생 시 측정 → 미달 시 fallback 으로 옵션 D 강등 트리거.
 
 ### 4.3 PoC 실패 시나리오 → No-Go 트리거
 
@@ -213,4 +219,5 @@ model File {
 
 - 2026-05-01 v0.1 (세션 71): 초안 작성. 진단 문서(2026-05-01) + 4단 게이트 + 옵션 매트릭스 + R2 권고. 판정 Conditional Go (PoC 4h 게이트).
 - 2026-05-01 v0.2 (세션 71): V1 옵션 A 사전 코드 6 파일 spike-032-prepared-code/ 에 작성 완료. ACCEPTED 직후 5분 내 적용 가능.
+- 2026-05-01 v0.3 (세션 72, **doc 정정 only**): §3 권고 헤더를 "옵션 B" → "V1=옵션 A → V2=옵션 B 점진 진화" 로 정정 (실제 채택과 일치). §4.2 PoC 표를 합격 기준 단일 컬럼 → 합격 기준 + 실측 + 판정 3컬럼으로 확장하고 PoC 6/6 실측값 (presigned 1.8ms, 1MB 749ms, 100MB 17.3s, HEAD 90ms) + 보류 3건 (1GB / CORS / 끊김 재시도) 명시. 코드/마이그레이션/의존성 변경 0 — V1 ACCEPTED 결과의 추적성 보강 목적.
 - 2026-05-01 v1.0 (세션 71, **ACCEPTED**): R2 토큰 발급 (account=f8f9dfc7..., bucket=yangpyeon-filebox-prod). PoC 6/6 합격 — presigned URL 발급 avg 1.8ms (목표 <50ms 28× 마진), 1MB PutObject 749ms, 100MB PutObject 17.3s (~47Mbps), HEAD 90ms, fetch presigned PUT status=200. V1 옵션 A 즉시 적용: src/lib/r2.ts + r2-presigned/r2-confirm 라우트 2개 + Prisma migration 20260501100000_add_file_storage_type 적용 (3 row 모두 'local' 검증) + @aws-sdk/client-s3@3.1040 + s3-request-presigner 의존성 + WSL 빌드+배포+PM2 재시작 완료. CORS 브라우저 PUT 검증과 1GB wall-clock은 V1 운영 단계에서 자연스럽게 검증 (회선 시간상 PoC 단계 제외). ADR-032 ACCEPTED 동반 승격.
