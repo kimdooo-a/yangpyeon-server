@@ -1,7 +1,18 @@
-# 다음 세션 프롬프트 (세션 75)
+# 다음 세션 프롬프트 (세션 76)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 75 종료)
+
+- **세션 75 핵심 (redundant verification — M1~M4 doc cleanup 동시 작업 충돌)**:
+  1. **본 세션이 시도한 작업**: S72 R2 V1 검증 후 마무리 6건(M1~M6) 식별 → M1~M4 자율 cleanup 진행 (spike-032 §4.2 PoC 표 / §3 헤더 / §9 v0.3 / ADR-032 §7 게이트 / wsl-build-deploy.sh /.env exclude).
+  2. **결과**: 같은 워킹트리에서 동시 진행 중인 다른 터미널이 동일 M1~M4 cleanup 을 commit `6061cdc docs(s73-followup): M1-M4 spike-032/ADR-032 PoC 실측 정리 + wsl-build-deploy .env 보호` 로 먼저 적용. 본 세션의 spike/ADR/wsl-build-deploy.sh edits 는 byte-identical → unstaged 단계에서 자동으로 no-op. M5/M6 도 다른 터미널 s73 (commit `9eac758`) 에서 적용 완료, s74 = ALS 마이그레이션 (commit `c7f1c39`) 도 별도 마감.
+  3. **본 세션 산출**: session-end 문서만 (current.md s75 row / logs/2026-05.md s75 entry / journal s75 / handover `260501-session75-r2-doc-cleanup-overlap.md` / 본 prompt 갱신). 코드/마이그레이션/의존성 변경 0.
+  4. **교훈 (메모리 룰 후보)**: 같은 워킹트리에서 동시 진행 중인 다른 터미널 작업과 task overlap 가능. `/cs` 단계 진입 전 `git log --oneline -5` 로 동일 영역 commit 여부 사전 확인 → byte-identical no-op 누적 방지. (S71 의 `feedback_baseline_check_before_swarm` 룰의 자매 룰 후보)
+  5. **세션 76 첫 작업** = 운영자 R2 콘솔 CORS 적용(아래 §S76-A 1단계, 3분) + 50MB+ 브라우저 PUT 실측(5분).
 
 ---
 
@@ -89,9 +100,11 @@ npm run dev
 
 ---
 
-## ⭐ 세션 75 추천 작업
+## ⭐ 세션 76 추천 작업
 
-### S75-A. **세션 74 commit + WSL 배포 + 폰에서 모바일 드래그 실측** (P0, ~30분)
+> 세션 75 (본) 는 redundant verification 으로 commit 0 — 추천 작업은 직전 세션 73/74 에서 이월된 항목 그대로
+
+### S76-A. **세션 74 commit + WSL 배포 + 폰에서 모바일 드래그 실측** (P0, ~30분)
 
 세션 74에서 ALS 마이그레이션 + 모바일 드래그 코드 완료, `tsc` 통과. 미커밋 상태.
 
@@ -101,13 +114,13 @@ npm run dev
 4. 폰에서 stylelucky4u.com → /memo → 헤더 드래그 실측 (헤더만 드래그 활성, 텍스트 영역 편집 정상)
 5. **회귀 검증**: 자주 안 쓰는 라우트(log-drains/test, webhooks/[id]/trigger, cron/[id] PATCH/DELETE, admin/users/[id]/{sessions,mfa/reset}) 한 번씩 ping smoke
 
-### S75-B. **세션 72/73 미커밋 R2 V1 + R2 UI 영역 정리** (P0, ~30분)
+### S76-B. **세션 72/73 미커밋 R2 V1 + R2 UI 영역 정리** (P0, ~30분)
 
 - 세션 72 handover 가 commit `275464c` 주장하나 실제 git log 부재 → R2 V1 영역 (src/lib/r2.ts, src/app/api/v1/filebox/files/r2-{presigned,confirm}/, prisma/migrations/20260501100000_..., prisma/schema.prisma 등) 미커밋 상태 검증 후 commit.
 - 세션 73 R2 UI 영역 (FileUploadZone 50MB 분기, [id]/route.ts 다운로드 302, lib/filebox-db.ts deleteFile R2 분기 TODO 등) 미커밋 상태 검증 후 commit.
 - 본 세션 74 commit과 영역 분리하여 별개 commit (3 PR 또는 영역별 chained commit).
 
-### S75-C. **R2 콘솔 CORS 적용 + 브라우저 실측** (P0, ~10분 + 검증 5분)
+### S76-C. **R2 콘솔 CORS 적용 + 브라우저 실측** (P0, ~10분 + 검증 5분)
 
 세션 73 종료 시점 R2 백엔드/UI/다운로드 모두 코드 완료. 마지막 1마일 = R2 버킷 CORS 정책 적용.
 
@@ -134,7 +147,7 @@ npm run dev
    - (b) HTTP 403 + signature mismatch → Content-Type 헤더 불일치 (presign vs PUT)
    - (c) HTTP 400 expired → presigned URL 만료 (300초)
 
-### S75-D. **R2 객체 cleanup 부채 정리** (P1, ~3h, 같은 PR 권고)
+### S76-D. **R2 객체 cleanup 부채 정리** (P1, ~3h, 같은 PR 권고)
 
 세션 73에서 deleteFile 이 R2 파일은 DB row 만 삭제 (TODO 주석 명시).
 
