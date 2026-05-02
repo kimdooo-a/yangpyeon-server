@@ -14,6 +14,7 @@ import {
   messengerErrorResponse,
   emitMessengerAudit,
 } from "@/lib/messenger/route-utils";
+import { publishUserEvent } from "@/lib/messenger/sse";
 
 export const runtime = "nodejs";
 
@@ -57,6 +58,14 @@ export const POST = withTenant(async (request, user, tenant) => {
         blockId: block.id,
       },
     });
+
+    // M3 user 채널 — blocker 본인 채널 (cross-device sync 목적, PRD api-surface §4.3).
+    // 차단당한 사람에게는 노출하지 않음 (stalker risk 차단).
+    publishUserEvent(tenant.id, user.sub, "block.created", {
+      blockId: block.id,
+      blockedUserId: parsed.data.blockedId,
+    });
+
     return successResponse({ block }, 201);
   } catch (err) {
     return messengerErrorResponse(err);

@@ -14,6 +14,7 @@ import {
   messengerErrorResponse,
   emitMessengerAudit,
 } from "@/lib/messenger/route-utils";
+import { publishUserEvent } from "@/lib/messenger/sse";
 
 export const runtime = "nodejs";
 
@@ -57,6 +58,19 @@ export const POST = withTenantRole(
           performedActions: result.performedActions,
         },
       });
+
+      // M3 user 채널 — 신고자에게 처리 결과 알림 (PRD api-surface §4.3).
+      publishUserEvent(
+        tenant.id,
+        result.report.reporterId,
+        "report.resolved",
+        {
+          reportId: id,
+          action: parsed.data.action,
+          note: parsed.data.note ?? null,
+        },
+      );
+
       return successResponse(result);
     } catch (err) {
       return messengerErrorResponse(err);

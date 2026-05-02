@@ -132,3 +132,119 @@ describe("messenger/sse — publishUserEvent", () => {
     });
   });
 });
+
+describe("messenger/sse — user-channel 이벤트 4종 PRD payload 계약 (api-surface §4.3)", () => {
+  it("mention.received: {messageId, conversationId, sender, snippet} 형식 + 자동 주입 없음", () => {
+    const received: RealtimeMessage[] = [];
+    const unsub = subscribe(userChannelKey(T1, U1), (m) => received.push(m));
+    publishUserEvent(T1, U1, "mention.received", {
+      messageId: "msg-mention-1",
+      conversationId: C1,
+      sender: "user-sender",
+      snippet: "hi @bob 회의 시작합니다",
+    });
+    unsub();
+    expect(received).toHaveLength(1);
+    expect(received[0].event).toBe("mention.received");
+    expect(received[0].payload).toEqual({
+      messageId: "msg-mention-1",
+      conversationId: C1,
+      sender: "user-sender",
+      snippet: "hi @bob 회의 시작합니다",
+    });
+    // conv 채널과 달리 conversationId 자동 주입 안 함 — payload 그대로.
+    expect(Object.keys(received[0].payload as object).sort()).toEqual(
+      ["conversationId", "messageId", "sender", "snippet"].sort(),
+    );
+  });
+
+  it("dm.received: {messageId, conversationId, sender, snippet} 형식", () => {
+    const received: RealtimeMessage[] = [];
+    const unsub = subscribe(userChannelKey(T1, U1), (m) => received.push(m));
+    publishUserEvent(T1, U1, "dm.received", {
+      messageId: "msg-dm-1",
+      conversationId: C1,
+      sender: "user-sender",
+      snippet: "안녕",
+    });
+    unsub();
+    expect(received[0].event).toBe("dm.received");
+    expect(received[0].payload).toEqual({
+      messageId: "msg-dm-1",
+      conversationId: C1,
+      sender: "user-sender",
+      snippet: "안녕",
+    });
+  });
+
+  it("report.resolved: {reportId, action, note} 형식 — note 는 null 허용", () => {
+    const received: RealtimeMessage[] = [];
+    const unsub = subscribe(userChannelKey(T1, U1), (m) => received.push(m));
+    publishUserEvent(T1, U1, "report.resolved", {
+      reportId: "report-1",
+      action: "DELETE_MESSAGE",
+      note: null,
+    });
+    publishUserEvent(T1, U1, "report.resolved", {
+      reportId: "report-2",
+      action: "DISMISS",
+      note: "운영자 검토 완료",
+    });
+    unsub();
+    expect(received).toHaveLength(2);
+    expect(received[0].payload).toEqual({
+      reportId: "report-1",
+      action: "DELETE_MESSAGE",
+      note: null,
+    });
+    expect(received[1].payload).toEqual({
+      reportId: "report-2",
+      action: "DISMISS",
+      note: "운영자 검토 완료",
+    });
+  });
+
+  it("block.created: {blockId, blockedUserId} 형식 — blocker 본인 채널 (cross-device sync)", () => {
+    const received: RealtimeMessage[] = [];
+    // blocker 본인 채널 구독.
+    const unsub = subscribe(userChannelKey(T1, U1), (m) => received.push(m));
+    // 차단당한 사람 채널은 별개 — 격리 검증.
+    const blockedReceived: RealtimeMessage[] = [];
+    const U2 = "cccccccc-cccc-cccc-cccc-cccccccccccc";
+    const unsubBlocked = subscribe(userChannelKey(T1, U2), (m) =>
+      blockedReceived.push(m),
+    );
+
+    publishUserEvent(T1, U1, "block.created", {
+      blockId: "block-1",
+      blockedUserId: U2,
+    });
+    unsub();
+    unsubBlocked();
+
+    expect(received).toHaveLength(1);
+    expect(received[0].payload).toEqual({
+      blockId: "block-1",
+      blockedUserId: U2,
+    });
+    // 차단당한 사람에게는 publish 되지 않음 — stalker risk 차단.
+    expect(blockedReceived).toHaveLength(0);
+  });
+
+  it("cross-tenant 격리: T2 의 같은 userId 구독자는 T1 user-channel publish 를 받지 않음", () => {
+    const t1: RealtimeMessage[] = [];
+    const t2: RealtimeMessage[] = [];
+    const u1 = subscribe(userChannelKey(T1, U1), (m) => t1.push(m));
+    const u2 = subscribe(userChannelKey(T2, U1), (m) => t2.push(m));
+    publishUserEvent(T1, U1, "mention.received", {
+      messageId: "x",
+      conversationId: C1,
+      sender: "s",
+      snippet: "",
+    });
+    u1();
+    u2();
+    expect(t1).toHaveLength(1);
+    expect(t2).toHaveLength(0);
+  });
+});

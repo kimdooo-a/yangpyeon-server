@@ -119,6 +119,13 @@ async function fetchByCgid(input: {
 export async function sendMessage(input: SendMessageInput): Promise<{
   message: MessageWithRelations;
   created: boolean;
+  /** 라우트가 user 채널 publish 결정에 사용 (M3). */
+  conversationKind: "DIRECT" | "GROUP" | "CHANNEL";
+  /**
+   * DIRECT 일 때 sender 가 아닌 peer 의 userId, 그 외엔 null.
+   * 그룹은 peer 단일 식별 불가 → null. DM 알림 라우팅 전용.
+   */
+  otherMemberId: string | null;
 }> {
   // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
   const ctx = getCurrentTenant();
@@ -149,17 +156,8 @@ export async function sendMessage(input: SendMessageInput): Promise<{
     );
   }
 
-  // 사전 lookup — 멱등 fetch.
-  const existing = await fetchByCgid({
-    tenantId: ctx.tenantId,
-    conversationId: input.conversationId,
-    clientGeneratedId: input.clientGeneratedId,
-  });
-  if (existing) {
-    return { message: existing, created: false };
-  }
-
-  // DIRECT 차단 검증.
+  // DIRECT peer 식별 — 차단 검증 + 멱등 fetch 분기 + 신규 INSERT 후 반환에 모두 활용.
+  let otherMemberId: string | null = null;
   if (conv.kind === "DIRECT") {
     const other = await db.conversationMember.findFirst({
       where: {
@@ -168,12 +166,31 @@ export async function sendMessage(input: SendMessageInput): Promise<{
       },
       select: { userId: true },
     });
+    otherMemberId = other?.userId ?? null;
+  }
+
+  // 사전 lookup — 멱등 fetch.
+  const existing = await fetchByCgid({
+    tenantId: ctx.tenantId,
+    conversationId: input.conversationId,
+    clientGeneratedId: input.clientGeneratedId,
+  });
+  if (existing) {
+    return {
+      message: existing,
+      created: false,
+      conversationKind: conv.kind,
+      otherMemberId,
+    };
+  }
+
+  // DIRECT 차단 검증.
+  if (conv.kind === "DIRECT" && otherMemberId) {
     if (
-      other &&
-      (await isBlocked({
+      await isBlocked({
         userIdA: input.senderId,
-        userIdB: other.userId,
-      }))
+        userIdB: otherMemberId,
+      })
     ) {
       throw new MessengerError(
         "USER_BLOCKED",
@@ -275,7 +292,12 @@ export async function sendMessage(input: SendMessageInput): Promise<{
       });
       return msg as MessageWithRelations;
     });
-    return { message: created, created: true };
+    return {
+      message: created,
+      created: true,
+      conversationKind: conv.kind,
+      otherMemberId,
+    };
   } catch (err) {
     if (isUniqueViolation(err)) {
       const fresh = await fetchByCgid({
@@ -284,7 +306,12 @@ export async function sendMessage(input: SendMessageInput): Promise<{
         clientGeneratedId: input.clientGeneratedId,
       });
       if (fresh) {
-        return { message: fresh, created: false };
+        return {
+          message: fresh,
+          created: false,
+          conversationKind: conv.kind,
+          otherMemberId,
+        };
       }
     }
     throw err;

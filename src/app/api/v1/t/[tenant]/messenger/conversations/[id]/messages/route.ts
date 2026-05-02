@@ -24,7 +24,13 @@ import {
   messengerErrorResponse,
   emitMessengerAudit,
 } from "@/lib/messenger/route-utils";
-import { publishConvEvent } from "@/lib/messenger/sse";
+import { publishConvEvent, publishUserEvent } from "@/lib/messenger/sse";
+
+/** PRD §4.3 user-channel notif payload 의 snippet — 본문 80자 컷, kind!=TEXT 면 빈 문자열. */
+function buildSnippet(body: string | null, kind: "TEXT" | "IMAGE" | "FILE"): string {
+  if (kind !== "TEXT" || !body) return "";
+  return body.length > 80 ? body.slice(0, 80) : body;
+}
 
 export const runtime = "nodejs";
 
@@ -137,6 +143,37 @@ export const POST = withTenant(async (request, user, tenant, context) => {
       publishConvEvent(tenant.id, id, "message.created", {
         message: result.message,
       });
+
+      // M3 user 채널 — DM 수신 알림 (DIRECT 한정, peer 에게).
+      const snippet = buildSnippet(parsed.data.body ?? null, parsed.data.kind);
+      if (
+        result.conversationKind === "DIRECT" &&
+        result.otherMemberId &&
+        result.otherMemberId !== user.sub
+      ) {
+        publishUserEvent(tenant.id, result.otherMemberId, "dm.received", {
+          messageId: result.message.id,
+          conversationId: id,
+          sender: user.sub,
+          snippet,
+        });
+      }
+
+      // M3 user 채널 — 멘션 알림 (차단 필터링 후 살아남은 mentions 만).
+      for (const m of result.message.mentions) {
+        if (m.mentionedUserId === user.sub) continue; // 자기 자신 멘션 방어
+        publishUserEvent(
+          tenant.id,
+          m.mentionedUserId,
+          "mention.received",
+          {
+            messageId: result.message.id,
+            conversationId: id,
+            sender: user.sub,
+            snippet,
+          },
+        );
+      }
     }
     return successResponse(
       { message: result.message, created: result.created },

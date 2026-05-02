@@ -462,6 +462,79 @@ describe("messenger/messages (env-gated)", () => {
   );
 
   it.skipIf(!fx.hasDb)(
+    "sendMessage: DIRECT 반환에 conversationKind='DIRECT' + otherMemberId=peer 포함 (M3 user-channel routing 용)",
+    async () => {
+      const { runWithTenant } = await fx.modules();
+      const alice = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("rk-a"),
+      });
+      const bob = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("rk-b"),
+      });
+      const conv = await createConversation({
+        tenantId: TENANTS.a,
+        kind: "DIRECT",
+        creatorId: alice.id,
+        memberIds: [alice.id, bob.id],
+      });
+
+      await runWithTenant({ tenantId: TENANTS.a }, async () => {
+        const r = await messages.sendMessage({
+          conversationId: conv.id,
+          senderId: alice.id,
+          kind: "TEXT",
+          body: "DM 라우팅",
+          clientGeneratedId: randomUUID(),
+        });
+        expect(r.created).toBe(true);
+        expect(r.conversationKind).toBe("DIRECT");
+        expect(r.otherMemberId).toBe(bob.id);
+      });
+    },
+  );
+
+  it.skipIf(!fx.hasDb)(
+    "sendMessage: GROUP 반환은 conversationKind='GROUP' + otherMemberId=null (peer 단일 식별 불가)",
+    async () => {
+      const { runWithTenant } = await fx.modules();
+      const alice = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("rkg-a"),
+      });
+      const bob = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("rkg-b"),
+      });
+      const charlie = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("rkg-c"),
+      });
+      const conv = await createConversation({
+        tenantId: TENANTS.a,
+        kind: "GROUP",
+        creatorId: alice.id,
+        memberIds: [alice.id, bob.id, charlie.id],
+        title: "그룹 dm-routing",
+      });
+
+      await runWithTenant({ tenantId: TENANTS.a }, async () => {
+        const r = await messages.sendMessage({
+          conversationId: conv.id,
+          senderId: alice.id,
+          kind: "TEXT",
+          body: "그룹은 peer 단일 식별 불가",
+          clientGeneratedId: randomUUID(),
+        });
+        expect(r.created).toBe(true);
+        expect(r.conversationKind).toBe("GROUP");
+        expect(r.otherMemberId).toBeNull();
+      });
+    },
+  );
+
+  it.skipIf(!fx.hasDb)(
     "sendMessage: DIRECT peer 차단 시 USER_BLOCKED",
     async () => {
       const { runWithTenant } = await fx.modules();
