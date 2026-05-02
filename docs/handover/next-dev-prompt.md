@@ -1,11 +1,23 @@
-# 다음 세션 프롬프트 (세션 83)
+# 다음 세션 프롬프트 (세션 84)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 82 종료 — M3 user 채널 + M2 라이브 활성화 + Prisma/RLS/timezone 4 latent fix)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 83 종료 — S82 follow-up 6 task 일괄: timezone audit P1 + 60 sources 확장 + multipart cron + SSE 라이브)
+
+- **세션 83 핵심 (코드 commit 0, 신규 untracked 2 + WSL 빌드+재배포 1회)** — S82 종료 시 5 follow-up 인계 + 사용자가 P1 격상한 PrismaPg timezone audit 합 6 task 모두 완료. 모두 운영 액션 + 새 정책 산출 영역 (코드 변경 X).
+  1. **24h 관찰 + PrismaPg shift prod 발현 empirical 재확인**: cron 정상 (classify 11:00 KST 자연 tick = DB 02:00:31+09 표시). runNow 10:55 wall → DB last_run_at = `01:57:23+09` (정확히 -9h). cron 자체는 matchesSchedule = JS Date 기반이라 영향 0.
+  2. **60 sources 점진 확장**: 5 신규 활성 (github-blog/huggingface-blog/stripe-blog/kakao-tech/techcrunch-ai). 9 RSS active (anthropic-news 비활). runNow 검증 sources=8 fetched=130 errors=0. 단 inserted=0 duplicates=130 — 신규 소스가 기존 60 canonical URL 중첩 의심 (별도 진단).
+  3. **anthropic-news 비활성화**: RSS endpoint anthropic.com 측 제거 4 path 모두 404 확인. SQL UPDATE active=FALSE + notes 갱신.
+  4. **S78-H multipart cleanup cron**: `scripts/seaweedfs-clean-multipart.sh` (weed shell 호출 + 로그) + WSL `~/scripts/` 설치 + crontab `0 4 * * 0 ...` (매주 일요일 04:00 KST). 수동 1회 실행 PASS.
+  5. **M3 SSE 라이브 e2e**: events route (S81 commit `069705c`) 가 마지막 deploy 이후 추가됨 → 미배포 발견. WSL 빌드+재배포 1회 (PM2 ypserver pid 226263 → 252403, ↺=21, ELF Linux x86-64). 재배포 후 401 응답 확인 (events route 정상 빌드+withTenant guard). publish/subscribe 풀 e2e = browser auth 필요 (별도). 부수: Windows port 3000 leftover node.exe (pid 6608, ypserver 무관) 발견.
+  6. **[P1] PrismaPg timezone audit** (`docs/solutions/2026-05-02-prismapg-timezone-prod-audit.md`): 12 코드 위치 분류 — ✅ Prisma round-trip cancel (edit/recall window/today-top/search/circuit-breaker/MFA challenge) / ✅ DB-side calc only (rate-limit-db S40 마이그레이션 후, cleanup-scheduler) / ⚠️ raw SQL workaround 인지 (sessions tokens.ts `expires_at <= NOW()` -9h 시프트로 7일 → 6일 15시간, 사용자 미체감 / MFA service.ts ::text 캐스트) / ✅ 외부 timestamp 파싱 (RSS publishedAt). prod 데이터 손실 0, 사용자 체감 거의 0. 신규 코드 유입 위험 실재 (S82 통합 test 가 그 case). **권고 = `?options=-c TimeZone=UTC` prod DATABASE_URL 적용** (트래픽 저점, 적용 직후 active session 1회 재로그인 외 영향 미미) — **사용자 의사결정 대기**.
+  7. **검증**: tsc 0 / WSL 빌드+배포 PASS / `/events` 401 응답 / weed shell 수동 PASS / runNow 10792ms PASS.
+  8. **본 세션 교훈**: S82 의 5 follow-up 인계 + 사용자 P1 추가 격상 1건 = 6 task 단일 세션 압축. 코드 commit 0 (모두 운영 액션 + 분석 산출). PrismaPg shift 영구 fix 가 P1 우선순위로 부상.
+
+- **세션 82 핵심 (3 commits `152562d` + `8bef896` + `5449f9e`, +625 LOC, 17 파일)** — S81 6 후보 중 진행 가능 3 작업 동시 압축. M3 user 채널 4 이벤트 wiring + M2 통합 32 케이스 라이브 활성화 (이때 Prisma extension + AbuseReport @map + Asia/Seoul timezone + 세션 67/80 fixture/test 4 latent bug 동시 노출/fix) + M3 SSE wire format 자동 검증.
 
 - **세션 82 핵심 (3 commits `152562d` + `8bef896` + `5449f9e`, +625 LOC, 17 파일)** — S81 6 후보 중 진행 가능 3 작업 동시 압축. M3 user 채널 4 이벤트 wiring + M2 통합 32 케이스 라이브 활성화 (이때 Prisma extension + AbuseReport @map + Asia/Seoul timezone + 세션 67/80 fixture/test 4 latent bug 동시 노출/fix) + M3 SSE wire format 자동 검증.
   1. **M3 user 채널** (`152562d`, +292 LOC, 6 파일): mention/dm/report/block 4 이벤트. sendMessage 반환 확장 (conversationKind + otherMemberId, helper 가 이미 query 중) → 라우트가 추가 DB query 0 으로 publish 결정. buildSnippet 80자 컷 (TEXT 한정). **block.created 가 blocker 본인 채널** (cross-device sync, stalker risk 차단). 4 PRD payload 계약 + cross-tenant 격리 5 신규 테스트 + sendMessage DIRECT/GROUP 분기 2 env-gated.
@@ -22,34 +34,41 @@
 
 ---
 
-## ⭐ 세션 83 첫 작업 우선순위 (세션 82 종료 시점, 2026-05-02)
+## ⭐ 세션 84 첫 작업 우선순위 (세션 83 종료 시점, 2026-05-02)
 
 | # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
 |---|------|------|------|----------|
-| ~~M3 user 채널~~ | ~~mention/dm/report/block 4 이벤트 wiring~~ | — | — | ✅ **세션 82 완료** (`152562d`) |
-| ~~M2 통합 라이브~~ | ~~32 케이스 + Prisma/RLS/timezone 4 latent fix~~ | — | — | ✅ **세션 82 완료** (`8bef896`) |
-| ~~M3 SSE wire format~~ | ~~encodeSseEvent + 7 테스트~~ | — | — | ✅ **세션 82 완료** (`5449f9e`) |
-| **S83-A** | **prod PrismaPg timezone 시프트 영향 가시화 + audit** | **P1** | **~2h** | rate-limit window / edit-15min / recall-24h / session-expiry / cron schedule 비교 로직 전수 audit. prod 양방향 cancel 가정이 깨지는 지점 (특히 외부 API timestamp 파싱) 식별. `~/ypserver/.env` 에 `?options=-c TimeZone=UTC` 추가 검토. ADR 또는 follow-up spec 필요. |
-| **S83-B** | **24h+ 관찰 후 60 소스 점진 확장 (5씩)** | **P0** | ~30분 × N회 | S81 후 시간 경과 충분 시 즉시. cron `last_status`/ContentItem count/Gemini 한도 확인. b8-activate.ts 패턴 재사용. anthropic-news 는 RSS URL 갱신 후 또는 비활성 유지. |
-| S83-C | **M4 UI 보드 진입** (대화목록 + 채팅창 + composer) | P0 messenger | 5-7 작업일 | 별도 세션 chunk. wireframes.md §1 + PRD §9 참조. /messenger 라우트 + 사이드바 "커뮤니케이션" 그룹. SWR + SSE 통합 hook (useConversation/useMessages). axe-core 통합. |
-| S83-D | **M5 첨부 + 답장 + 멘션 + 검색** | P1 messenger | 3-4 작업일 | M4 후속. AttachmentPicker (filebox 통합) + cmdk 멘션 popover + 검색 페이지 (PG GIN trgm index). |
-| S83-E | **M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰** | P1 messenger | 3-4 작업일 | M5 후속. in-app 알림 종 + NotificationPreference 페이지 + BlockUserDialog + ReportMessageDialog + admin/messenger/{moderation,health,quota}. kdysharpedge 보안 리뷰. |
-| S83-F | totp.test.ts AES-GCM tamper 플레이크 fix | P2 | ~30분 | base64 last-char flip → decoded buffer middle byte flip 으로 변경. 결정적 변조 보장. |
-| S83-G | Phase 2 plugin 마이그레이션 (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. ADR-022 §1 Phase 2 트리거. |
-| S83-H | anthropic-news RSS URL 갱신 또는 제거 | P2 | ~10분 | 외부 사이트 측 변경 — 신규 URL 확인. 또는 다른 anthropic 콘텐츠 소스 추가. |
-| S83-I | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. S69 `srv_almanac_*` 키 발급 완료. 운영자 본인 작업. |
+| ~~S83-A timezone audit~~ | ~~12 위치 분류 + 영향 분석 + 권고~~ | — | — | ✅ **세션 83 완료** (`docs/solutions/2026-05-02-prismapg-timezone-prod-audit.md`). 사용자 의사결정 대기. |
+| ~~S83-B 60 sources 5 확장~~ | ~~github/huggingface/stripe/kakao/techcrunch~~ | — | — | ✅ **세션 83 완료** (9 RSS active, runNow PASS) |
+| ~~S83-H anthropic-news 비활~~ | ~~RSS endpoint 404 확인 후 active=FALSE~~ | — | — | ✅ **세션 83 완료** (대체 endpoint 탐색은 별도) |
+| ~~S78-H multipart cron~~ | ~~scripts/seaweedfs-clean-multipart.sh + crontab~~ | — | — | ✅ **세션 83 완료** (매주 일요일 04:00 KST) |
+| ~~M3 SSE 빌드+재배포~~ | ~~events route 라이브 진입~~ | — | — | ✅ **세션 83 완료** (PM2 ypserver pid 252403, ↺=21) |
+| **S84-A** | **prod DATABASE_URL `?options=-c TimeZone=UTC` 적용** | **P1 (사용자 의사결정)** | **~10분 + 24h 모니터** | audit §4.1 권고. 트래픽 저점 (KST 03:00~05:00). 절차: `~/ypserver/.env` 수정 → `pm2 restart ypserver` → smoke test (로그인+메시지+cron lastRunAt) → 24h 후 active session count 모니터. 영향: 적용 직후 active sessions 다수 expired 처리 → 사용자 재로그인 1회. 데이터 손실 0. |
+| **S84-B** | **untracked 2 파일 commit + push** | **P0 정합화** | **5분** | `docs/solutions/2026-05-02-prismapg-timezone-prod-audit.md` + `scripts/seaweedfs-clean-multipart.sh` — git status 확인 후 단일 commit. |
+| **S84-C** | **24h+ 관찰 후 추가 5 sources 확장** (9 → 14) | **P0** | ~30분 | S83 신규 5 소스의 cron 자연 fire 안정성 (consecutiveFailures<3) 확인 후. 안정 시 추가 5 활성. anthropic-news 는 대체 endpoint 발견 시 재활성. |
+| **S84-D** | **inserted=0 dedupe 진단** | **P1** | ~1h | runNow 의 inserted=0 duplicates=130 원인 — canonical URL 중첩 (예상) vs dedupe 너무 적극 구분. promote.ts + dedupe.ts 의 dedup key 추적 + 표본 ContentItem 수동 비교. 너무 적극이면 정책 완화 PR. |
+| S84-E | **M3 SSE browser publish/subscribe e2e** | P1 | ~30분 | 운영자 본인 (auth cookie + 실 conversation). 또는 다음 M4 UI 진입 시 자연 검증. |
+| S84-F | **M4 UI 보드 진입** (대화목록 + 채팅창 + composer) | P0 messenger | 5-7 작업일 | 별도 세션 chunk. wireframes.md §1 + PRD §9. /messenger 라우트 + 사이드바 "커뮤니케이션" 그룹. SWR + SSE 통합 hook (useConversation/useMessages). axe-core 통합. |
+| S84-G | **M5 첨부 + 답장 + 멘션 + 검색** | P1 messenger | 3-4 작업일 | M4 후속. AttachmentPicker (filebox 통합) + cmdk 멘션 popover + 검색 페이지 (PG GIN trgm index). |
+| S84-H | **M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰** | P1 messenger | 3-4 작업일 | M5 후속. in-app 알림 종 + NotificationPreference 페이지 + BlockUserDialog + ReportMessageDialog + admin/messenger/{moderation,health,quota}. kdysharpedge 보안 리뷰. |
+| S84-I | totp.test.ts AES-GCM tamper 플레이크 fix | P2 | ~30분 | base64 last-char flip → decoded buffer middle byte flip 으로 변경. 결정적 변조 보장. |
+| S84-J | Phase 2 plugin 마이그레이션 (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. ADR-022 §1 Phase 2 트리거. |
+| S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. Windows curl localhost:3000 라우팅 정상화 목적. |
+| S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. S69 `srv_almanac_*` 키 발급 완료. 운영자 본인 작업. |
 
 ### 영구 룰 (S82 후속 추가, commit `04e441b`)
 
 **PM2 운영 서버 임의 종료 절대 금지** — `CLAUDE.md` §"PM2 운영 서버 — 임의 종료 절대 금지 규칙" + `memory/feedback_pm2_servers_no_stop.md`. "모든 서버 종료" / "전부 다 내려" 같은 광범위 표현은 **세션 기동분 한정** (dev 서버, vitest worker 등). PM2 운영 4개 (ypserver/cloudflared/seaweedfs/pm2-logrotate) 는 명시적 지시 ("PM2 운영 서버 종료" / "ypserver 정지" / "pm2 stop all") 시에만 정지. 정지 전 영향 범위 1줄 보고 + 확인 필수.
 
-### S83 진입 시 첫 행동
+### S84 진입 시 첫 행동
 
 1. `git status` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
 2. `git pull origin spec/aggregator-fixes` (필요 시)
-3. **timezone audit** (S83-A) 또는 **24h 관찰 후 60 소스 확장** (S83-B) — 우선순위 사용자 결정 또는 자율
-4. **M3 user 채널 라이브 검증**: 운영자가 messenger 라우트 호출 (curl 또는 다음 세션 M4 UI 시) → SSE 연결 후 mention/dm publish 확인 — manual 가능
-5. M4 UI 진입 (별도 세션 chunk, 5-7일)
+3. **untracked 2 파일 정리** (S84-B): `docs/solutions/2026-05-02-prismapg-timezone-prod-audit.md` + `scripts/seaweedfs-clean-multipart.sh` — 단일 commit + push
+4. **timezone fix 적용 결정** (S84-A): 사용자 확인 후 트래픽 저점 적용 또는 보류
+5. **24h+ 관찰 후 60 sources 추가 확장** (S84-C, 9 → 14): cron `last_status` + ContentItem count + Gemini 한도 + consecutiveFailures<3 확인 후
+6. **inserted=0 dedupe 진단** (S84-D): runNow 의 130/130 dup 원인 분석
+7. M4 UI 진입 (S84-F, 별도 세션 chunk, 5-7일)
 
 ### 새로 정착한 인프라 (사용 패턴)
 
