@@ -1,7 +1,57 @@
-# 다음 세션 프롬프트 (세션 81)
+# 다음 세션 프롬프트 (세션 82)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 81 종료 — wave 5 세션 매핑 단일 압축)
+
+- **세션 81 핵심 (B7+B8 라이브 + Track C M2 23 라우트 + M3 SSE + M2 통합테스트 32, 3 commits `ffdd2dd` + `72b5ebd` + `069705c`, +3,164 LOC, 26 파일)** — 사용자 단일 요청 "B7,b8 + C 전체" 수렴, wave-wiggly-axolotl 의 5 세션 매핑(80~84) 단일 세션 압축.
+  1. **B7 시드+배포** (`ffdd2dd`, +477 LOC, 5 파일): scripts/seed-aggregator-cron.ts (Prisma.InputJsonValue 캐스트 1차 tsc 정정) + b8-list/activate/check/runnow 4 보조. WSL 직접 적용 → 6 row CREATE (enabled=FALSE). WSL 빌드+배포 pid 220187 ↺=19. ELF Linux x86-64 검증.
+  2. **B8 5 소스 활성화 + runNow 라이브 검증**: 60 sources 인벤토리 → 5 선정 (anthropic-news/openai-blog/vercel-blog/toss-tech/hn-algolia-front). 6 cron enabled=TRUE + circuit reset. **runNow 강제 실행** (24h cron tick 압축, 결정적 회귀 검증의 의미적 동등): rss-fetch SUCCESS 13s → classify SUCCESS 237ms → promote SUCCESS 303ms → **items=50 첫 production Almanac 카드 라이브** (4개월 P0 본진 완주).
+  3. **§3 격리 첫 production 실증**: anthropic-news 404 (외부 RSS URL 변경) → consecutiveFailures=1, 다른 4 소스 fetch 차단 0. ADR-022 §3 "한 컨슈머 실패 격리" 첫 production 검증.
+  4. **B3 한글 boundary fix 라이브 통과**: toss-tech (RSS ko) 한글 콘텐츠가 fetch+classify+promote 전 경로 통과 — spec port-time bug (regex `\b` ASCII-only) 가 production 차단되지 않음 증명.
+  5. **Track C M2 23 ops** (`72b5ebd`, +1,360 LOC, 17 파일): 4 그룹 (C1 conversations 5 ops / C2 messages 5 / C3 members+typing+receipts 5 / C4 safety+admin 8). 공용 `route-utils.ts` (MessengerError → HTTP status 매핑 20 코드 + emitMessengerAudit). 패턴 단일 (가드+Zod parse+helper 호출+audit+errorMapping). 헬퍼/스키마/타입 사전 완비 (S67/68) → 라우트 layer 만 신규. 17 라우트 unauth ping 모두 401. WSL 재배포 pid 226263 ↺=20.
+  6. **M3 SSE 채널 + M2 통합 테스트 32 케이스** (`069705c`, +1,332 LOC, 4 신규 + 5 갱신, 다른 터미널): src/lib/messenger/sse.ts (`convChannelKey(tenantId, conversationId)` + `userChannelKey` + publishConvEvent/publishUserEvent try-catch fail-soft, tenant-namespaced 채널) + `conversations/[id]/events/route.ts` (115 LOC, withTenant + 멤버 검증 + 25s keepalive + abort cleanup) + tests/messenger/m2-integration.test.ts (969 LOC, 32 case env-gated `it.skipIf`) + tests/messenger/sse.test.ts (134 LOC, 8 case no-DB). 5 producer 라우트 wiring (message.{created,updated,deleted} / member.{joined,left} / typing.started / receipt.updated) = 8/13 conv 이벤트.
+  7. **brittle test 회피**: vi.spyOn 모듈 namespace mock 의 ESM live binding flake 1회 발견 → listener-throw 패턴으로 교체 + 5-run 안정성 확인.
+  8. **검증** (전체 누적): tsc 0 / vitest 520 pass + 89 skip (베이스라인 509/60 대비 +11 pass +29 skip, 회귀 0) / WSL 빌드+배포 2회 PASS / ELF Linux x86-64.
+  9. **본 세션 교훈**: wave-wiggly-axolotl 5 세션 매핑 단일 압축은 (a) 헬퍼/스키마 사전 완비 + (b) 단일 패턴 + (c) cron 라이브 검증을 runNow 로 압축의 3 조건 충족 시 가능. 4개월 P0 본진 + Track C 라우트 layer + M3 실시간 인프라 + 통합 테스트 머지 게이트를 단일 세션 안에 도달.
+
+---
+
+## ⭐ 세션 82 첫 작업 우선순위 (세션 81 종료 시점, 2026-05-02)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| ~~B7~~ | ~~scripts/seed-aggregator-cron.ts + 6 jobs + WSL 빌드+배포~~ | — | — | ✅ **세션 81 완료** (`ffdd2dd`) |
+| ~~B8~~ | ~~5 소스 활성화 + runNow 라이브 검증~~ | — | — | ✅ **세션 81 완료** (runNow 압축, 첫 50개 카드 라이브) |
+| ~~Track C M2~~ | ~~23 ops 19 routes 4 그룹~~ | — | — | ✅ **세션 81 완료** (`72b5ebd`) |
+| ~~M3 SSE conv 8 이벤트~~ | ~~publishConvEvent 5 라우트 wiring~~ | — | — | ✅ **세션 81 완료** (`069705c`, 다른 터미널) |
+| ~~M2 통합 테스트 32~~ | ~~env-gated `it.skipIf` 패턴~~ | — | — | ✅ **세션 81 완료** (RLS_TEST_DATABASE_URL export 시 자동 활성) |
+| **S82-A** | **24h cron 자연 윈도우 관찰** + ContentItem count + Gemini 한도 + 60 source 점진 확장 (5씩) | **P0 본진 안정화** | **~1h (관찰) + 30분 (확장)** | cron schedule 자연 tick 대기. 안정성 확인 (consecutiveFailures<3) 후 5 소스씩 추가. anthropic-news 는 RSS URL 갱신 후 또는 비활성 유지. |
+| **S82-B** | **M3 SSE 라이브 e2e** (브라우저 EventSource 또는 curl SSE 클라이언트) | **P0 Track C** | **~2h** | 본 세션 = unit test only. 라이브 = 클라이언트가 실제 typing/message publish 수신 검증. publish 가 fan-out 정확한지. |
+| S82-C | **M3 user 채널 5 이벤트** (mention/dm/report/block/push) wiring | P1 | ~3h | publishUserEvent 라우팅 (sender→recipient userIds 추출 후 fan-out). mentions 차단 사용자 필터링 후 살아남은 mentions 만 publish. M4 push notification 통합 별도. |
+| S82-D | **RLS_TEST_DATABASE_URL 셋업** → M2 통합 테스트 32 활성화 | P1 | ~3h | WSL postgres test DB + 모든 마이그레이션 + RLS roles + admin role 패스워드. ops 부담 vs 머지 게이트 가치 trade-off. |
+| S82-E | **Almanac Vercel ALMANAC_TENANT_KEY env + redeploy** | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. S69 `srv_almanac_*` 키 발급 완료. 운영자 본인 작업. |
+| S82-F | anthropic-news RSS URL 갱신 (외부 사실 확인) | P2 | 5분 | 사이트 RSS 경로 변경 — 신규 URL 확인 후 source.endpoint 갱신. 또는 다른 anthropic 콘텐츠 소스 (X/Twitter, 블로그) 추가. |
+| S78-H | multipart cleanup cron 등록 (`s3.clean.uploads -timeAgo=24h`) | P1 | ~30분 | 미진행 부채. 어느 세션이든. |
+| S78-D | 폰 모바일 드래그 실측 (c7f1c39 PointerEvent) | P1 | 5분 | 보너스. |
+| S78-I | filer leveldb 전환 | P2 | 30분 | 50만 entry 도달 시만. |
+
+### S82 진입 시 첫 행동
+
+1. `git status` + `git log --oneline -5` 점검 (`feedback_concurrent_terminal_overlap` 룰)
+2. `git pull origin spec/aggregator-fixes` (필요 시)
+3. **24h 관찰** — `psql` 로 `ContentItem` count + `cron_jobs.last_status` + `content_sources.consecutiveFailures` 확인
+4. 안정성 확인 시 → S82-A 60 소스 점진 확장
+5. 또는 → S82-B M3 SSE 라이브 e2e (병행 가능)
+
+### Phase 2 plugin 트리거 (DAU/요구 도달 시)
+
+- `packages/tenant-almanac/` 신규 (현재 코드 = 단일 인스턴스 컨슈머)
+- ADR-022 §1 Phase 2 트리거 도달 시 — Almanac DAU 임계 또는 다른 컨슈머 추가 시
+- 단일 인스턴스 → multi-instance 분리 = Redis pubsub 도입 (M3 SSE bus.ts) + worker pool 격리 (cron registry) + tenant manifest packages 분리
 
 ---
 
