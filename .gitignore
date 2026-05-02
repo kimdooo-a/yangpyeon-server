@@ -72,3 +72,15 @@ nul
 !/standalone/install-native-linux.sh
 !/standalone/.env.production.example
 !/standalone/README.md
+
+# Claude Code 로컬/임시 산출 (세션 83 정리)
+# settings.json 은 추적 (공통 정책), settings.local.json 은 사용자별 (시크릿/경로 포함 가능)
+/.claude/settings.local.json
+# 실행 중 PID 락 (세션 종료 즉시 무의미)
+/.claude/scheduled_tasks.lock
+# 병렬 에이전트 워크트리 (각 ~30~50MB node_modules 포함, 임시 작업공간)
+/.claude/worktrees/
+
+# kdyswarm 락 파일 (세션 단위 역사 기록은 lock.completed-*.json 로 일부 추적,
+# 진행 중 lock.json 은 ephemeral)
+/.kdyswarm/lock.json
