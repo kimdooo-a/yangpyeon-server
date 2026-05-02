@@ -68,3 +68,16 @@ export function publishUserEvent(
     console.warn("[messenger.sse] publish failed", { tenantId, userId, event, err });
   }
 }
+
+/**
+ * SSE wire format 인코더 — `event: <name>\ndata: <json>\n\n`.
+ * EventSource spec 준수. payload 는 JSON.stringify.
+ */
+export function encodeSseEvent(event: string, payload: unknown): string {
+  return `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+}
+
+/** SSE comment (keepalive) — `: <text>\n\n`. EventSource 가 무시. */
+export function encodeSseComment(text: string): string {
+  return `: ${text}\n\n`;
+}

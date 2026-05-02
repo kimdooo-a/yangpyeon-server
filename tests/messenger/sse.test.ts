@@ -20,6 +20,8 @@ import {
   userChannelKey,
   publishConvEvent,
   publishUserEvent,
+  encodeSseEvent,
+  encodeSseComment,
 } from "@/lib/messenger/sse";
 
 const T1 = "11111111-1111-1111-1111-111111111111";
@@ -246,5 +248,135 @@ describe("messenger/sse — user-channel 이벤트 4종 PRD payload 계약 (api-
     u2();
     expect(t1).toHaveLength(1);
     expect(t2).toHaveLength(0);
+  });
+});
+
+describe("messenger/sse — wire format (EventSource spec)", () => {
+  it("encodeSseEvent: `event: <name>\\ndata: <json>\\n\\n` 형식", () => {
+    const out = encodeSseEvent("message.created", {
+      messageId: "m-1",
+      body: "hello",
+    });
+    expect(out).toBe(
+      `event: message.created\ndata: {"messageId":"m-1","body":"hello"}\n\n`,
+    );
+    // EventSource parser 가 인식하는 핵심: `\n\n` 종결자.
+    expect(out.endsWith("\n\n")).toBe(true);
+  });
+
+  it("encodeSseEvent: payload 가 nested 객체 — JSON.stringify 동등", () => {
+    const payload = { user: { id: "u-1", name: "Alice" }, ts: 1234567890 };
+    const out = encodeSseEvent("typing.started", payload);
+    expect(out).toBe(`event: typing.started\ndata: ${JSON.stringify(payload)}\n\n`);
+  });
+
+  it("encodeSseComment: `: <text>\\n\\n` 형식 (EventSource 가 무시)", () => {
+    expect(encodeSseComment("keepalive")).toBe(": keepalive\n\n");
+  });
+
+  it("encodeSseEvent: payload 의 한글/이모지 unescape 보존", () => {
+    const out = encodeSseEvent("dm.received", { snippet: "안녕 👋" });
+    // JSON.stringify 가 한글/이모지는 그대로 출력.
+    expect(out).toContain("안녕 👋");
+  });
+});
+
+describe("messenger/sse — bus → stream end-to-end (EventSource simulation)", () => {
+  it("subscribe + publish + encode → SSE wire bytes 가 EventSource parser 가 읽을 형식", async () => {
+    const T = "11111111-1111-1111-1111-111111111111";
+    const C = "ccccccc-cccc-cccc-cccc-cccccccccccc";
+    const collected: string[] = [];
+
+    // route.ts 와 동일한 구독 + 인코딩 흐름.
+    const unsub = subscribe(convChannelKey(T, C), (msg) => {
+      collected.push(encodeSseEvent(msg.event, msg.payload));
+    });
+
+    publishConvEvent(T, C, "message.created", {
+      message: { id: "m-1", body: "live" },
+    });
+    publishConvEvent(T, C, "typing.started", { userId: "u-2" });
+    publishConvEvent(T, C, "receipt.updated", { lastReadMessageId: "m-1" });
+
+    unsub();
+
+    expect(collected).toHaveLength(3);
+    // EventSource 가 `event:` 와 `data:` 를 라인 단위로 파싱.
+    expect(collected[0]).toMatch(/^event: message\.created\ndata: \{.*"id":"m-1".*\}\n\n$/);
+    expect(collected[1]).toMatch(/^event: typing\.started\n/);
+    expect(collected[2]).toMatch(/^event: receipt\.updated\n/);
+  });
+
+  it("ReadableStream + TextEncoder 통합: 1 publish → 1 chunk decoded back to event", async () => {
+    const T = "11111111-1111-1111-1111-111111111111";
+    const C = "ddddddd-dddd-dddd-dddd-dddddddddddd";
+    const encoder = new TextEncoder();
+
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+      },
+    });
+
+    const unsub = subscribe(convChannelKey(T, C), (msg) => {
+      controller.enqueue(encoder.encode(encodeSseEvent(msg.event, msg.payload)));
+    });
+
+    publishConvEvent(T, C, "message.created", { message: { id: "m-2" } });
+    controller.close();
+    unsub();
+
+    // stream 으로부터 raw bytes 읽기.
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    const chunks: string[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(decoder.decode(value));
+    }
+    const wire = chunks.join("");
+
+    // EventSource 파싱 시뮬레이션 (단순화 — 첫 event 만 파싱).
+    const eventLine = wire.split("\n").find((l) => l.startsWith("event: "));
+    const dataLine = wire.split("\n").find((l) => l.startsWith("data: "));
+    expect(eventLine).toBe("event: message.created");
+    expect(dataLine).toBeDefined();
+    const data = JSON.parse(dataLine!.slice("data: ".length));
+    expect(data).toEqual({
+      conversationId: C,
+      message: { id: "m-2" },
+    });
+  });
+
+  it("multiple concurrent subscribers: 같은 채널 구독자 N 명 동시 수신", () => {
+    const T = "11111111-1111-1111-1111-111111111111";
+    const C = "eeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+    const a: string[] = [];
+    const b: string[] = [];
+    const c: string[] = [];
+
+    const ua = subscribe(convChannelKey(T, C), (m) =>
+      a.push(encodeSseEvent(m.event, m.payload)),
+    );
+    const ub = subscribe(convChannelKey(T, C), (m) =>
+      b.push(encodeSseEvent(m.event, m.payload)),
+    );
+    const uc = subscribe(convChannelKey(T, C), (m) =>
+      c.push(encodeSseEvent(m.event, m.payload)),
+    );
+
+    publishConvEvent(T, C, "message.created", { message: { id: "broadcast" } });
+
+    ua();
+    ub();
+    uc();
+
+    expect(a).toHaveLength(1);
+    expect(b).toHaveLength(1);
+    expect(c).toHaveLength(1);
+    expect(a[0]).toBe(b[0]);
+    expect(b[0]).toBe(c[0]);
   });
 });

@@ -27,7 +27,11 @@ import { withTenant } from "@/lib/api-guard-tenant";
 import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { errorResponse } from "@/lib/api-response";
 import { subscribe } from "@/lib/realtime/bus";
-import { convChannelKey } from "@/lib/messenger/sse";
+import {
+  convChannelKey,
+  encodeSseEvent,
+  encodeSseComment,
+} from "@/lib/messenger/sse";
 import type { RealtimeMessage } from "@/lib/types/supabase-clone";
 
 export const runtime = "nodejs";
@@ -69,15 +73,13 @@ export const GET = withTenant(async (request, user, tenant, context) => {
         }
       };
 
-      send(
-        `event: ready\ndata: ${JSON.stringify({ channel, conversationId: id })}\n\n`,
-      );
+      send(encodeSseEvent("ready", { channel, conversationId: id }));
 
       unsubscribe = subscribe(channel, (msg: RealtimeMessage) => {
-        send(`event: ${msg.event}\ndata: ${JSON.stringify(msg.payload)}\n\n`);
+        send(encodeSseEvent(msg.event, msg.payload));
       });
 
-      keepalive = setInterval(() => send(`: keepalive\n\n`), 25_000);
+      keepalive = setInterval(() => send(encodeSseComment("keepalive")), 25_000);
 
       const signal = (request as unknown as NextRequest).signal;
       const cleanup = () => {
