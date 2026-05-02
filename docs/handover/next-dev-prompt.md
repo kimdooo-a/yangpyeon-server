@@ -1,7 +1,80 @@
-# 다음 세션 프롬프트 (세션 82)
+# 다음 세션 프롬프트 (세션 83)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 82 종료 — M3 user 채널 + M2 라이브 활성화 + Prisma/RLS/timezone 4 latent fix)
+
+- **세션 82 핵심 (3 commits `152562d` + `8bef896` + `5449f9e`, +625 LOC, 17 파일)** — S81 6 후보 중 진행 가능 3 작업 동시 압축. M3 user 채널 4 이벤트 wiring + M2 통합 32 케이스 라이브 활성화 (이때 Prisma extension + AbuseReport @map + Asia/Seoul timezone + 세션 67/80 fixture/test 4 latent bug 동시 노출/fix) + M3 SSE wire format 자동 검증.
+  1. **M3 user 채널** (`152562d`, +292 LOC, 6 파일): mention/dm/report/block 4 이벤트. sendMessage 반환 확장 (conversationKind + otherMemberId, helper 가 이미 query 중) → 라우트가 추가 DB query 0 으로 publish 결정. buildSnippet 80자 컷 (TEXT 한정). **block.created 가 blocker 본인 채널** (cross-device sync, stalker risk 차단). 4 PRD payload 계약 + cross-tenant 격리 5 신규 테스트 + sendMessage DIRECT/GROUP 분기 2 env-gated.
+  2. **M2 라이브 + 4 latent bug fix** (`8bef896`, +180 LOC, 8 파일): WSL postgres `luckystyle4u_test` 신규 DB (38 tables + 30 RLS policies + role GRANTs, schema-only clone) 첫 실행 67 fail/25 pass 에서 4 함정 동시 노출:
+     - **(A.3) Prisma extension `query(args)` escape — 가장 큰 발견**: `tenantPrismaFor`/`prismaWithTenant` 의 `$transaction` 안에서 `tx.$executeRawUnsafe('SET LOCAL app.tenant_id')` 적용 후 `query(args)` 호출 시 query 가 우리 tx connection 을 사용하지 않고 base client 의 새 conn 으로 escape → SET LOCAL 무효 → RLS always-fail (0 rows). **prod 가 BYPASSRLS postgres 사용해서 가려져 있던 latent bug**. 비-bypass role(`app_test_runtime`)로 테스트하는 첫 시도에서 노출. 수정: `tx[modelCamel][operation](args)` 직접 호출 + raw operation 은 args array spread 로 tx 에 binding (양 함수 동일 적용).
+     - **(A.4) PrismaPg + Asia/Seoul timezone +9hr 시프트**: WSL postgres session timezone = Asia/Seoul. PrismaPg adapter 가 TIMESTAMPTZ 의 +09 offset 을 ignore 하고 local 시각을 UTC 로 mis-parse → 9시간 시프트. prod read/write 양방향 동시 시프트로 cancel 되어 보이지 않으나 admin pool (raw pg) + Prisma 혼용 시 노출. 회피: `?options=-c TimeZone=UTC`. **prod 영향 가시화 follow-up 별도 필요** (rate-limit/edit/recall/session 비교 audit).
+     - **(A.2) AbuseReport.targetKind @map 누락**: schema 가 `targetKind` (camelCase, no @map), DB 가 `target_kind` (snake_case). prod 미운영 라우트라 latent. session 80 Track C M2 추가 시 누락된 채 머지된 흔적.
+     - **(A.1) 세션 67/80 fixture/test 5건**: tenant_memberships ON CONSTRAINT 명 미실재 (INDEX 형태) / files-folders cascade cleanup 누락 / message_receipts.lastReadAt 미실재 / notification_preferences.id+created_at 미실재 (composite PK) / DUPLICATE_REPORT regex vs Korean message — 모두 라이브 테스트 한 번도 안 돌아서 통과한 채로 머지된 흔적.
+     - **인프라 영구 정착**: `scripts/setup-test-db-role.sh` (app_test_runtime password 발급) + `scripts/run-integration-tests.sh` (bash 러너, WSL→Win cross-OS env 손실 노트 포함) + `.env.test.example` (env 템플릿). 메신저 92/92 PASS.
+  3. **M3 SSE wire format** (`5449f9e`, +153 LOC, 3 파일): events/route.ts 의 인라인 SSE 형식을 `encodeSseEvent(event, payload)` + `encodeSseComment(text)` 헬퍼로 추출. 7 신규 테스트 (wire format 4 + ReadableStream+TextEncoder 통합 1 + multiple subscribers 1 + 한글·이모지 unescape 1). 브라우저 EventSource 라이브 검증 자동화 대체.
+  4. **M4 = UI 보드** (PRD 확인): 사용자 message 의 "M4 push notification (web push subscribe)" 는 mis-naming. 실제 PRD 의 messenger Phase 1 M4 = UI 보드 (대화목록 + 채팅창 + composer, 5-7 작업일). web push (Service Worker / VAPID) 자체 Phase 1 미포함 (M6 가 in-app SSE only). 진입 안 함.
+  5. **검증**: tsc 0 / vitest 532 pass + 91 skip (베이스라인 525/89 → +7 sse wire-format) / live 92/92 / 5-run 4 깔끔 + 1 totp.test.ts AES-GCM tamper 플레이크 (pre-existing, base64 padding 한정 flip).
+  6. **본 세션 교훈**: 라이브 테스트 첫 시도가 4 latent bug 동시 노출. prod = BYPASSRLS = RLS 검증 회피 + 양방향 timezone 시프트 cancel = bug 가려짐 = 머지 통과. 라이브 검증 부재 시 회귀 누적의 전형. 인프라 정착 후 향후 모든 messenger 도메인 변경 회귀 자동 차단.
+
+---
+
+## ⭐ 세션 83 첫 작업 우선순위 (세션 82 종료 시점, 2026-05-02)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| ~~M3 user 채널~~ | ~~mention/dm/report/block 4 이벤트 wiring~~ | — | — | ✅ **세션 82 완료** (`152562d`) |
+| ~~M2 통합 라이브~~ | ~~32 케이스 + Prisma/RLS/timezone 4 latent fix~~ | — | — | ✅ **세션 82 완료** (`8bef896`) |
+| ~~M3 SSE wire format~~ | ~~encodeSseEvent + 7 테스트~~ | — | — | ✅ **세션 82 완료** (`5449f9e`) |
+| **S83-A** | **prod PrismaPg timezone 시프트 영향 가시화 + audit** | **P1** | **~2h** | rate-limit window / edit-15min / recall-24h / session-expiry / cron schedule 비교 로직 전수 audit. prod 양방향 cancel 가정이 깨지는 지점 (특히 외부 API timestamp 파싱) 식별. `~/ypserver/.env` 에 `?options=-c TimeZone=UTC` 추가 검토. ADR 또는 follow-up spec 필요. |
+| **S83-B** | **24h+ 관찰 후 60 소스 점진 확장 (5씩)** | **P0** | ~30분 × N회 | S81 후 시간 경과 충분 시 즉시. cron `last_status`/ContentItem count/Gemini 한도 확인. b8-activate.ts 패턴 재사용. anthropic-news 는 RSS URL 갱신 후 또는 비활성 유지. |
+| S83-C | **M4 UI 보드 진입** (대화목록 + 채팅창 + composer) | P0 messenger | 5-7 작업일 | 별도 세션 chunk. wireframes.md §1 + PRD §9 참조. /messenger 라우트 + 사이드바 "커뮤니케이션" 그룹. SWR + SSE 통합 hook (useConversation/useMessages). axe-core 통합. |
+| S83-D | **M5 첨부 + 답장 + 멘션 + 검색** | P1 messenger | 3-4 작업일 | M4 후속. AttachmentPicker (filebox 통합) + cmdk 멘션 popover + 검색 페이지 (PG GIN trgm index). |
+| S83-E | **M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰** | P1 messenger | 3-4 작업일 | M5 후속. in-app 알림 종 + NotificationPreference 페이지 + BlockUserDialog + ReportMessageDialog + admin/messenger/{moderation,health,quota}. kdysharpedge 보안 리뷰. |
+| S83-F | totp.test.ts AES-GCM tamper 플레이크 fix | P2 | ~30분 | base64 last-char flip → decoded buffer middle byte flip 으로 변경. 결정적 변조 보장. |
+| S83-G | Phase 2 plugin 마이그레이션 (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. ADR-022 §1 Phase 2 트리거. |
+| S83-H | anthropic-news RSS URL 갱신 또는 제거 | P2 | ~10분 | 외부 사이트 측 변경 — 신규 URL 확인. 또는 다른 anthropic 콘텐츠 소스 추가. |
+| S83-I | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. S69 `srv_almanac_*` 키 발급 완료. 운영자 본인 작업. |
+
+### S83 진입 시 첫 행동
+
+1. `git status` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (필요 시)
+3. **timezone audit** (S83-A) 또는 **24h 관찰 후 60 소스 확장** (S83-B) — 우선순위 사용자 결정 또는 자율
+4. **M3 user 채널 라이브 검증**: 운영자가 messenger 라우트 호출 (curl 또는 다음 세션 M4 UI 시) → SSE 연결 후 mention/dm publish 확인 — manual 가능
+5. M4 UI 진입 (별도 세션 chunk, 5-7일)
+
+### 새로 정착한 인프라 (사용 패턴)
+
+**메신저 통합 테스트 라이브 실행**:
+```powershell
+# PowerShell (현재 권장 — WSL→Win cross-OS env 손실 회피)
+$env:RLS_TEST_DATABASE_URL='postgresql://app_test_runtime:<pwd>@localhost:5432/luckystyle4u_test?options=-c%20TimeZone%3DUTC'
+$env:RLS_TEST_ADMIN_DATABASE_URL='postgresql://postgres:<pwd>@localhost:5432/luckystyle4u_test'
+$env:DATABASE_URL=$env:RLS_TEST_DATABASE_URL
+npx vitest run --no-file-parallelism tests/messenger/
+```
+또는 WSL Linux Node 설치 시 `bash scripts/run-integration-tests.sh tests/messenger/`.
+
+**`.env.test.local`** (gitignored, S82 셋업 완료):
+- `RLS_TEST_RUNTIME_PASSWORD` = app_test_runtime password
+- `RLS_TEST_ADMIN_PASSWORD` = postgres superuser password (prod 와 동일)
+
+**테스트 DB 재생성** (필요 시):
+```bash
+wsl -- psql -U postgres -c "DROP DATABASE IF EXISTS luckystyle4u_test; CREATE DATABASE luckystyle4u_test;"
+wsl -- pg_dump -U postgres --schema-only --no-owner luckystyle4u | wsl -- psql -U postgres -d luckystyle4u_test
+wsl -- bash scripts/setup-test-db-role.sh
+```
+
+### Phase 2 plugin 트리거 (DAU/요구 도달 시)
+
+- `packages/tenant-almanac/` 신규 (현재 코드 = 단일 인스턴스 컨슈머)
+- ADR-022 §1 Phase 2 트리거 도달 시 — Almanac DAU 임계 또는 다른 컨슈머 추가 시
+- 단일 인스턴스 → multi-instance 분리 = Redis pubsub 도입 (M3 SSE bus.ts) + worker pool 격리 (cron registry) + tenant manifest packages 분리
 
 ---
 
@@ -19,6 +92,10 @@
   9. **본 세션 교훈**: wave-wiggly-axolotl 5 세션 매핑 단일 압축은 (a) 헬퍼/스키마 사전 완비 + (b) 단일 패턴 + (c) cron 라이브 검증을 runNow 로 압축의 3 조건 충족 시 가능. 4개월 P0 본진 + Track C 라우트 layer + M3 실시간 인프라 + 통합 테스트 머지 게이트를 단일 세션 안에 도달.
 
 ---
+
+## (세션 81 종료 시점 표 — 참고용 보존, S82 에서 모두 진행됨)
+
+(세션 82 진행 결과는 위 §"세션 83 첫 작업 우선순위" 참조)
 
 ## ⭐ 세션 82 첫 작업 우선순위 (세션 81 종료 시점, 2026-05-02)
 
