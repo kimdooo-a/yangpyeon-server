@@ -172,4 +172,19 @@ WSL PM2 3개 (cloudflared 6일 / seaweedfs 20h / ypserver 2h ↺=20) + pm2-logro
 
 ---
 
+## 세션 82 후속 (/cs 2차) — CLAUDE.md PM2 운영 서버 룰 명문화
+
+> **사용자**: "claude.md에 명시. pm2 운영서버는 명시적으로 pm2 운영서버 종료를 명령하기 전까지 계속 업데이트, 운영해야되어야한다. 세션 안에서의 서버 종료는 해당 세션에서 기동한 서버에 한한다."
+
+직전 /cs 1차 완료 시점에 PM2 4개 (cloudflared/seaweedfs/ypserver/pm2-logrotate) 보존 + 사용자 추가 확인 대기 상태. 사용자가 광범위 표현 ("모든 서버 종료") 의 적용 범위를 영구 명문화 지시.
+
+**산출 (commit `04e441b`)**:
+- `CLAUDE.md` §"PM2 운영 서버 — 임의 종료 절대 금지 규칙" 신설 (16줄): PM2 등록 프로세스는 명시적 종료 지시 전까지 절대 정지 X / "모든 서버 종료" = 세션 기동분 한정 / 명시적 종료 명령 시 영향 범위 1줄 보고 + 확인 / 코드 변경 운영 적용은 정지가 아닌 재배포.
+- `memory/feedback_pm2_servers_no_stop.md` 신규 — 광범위 표현 매핑표 + 명시적 정지 명령 처리 절차.
+- `MEMORY.md` 인덱스 업데이트.
+
+향후 모든 세션 자동 인지 — 외부 stylelucky4u.com 24/7 운영 보호.
+
+---
+
 [← handover/_index.md](./_index.md)

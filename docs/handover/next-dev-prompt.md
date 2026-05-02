@@ -39,6 +39,10 @@
 | S83-H | anthropic-news RSS URL 갱신 또는 제거 | P2 | ~10분 | 외부 사이트 측 변경 — 신규 URL 확인. 또는 다른 anthropic 콘텐츠 소스 추가. |
 | S83-I | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. S69 `srv_almanac_*` 키 발급 완료. 운영자 본인 작업. |
 
+### 영구 룰 (S82 후속 추가, commit `04e441b`)
+
+**PM2 운영 서버 임의 종료 절대 금지** — `CLAUDE.md` §"PM2 운영 서버 — 임의 종료 절대 금지 규칙" + `memory/feedback_pm2_servers_no_stop.md`. "모든 서버 종료" / "전부 다 내려" 같은 광범위 표현은 **세션 기동분 한정** (dev 서버, vitest worker 등). PM2 운영 4개 (ypserver/cloudflared/seaweedfs/pm2-logrotate) 는 명시적 지시 ("PM2 운영 서버 종료" / "ypserver 정지" / "pm2 stop all") 시에만 정지. 정지 전 영향 범위 1줄 보고 + 확인 필수.
+
 ### S83 진입 시 첫 행동
 
 1. `git status` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
