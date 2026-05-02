@@ -325,9 +325,8 @@ describe("messenger/m2-integration (env-gated) — receipts 4 cases", () => {
             conversationId: conv.id,
             userId: alice.id,
             lastReadMessageId: msg.id,
-            lastReadAt: new Date(),
           },
-          update: { lastReadMessageId: msg.id, lastReadAt: new Date() },
+          update: { lastReadMessageId: msg.id },
         });
       });
       expect(out.lastReadMessageId).toBe(msg.id);
@@ -366,9 +365,8 @@ describe("messenger/m2-integration (env-gated) — receipts 4 cases", () => {
             conversationId: conv.id,
             userId: alice.id,
             lastReadMessageId: m1.id,
-            lastReadAt: new Date(),
           },
-          update: { lastReadMessageId: m1.id, lastReadAt: new Date() },
+          update: { lastReadMessageId: m1.id },
         });
         await db.messageReceipt.upsert({
           where: { conversationId_userId: { conversationId: conv.id, userId: alice.id } },
@@ -376,9 +374,8 @@ describe("messenger/m2-integration (env-gated) — receipts 4 cases", () => {
             conversationId: conv.id,
             userId: alice.id,
             lastReadMessageId: m2.id,
-            lastReadAt: new Date(),
           },
-          update: { lastReadMessageId: m2.id, lastReadAt: new Date() },
+          update: { lastReadMessageId: m2.id },
         });
       });
       const pool = await getAdminPool();
@@ -449,8 +446,8 @@ describe("messenger/m2-integration (env-gated) — receipts 4 cases", () => {
       // BYPASSRLS 로 receipt 직접 시드.
       const pool = await getAdminPool();
       await pool.query(
-        `INSERT INTO message_receipts (id, tenant_id, conversation_id, user_id, last_read_message_id, last_read_at)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, NOW())`,
+        `INSERT INTO message_receipts (tenant_id, conversation_id, user_id, last_read_message_id, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())`,
         [TENANTS.b, convB.id, aliceB.id, msgB.id],
       );
       const visible = await runWithTenant({ tenantId: TENANTS.a }, async () => {
@@ -542,8 +539,8 @@ describe("messenger/m2-integration (env-gated) — notification-preferences 4 ca
       // tenant_b row 시드 (admin pool BYPASSRLS).
       const pool = await getAdminPool();
       await pool.query(
-        `INSERT INTO notification_preferences (id, tenant_id, user_id, mentions_only, push_enabled, created_at, updated_at)
-         VALUES (gen_random_uuid(), $1, $2, false, true, NOW(), NOW())`,
+        `INSERT INTO notification_preferences (tenant_id, user_id, mentions_only, push_enabled, updated_at)
+         VALUES ($1, $2, false, true, NOW())`,
         [TENANTS.b, userB.id],
       );
       const visible = await runWithTenant({ tenantId: TENANTS.a }, async () => {
@@ -881,7 +878,7 @@ describe("messenger/m2-integration (env-gated) — abuse-reports duplicate 3 cas
             reason: "ABUSE",
           }),
         ),
-      ).rejects.toThrow(/DUPLICATE_REPORT/);
+      ).rejects.toMatchObject({ code: "DUPLICATE_REPORT" });
     },
   );
 

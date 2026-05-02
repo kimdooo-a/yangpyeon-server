@@ -1070,7 +1070,7 @@ model AbuseReport {
   id             String                @id @default(uuid()) @db.Uuid
   tenantId       String                @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
   reporterId     String                @map("reporter_id")
-  targetKind     AbuseReportTargetKind
+  targetKind     AbuseReportTargetKind @map("target_kind")
   targetId       String                @map("target_id")
   reason         String                @db.Text
   status         AbuseReportStatus     @default(OPEN)

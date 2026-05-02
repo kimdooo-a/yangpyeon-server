@@ -79,7 +79,7 @@ function getExtendedClient() {
       name: "tenant-rls",
       query: {
         $allOperations: async (params: AllOperationsParams) => {
-          const { args, query } = params;
+          const { args, model, operation } = params;
           const ctx = getCurrentTenantOrNull();
           if (!ctx) {
             throw new Error(
@@ -88,22 +88,44 @@ function getExtendedClient() {
             );
           }
 
-          // Extension 자체가 transaction 을 감싸지 않으면 SET LOCAL 이 다음 query 까지 살지 못한다.
-          // basePrisma.$transaction 으로 감싸 GUC 가 query 시점에 유효하게 한다.
-          // tx 는 Omit<PrismaClient, ITXClientDenyList> — generated client 의 @ts-nocheck 영향으로
-          // 타입 surface 가 부정확. 다른 호출 사이트와 동일하게 any 로 캐스트.
+          // 2026-05-02 (s82) — tenantPrismaFor 와 동일 함정. query(args) 가 tx connection
+          // 을 사용하지 않고 base client 의 새 connection 으로 escape → SET LOCAL 무효.
+          // 수정: tx 안에서 model.operation 을 직접 호출하여 같은 connection 보장.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           return (basePrisma as PrismaClient).$transaction(async (tx: any) => {
-            const txAny = tx;
             if (ctx.bypassRls) {
-              await txAny.$executeRawUnsafe(`SET LOCAL ROLE app_admin`);
+              await tx.$executeRawUnsafe(`SET LOCAL ROLE app_admin`);
             } else {
               const safeUuid = assertValidUuid(ctx.tenantId);
-              await txAny.$executeRawUnsafe(
+              await tx.$executeRawUnsafe(
                 `SET LOCAL app.tenant_id = '${safeUuid}'`,
               );
             }
-            return query(args);
+            if (!model) {
+              // Raw operation ($executeRawUnsafe/$queryRawUnsafe/$queryRaw 등) — tx
+              // delegate 호출 시 args 가 array 면 spread (variadic), 아니면 단일 인자.
+              const rawFn = (tx as Record<string, unknown>)[operation];
+              if (typeof rawFn === "function") {
+                if (Array.isArray(args)) {
+                  return (rawFn as (...a: unknown[]) => Promise<unknown>).apply(
+                    tx,
+                    args,
+                  );
+                }
+                return (rawFn as (a: unknown) => Promise<unknown>).call(tx, args);
+              }
+              return params.query(args);
+            }
+            const camel = model.charAt(0).toLowerCase() + model.slice(1);
+            const delegate = (tx as Record<string, unknown>)[camel] as
+              | Record<string, (args: unknown) => Promise<unknown>>
+              | undefined;
+            if (!delegate || typeof delegate[operation] !== "function") {
+              throw new Error(
+                `prismaWithTenant: unknown model/operation in tx — ${model}.${operation}`,
+              );
+            }
+            return delegate[operation].call(delegate, args);
           });
         },
       },
@@ -148,7 +170,18 @@ export function tenantPrismaFor(ctx: TenantContext): PrismaClient {
     name: "tenant-rls-direct",
     query: {
       $allOperations: async (params: AllOperationsParams) => {
-        const { args, query } = params;
+        const { args, model, operation } = params;
+        // 2026-05-02 (s82): Prisma extension 의 `query(args)` 콜백은 우리가 연
+        // `$transaction` 의 tx connection 을 사용하지 않고 base client 의
+        // 새 connection 으로 escape 한다. 결과: SET LOCAL app.tenant_id 가 적용된
+        // tx 와 실제 query 가 다른 connection 이라 RLS 가 always-fail (0 rows).
+        //
+        // 수정: tx 안에서 SET LOCAL 이후 같은 tx client 의 model.operation 을 직접
+        // 호출. Prisma extension 의 자동 query(args) 우회. params.model 은 PascalCase
+        // ("Message") 라 camelCase 로 변환 필요.
+        //
+        // prod 환경(postgres BYPASSRLS) 에서는 SET LOCAL 이 no-op 와 같으나 테스트 환경
+        // (app_test_runtime non-bypass) 에서는 본 fix 가 필수.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         return (basePrisma as PrismaClient).$transaction(async (tx: any) => {
           if (ctx.bypassRls) {
@@ -159,7 +192,28 @@ export function tenantPrismaFor(ctx: TenantContext): PrismaClient {
               `SET LOCAL app.tenant_id = '${safeUuid}'`,
             );
           }
-          return query(args);
+          // Raw operation ($queryRaw/$executeRaw 등) 은 model 미지정 — 원본 query 사용.
+          // 단 raw 도 tx connection 을 써야 하므로 tx 에 binding.
+          if (!model) {
+            const rawFn = (tx as Record<string, unknown>)[operation];
+            if (typeof rawFn === "function") {
+              return (rawFn as (args: unknown) => Promise<unknown>).call(tx, args);
+            }
+            // fallback: 알 수 없는 raw operation — query 콜백 사용 (transaction 밖이지만
+            // bypass 모드일 가능성 높음).
+            return params.query(args);
+          }
+          // PascalCase → camelCase ("Message" → "message", "AbuseReport" → "abuseReport").
+          const camel = model.charAt(0).toLowerCase() + model.slice(1);
+          const delegate = (tx as Record<string, unknown>)[camel] as
+            | Record<string, (args: unknown) => Promise<unknown>>
+            | undefined;
+          if (!delegate || typeof delegate[operation] !== "function") {
+            throw new Error(
+              `tenantPrismaFor: unknown model/operation in tx — ${model}.${operation}`,
+            );
+          }
+          return delegate[operation].call(delegate, args);
         });
       },
     },

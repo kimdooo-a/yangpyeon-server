@@ -134,6 +134,16 @@ export async function resetMessengerData(): Promise<void> {
     `DELETE FROM tenant_memberships WHERE tenant_id = ANY($1::uuid[])`,
     [tenantArr],
   );
+  // 첨부 파일 정리 — files.owner_id FK 가 users 에 걸려 있어 DELETE FROM users 차단 회피.
+  // 테스트 stored_name pattern 으로 좁힘.
+  await pool.query(
+    `DELETE FROM files WHERE stored_name LIKE 'mxtest-%' OR (tenant_id = ANY($1::uuid[]) AND owner_id IN (SELECT id FROM users WHERE email LIKE 'mxtest-%@x.com'))`,
+    [tenantArr],
+  );
+  await pool.query(
+    `DELETE FROM folders WHERE name LIKE 'mxtest-%' OR (tenant_id = ANY($1::uuid[]) AND owner_id IN (SELECT id FROM users WHERE email LIKE 'mxtest-%@x.com'))`,
+    [tenantArr],
+  );
   // test 시작/종료 시 user 도 정리. 테스트 email pattern 으로 좁혀 다른 시드와 충돌 회피.
   await pool.query(`DELETE FROM users WHERE email LIKE 'mxtest-%@x.com'`);
 }
@@ -172,10 +182,11 @@ export async function createUser(input: CreateUserInput): Promise<SeededUser> {
   const row = r.rows[0] as { id: string; tenant_id: string; email: string };
 
   if (input.withMembership !== false) {
+    // ON CONFLICT 은 컬럼 기반 — UNIQUE 는 INDEX 형태 (CONSTRAINT 이름 비실재).
     await pool.query(
       `INSERT INTO tenant_memberships (id, tenant_id, user_id, role, created_at, updated_at)
        VALUES (gen_random_uuid(), $1, $2, $3, NOW(), NOW())
-       ON CONFLICT ON CONSTRAINT tenant_memberships_tenant_id_user_id_key DO NOTHING`,
+       ON CONFLICT (tenant_id, user_id) DO NOTHING`,
       [input.tenantId, row.id, input.membershipRole ?? "MEMBER"],
     );
   }

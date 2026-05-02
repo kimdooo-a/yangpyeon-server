@@ -173,7 +173,8 @@ describe("messenger/messages (env-gated)", () => {
         creatorId: alice.id,
         memberIds: [alice.id, bob.id],
       });
-      const past = new Date(Date.now() - 15 * 60 * 1000 - 1000);
+      // 15분 + 5초 margin — clock drift / TIMESTAMPTZ ms truncation 회피.
+      const past = new Date(Date.now() - 15 * 60 * 1000 - 5000);
       const seeded = await createMessage({
         tenantId: TENANTS.a,
         conversationId: conv.id,
@@ -254,7 +255,8 @@ describe("messenger/messages (env-gated)", () => {
         creatorId: alice.id,
         memberIds: [alice.id, bob.id],
       });
-      const past = new Date(Date.now() - 24 * 60 * 60 * 1000 - 1000);
+      // 24h + 5초 margin — clock drift / TIMESTAMPTZ ms truncation 회피.
+      const past = new Date(Date.now() - 24 * 60 * 60 * 1000 - 5000);
       const seeded = await createMessage({
         tenantId: TENANTS.a,
         conversationId: conv.id,
