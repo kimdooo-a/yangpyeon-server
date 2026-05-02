@@ -37,6 +37,22 @@
 - `memory/project_standalone_reversal.md` — standalone 모드 재도입 (2026-04-19 세션 3)
 - `memory/feedback_migration_apply_directly.md` — Claude 직접 마이그레이션 적용 정책
 
+## PM2 운영 서버 — 임의 종료 절대 금지 규칙 (Claude 직접 적용)
+
+이 컴퓨터의 WSL2 Ubuntu 에서 PM2 가 관리하는 운영 서버는 stylelucky4u.com 외부 컨슈머에게 24/7 서비스 중이다. 세션 종료(`/cs`) 또는 사용자가 "모든 서버 종료" 같은 광범위 표현을 사용하더라도, 다음 규칙을 강제한다:
+
+- **PM2 운영 서버(`ypserver`, `cloudflared`, `seaweedfs`, `pm2-logrotate` 및 향후 추가될 모든 PM2 등록 프로세스) 는 운영자가 명시적으로 "PM2 운영 서버 종료" 또는 동등한 표현으로 지시하기 전까지 절대 정지/재시작하지 않는다.**
+- "모든 서버 종료" 같은 광범위 표현은 **해당 세션에서 Claude 가 직접 기동한 서버에 한정**한다 (예: 세션 중 띄운 dev 서버, 테스트용 ad-hoc 프로세스, vitest worker leftover 등).
+- 세션 외부에서 이미 운영 중이던 PM2 프로세스는 명시적 정지 명령(예: "ypserver 정지", "pm2 stop all", "운영 서버 내려") 가 있을 때만 다음 명령으로 처리한다:
+  ```bash
+  wsl -d Ubuntu -- bash -lc 'source ~/.nvm/nvm.sh && pm2 stop <name>'
+  ```
+- 정지 전에는 **반드시 영향 범위(어떤 외부 서비스가 OFF 되는지) 를 1줄로 보고 + 확인** 한다. PM2 운영 서버 정지는 파괴적 행동에 해당.
+- 코드 변경 후 운영 적용은 정지가 아닌 **재배포** (`/ypserver` 스킬, `pack-standalone.sh` + `wsl-build-deploy.sh` + `pm2 restart ypserver`) 로 처리.
+
+**연관 메모리:**
+- `memory/project_overview.md` — 운영 인프라 구성
+
 ## 문서 체계 (풀뿌리 트리)
 
 이 파일(CLAUDE.md)이 루트입니다. 모든 기록은 아래 트리를 따라 빠짐없이 연결됩니다.
