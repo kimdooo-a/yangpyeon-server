@@ -151,11 +151,18 @@ export async function dedupeAgainstDb(
     batchUnique.push({ item, hash });
   }
 
-  // 2) DB 와 비교 — 일괄 SELECT (tenant-scoped via RLS)
+  // 2) DB 와 비교 — 일괄 SELECT (tenant-scoped via RLS + explicit tenantId)
+  //
+  // S84-D (2026-05-03): WHERE 에 ctx.tenantId 명시 (defense-in-depth).
+  // 배경: prod = postgres BYPASSRLS → SET LOCAL app.tenant_id 가 RLS 회피로 인해
+  // 행 필터링 효과 없음. dedupe 가 RLS 에만 의존하면 다른 tenant 의 동일 urlHash
+  // 행이 "existing" 으로 오인되어 over-aggressive duplicate flagging 발생.
+  // 사례: 5/2 21:00 runNow 가 130 신규를 default tenant legacy 행과 충돌시켜
+  // inserted=1 duplicates=129 (실제 신규 130 모두 fresh).
   const hashes = batchUnique.map((x) => x.hash);
   const prisma = tenantPrismaFor(ctx);
   const existing = await prisma.contentIngestedItem.findMany({
-    where: { urlHash: { in: hashes } },
+    where: { tenantId: ctx.tenantId, urlHash: { in: hashes } },
     select: { urlHash: true },
   });
   const existingSet = new Set(existing.map((r) => r.urlHash));

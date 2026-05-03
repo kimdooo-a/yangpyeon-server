@@ -270,4 +270,20 @@ describe("dedupeAgainstDb — DB 일괄 dedupe (mocked)", () => {
     );
     expect(callArgs.select).toEqual({ urlHash: true });
   });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // S84-D 진단 후속 — cross-tenant collision 차단 (BYPASSRLS prod 회피)
+  // ─────────────────────────────────────────────────────────────────────────
+  // 원인: prod = postgres BYPASSRLS → SET LOCAL app.tenant_id 가 RLS 회피로 인해
+  // SELECT 필터링 효과 없음. dedupe 가 RLS 에만 의존하면 다른 tenant 의 동일
+  // urlHash 행을 "existing" 으로 오인 → over-aggressive duplicate flagging.
+  // 2026-05-02 21:00 runNow: 130 fetched 가 default tenant 의 legacy 130 행과
+  // collision 되어 inserted=1 duplicates=129 (사실 신규 130 모두 fresh 였음).
+  // 수정: WHERE 절에 ctx.tenantId 명시 (defense-in-depth).
+  it("26. SELECT where 에 ctx.tenantId 가 명시되어야 함 (BYPASSRLS 회피)", async () => {
+    findManyMock.mockResolvedValueOnce([]);
+    await dedupeAgainstDb([makeItem("https://a.com/1")], FAKE_TENANT_CTX);
+    const callArgs = findManyMock.mock.calls[0][0];
+    expect(callArgs.where.tenantId).toBe(FAKE_TENANT_CTX.tenantId);
+  });
 });
