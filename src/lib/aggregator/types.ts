@@ -66,13 +66,17 @@ export interface FetchReport {
 /**
  * AGGREGATOR cron job 분기 키.
  * cron payload.module 으로 전달되어 runner.ts 에서 디스패치.
+ *
+ * cleanup (S84+ 추가): 기존 SQL kind 의 readonly 풀 한계 회피 — 30일 경과
+ * rejected/duplicate ingested 행을 tenant-scoped 로 삭제. aggregator/cleanup.ts.
  */
 export type AggregatorModule =
   | "rss-fetcher"
   | "html-scraper"
   | "api-poller"
   | "classifier"
-  | "promoter";
+  | "promoter"
+  | "cleanup";
 
 /**
  * runner 가 cron 에 반환하는 표준 결과 포맷.

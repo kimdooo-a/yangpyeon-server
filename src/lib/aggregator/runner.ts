@@ -35,6 +35,7 @@ import { fetchSource } from "./fetchers";
 import { dedupeAgainstDb, urlHash } from "./dedupe";
 import { enrichItem } from "./llm";
 import { promotePending } from "./promote";
+import { runCleanup } from "./cleanup";
 
 const FAILURE_THRESHOLD = 5;
 const DEFAULT_CLASSIFIER_BATCH = 50;
@@ -74,6 +75,8 @@ export async function runAggregatorModule(
           payload.batch ?? DEFAULT_CLASSIFIER_BATCH,
           started,
         );
+      case "cleanup":
+        return await runCleanupModule(ctx, started);
       default:
         return {
           status: "FAILURE",
@@ -307,5 +310,21 @@ async function runPromoter(
       result.errors > 0 && result.promoted === 0 ? "FAILURE" : "SUCCESS",
     durationMs: Date.now() - startedAt,
     message: `promoted=${result.promoted} errors=${result.errors}`,
+  };
+}
+
+/**
+ * cleanup 모듈 — 30일 경과 rejected/duplicate ingested 행 삭제.
+ * 기존 SQL kind 의 readonly 풀 한계 회피용 (S84+ 부채 해소).
+ */
+async function runCleanupModule(
+  ctx: TenantContext,
+  startedAt: number,
+): Promise<AggregatorRunResult> {
+  const result = await runCleanup(ctx);
+  return {
+    status: "SUCCESS",
+    durationMs: Date.now() - startedAt,
+    message: `deleted=${result.deleted}`,
   };
 }

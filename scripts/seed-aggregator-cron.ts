@@ -18,7 +18,12 @@
  *   - almanac-api-poll       (every 6h, AGGREGATOR api-poller)
  *   - almanac-classify       (every 30m, AGGREGATOR classifier batch=50)
  *   - almanac-promote        (every 30m, AGGREGATOR promoter   batch=50)
- *   - almanac-cleanup        (0 3 * * *, SQL DELETE 30일 경과 rejected/duplicate)
+ *   - almanac-cleanup        (0 3 * * *, AGGREGATOR module=cleanup, 30일 경과 rejected/duplicate 삭제)
+ *
+ * S84+ (2026-05-03): cleanup 이 SQL kind 였으나 cron runner.ts 의 SQL 핸들러가
+ * runReadonly 풀을 사용해 DELETE 가 "cannot execute DELETE in a read-only
+ * transaction" 으로 매번 FAILURE. AGGREGATOR module=cleanup 으로 이전
+ * (aggregator/cleanup.ts).
  */
 import { prisma } from "@/lib/prisma";
 import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
@@ -48,11 +53,6 @@ interface CronJobSeed {
   kind: "SQL" | "FUNCTION" | "WEBHOOK" | "AGGREGATOR";
   payload: Prisma.InputJsonValue;
 }
-
-const CLEANUP_SQL =
-  "DELETE FROM content_ingested_items " +
-  "WHERE status IN ('rejected','duplicate') " +
-  "AND fetched_at < NOW() - INTERVAL '30 days'";
 
 const ALMANAC_CRON_JOBS: CronJobSeed[] = [
   {
@@ -88,8 +88,8 @@ const ALMANAC_CRON_JOBS: CronJobSeed[] = [
   {
     name: "almanac-cleanup",
     schedule: "0 3 * * *",
-    kind: "SQL",
-    payload: { sql: CLEANUP_SQL },
+    kind: "AGGREGATOR",
+    payload: { module: "cleanup" },
   },
 ];
 
