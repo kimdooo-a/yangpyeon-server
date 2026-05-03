@@ -103,7 +103,8 @@ CLAUDE.md (루트 — 지금 이 파일)
 │   │   ├─ ADR-028 (Cron Worker Pool — hybrid 옵션 D)
 │   │   └─ ADR-029 (Per-tenant Observability — M1+L1+T3 → Phase 4 OTel)
 │   ├─→ 02-proposals/ ·················· CLAUDE.md 정체성 재정의 제안서
-│   └─→ 03-spikes/ ····················· spike-baas-001 (Prisma) + spike-baas-002 (worker pool)
+│   ├─→ 03-spikes/ ····················· spike-baas-001 (Prisma) + spike-baas-002 (worker pool)
+│   └─→ 04-architecture-wave/wave-tracker.md ··· 4-Track 진척도 (A/B/C/D, S80~ 갱신, 세션 종료마다 row 1행)
 │
 ├─→ spikes/README.md ····················· 기술 검증 결과 색인 + Quick Reference
 │   ├─→ spike-001-frontend-design/ ······ 프론트엔드 디자인 리서치
@@ -155,6 +156,23 @@ CLAUDE.md (루트 — 지금 이 파일)
 - **컨슈머 등록**: 코드 수정 0줄. `packages/tenant-<id>/manifest.ts` + DB tenants 테이블 row 추가만 (ADR-026).
 - **장애 격리 검증**: 새 기능이 cross-tenant 전파 없음을 PR 본문에 증명 (테스트 또는 설계 근거).
 - **첫 컨슈머 Almanac**: spec/aggregator-fixes v1.0 그대로 출시, 출시 후 `packages/tenant-almanac/`로 마이그레이션 (ADR-024 부속 결정).
+
+### PR 리뷰 게이트 룰 (S82 4 latent bug 재발 차단, 2026-05-03 정착)
+
+세션 82 첫 라이브 테스트가 4개월간 prod 에서 가려져 있던 4 latent bug 동시 노출 (Prisma extension RLS escape, PrismaPg timezone shift, AbuseReport @map 누락, 5 fixture/test). 재발 차단을 위해 모든 backend PR 본문에 다음 5 항목 필수 명시:
+
+1. **신규 모델 = `tenantId` 첫 컬럼 + RLS 정책 + composite unique 검증**
+2. **신규 라우트 = `withTenant()` 가드 + cross-tenant 격리 테스트** (다른 tenant id 로 조회 시 0 rows 또는 403 검증)
+3. **Prisma 호출 = `tenantPrismaFor(ctx)` closure 패턴** (ALS 의존 X, 메모리 룰 `project_workspace_singleton_globalthis` 적용). raw operation 시 args array spread 로 tx binding.
+4. **non-BYPASSRLS role 로 라이브 테스트 1회 통과** — `bash scripts/run-integration-tests.sh tests/<domain>/` (PowerShell 권장 = WSL→Win cross-OS env 손실 회피). prod 가 BYPASSRLS postgres 사용해서 가려지는 RLS bug 차단.
+5. **timezone-sensitive 비교** = (a) Prisma round-trip cancel 패턴 (write/read 양방향 동시) **또는** (b) `expires_at <= NOW()` raw SQL workaround 명시 + 영향 분석 (`docs/solutions/2026-05-02-prismapg-timezone-prod-audit.md` 참조). prod TimeZone=UTC 적용 후 (S84-A 완료 시) 본 항목은 자동 통과.
+
+**신규 도메인** (messenger 외 추가 시): 본 룰의 4번 게이트가 통과하기 전에는 prod 머지 금지. 통합 테스트 인프라 (`scripts/setup-test-db-role.sh` + `scripts/run-integration-tests.sh` + `.env.test.local`) 가 이미 정착되어 있으니 신규 도메인은 첫 라이브 테스트를 머지 게이트로 두는 것이 4 latent bug 패턴 재발 차단의 가장 확실한 정책.
+
+**연관 문서:**
+- `docs/research/baas-foundation/04-architecture-wave/wave-tracker.md` §2.2 (S82 4 latent bug 분류)
+- `memory/feedback_verification_scope_depth.md` (검증 깊이 = handler 진입 후 1 step)
+- `docs/solutions/2026-05-02-prismapg-timezone-prod-audit.md` (timezone audit 12 위치 분류)
 
 ## 세션 시작/종료
 - **시작**: `docs/status/current.md` + 최신 `docs/handover/` 인수인계서 확인
