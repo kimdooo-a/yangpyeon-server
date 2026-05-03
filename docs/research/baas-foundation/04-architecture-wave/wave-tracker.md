@@ -82,7 +82,7 @@ S81 anthropic-news 404 → consecutiveFailures=1, 다른 4 소스 fetch 차단 0
 - [ ] 24h+ 관찰 후 추가 5 sources 확장 (9 → 14, S84-C)
 - [x] **inserted=0 dedupe 진단 (S84-D)** — 2026-05-03 완료. root cause = `dedupe.ts` WHERE 절 tenantId 누락 + prod BYPASSRLS + 레거시 130 default-tenant 행. **Fix A** (코드 explicit tenantId 필터) + **Fix B** (130 default → almanac UPDATE, cross-tenant FK 0). `docs/solutions/2026-05-03-dedupe-cross-tenant-collision-root-cause.md`
 - [ ] anthropic-news 대체 endpoint 탐색
-- [ ] **almanac-cleanup cron FAILURE** (`cannot execute DELETE in a read-only transaction`) — 별개 이슈, S84+ task
+- [x] **almanac-cleanup cron FAILURE 해소** (S84+, 2026-05-03) — SQL kind 의 readonly 풀 한계 회피. AGGREGATOR module=cleanup 신설 (`src/lib/aggregator/cleanup.ts`, TDD 6 PASS). DB row `kind:SQL→AGGREGATOR, payload:{module:"cleanup"}` 적용 + b8-runnow 라이브 검증 SUCCESS deleted=0. **prod 배포는 다른 터미널 M4 UI Phase 1 WIP 안정화 후** (현재 transient import 미완성 — `ConversationList.tsx` 가 미작성 hook 참조).
 
 ---
 
