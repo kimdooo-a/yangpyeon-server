@@ -36,6 +36,9 @@ import {
   Lock,
   Trash2,
   StickyNote,
+  MessageCircle,
+  Bell,
+  Activity,
 } from "lucide-react";
 
 type NavItem = {
@@ -57,6 +60,12 @@ const navItems: NavItem[] = [
   { href: "/filebox", label: "파일박스", icon: <IconFilebox size={18} />, group: "콘텐츠" },
   { href: "/notes", label: "메모", icon: <StickyNote size={18} />, group: "콘텐츠" },
   { href: "/members", label: "회원 관리", icon: <IconMembers size={18} />, group: "콘텐츠" },
+
+  // 커뮤니케이션 — Track C Messenger Phase 1 M4 UI 진입 (S84-F1)
+  { href: "/messenger", label: "대화", icon: <MessageCircle size={18} />, group: "커뮤니케이션" },
+  { href: "/messenger/settings", label: "알림 설정", icon: <Bell size={18} />, group: "커뮤니케이션" },
+  { href: "/admin/messenger/moderation", label: "신고/차단 운영", icon: <ShieldCheck size={18} />, group: "커뮤니케이션" },
+  { href: "/admin/messenger/health", label: "메신저 헬스", icon: <Activity size={18} />, group: "커뮤니케이션" },
 
   // 데이터베이스 (신규 — 세션 14)
   { href: "/tables", label: "테이블 에디터", icon: <Table2 size={18} />, group: "데이터베이스" },
@@ -98,6 +107,7 @@ const ADMIN_ONLY_PATHS = [
   "/members",
   "/functions",
   "/database/backups",
+  "/admin/messenger/health",
 ];
 
 /** MANAGER 이상만 접근 가능한 경로 */
@@ -111,11 +121,13 @@ const MANAGER_PLUS_PATHS = [
   "/realtime",
   "/advisors/security",
   "/advisors/performance",
+  "/admin/messenger/moderation",
 ];
 
 const GROUP_ORDER = [
   "운영",
   "콘텐츠",
+  "커뮤니케이션",
   "데이터베이스",
   "개발 도구",
   "감사·설정",
