@@ -112,8 +112,12 @@ describe("AES-256-GCM encryption", () => {
 
   it("변조된 ciphertext 를 거부한다 (GCM auth tag)", async () => {
     const ct = await encryptSecret("JBSWY3DPEHPK3PXP");
-    // 마지막 문자 뒤집기
-    const tampered = ct.slice(0, -1) + (ct.endsWith("A") ? "B" : "A");
+    // base64url 디코드 → auth tag 영역(offset 12-28) 1 byte XOR → 재인코딩.
+    // 마지막 char flip 은 6.25% 확률로 base64 트레일링 패딩 비트만 바꿔
+    // decode 결과가 byte-identical → AuthTag 통과 → throw 미발생 함정 (S82~84 P2 flake).
+    const buf = Buffer.from(ct, "base64url");
+    buf[20] ^= 0xff;
+    const tampered = buf.toString("base64url");
     await expect(decryptSecret(tampered)).rejects.toThrow();
   });
 });
