@@ -46,7 +46,7 @@ INSERT INTO "content_sources" (
 
 -- AI 모델 회사 공식 블로그
 ('openai-blog',        'OpenAI Blog',                'https://openai.com/news/rss.xml',                                              'RSS',  'build',     'seedcat_b_aicompanies', 'en', '{}'::jsonb, FALSE, NULL),
-('anthropic-news',     'Anthropic News',             'https://www.anthropic.com/news/rss.xml',                                       'RSS',  'build',     'seedcat_b_aicompanies', 'en', '{}'::jsonb, FALSE, NULL),
+('anthropic-news',     'Anthropic News',             'https://raw.githubusercontent.com/Olshansk/rss-feeds/main/feeds/feed_anthropic_news.xml', 'RSS',  'build',     'seedcat_b_aicompanies', 'en', '{}'::jsonb, FALSE, '공식 anthropic.com/news/rss.xml 미제공 — Olshansk/rss-feeds GitHub Actions hourly scrape (third-party).'),
 ('google-ai-blog',     'Google AI Blog',             'https://blog.google/technology/ai/rss/',                                       'RSS',  'build',     'seedcat_b_aicompanies', 'en', '{}'::jsonb, FALSE, NULL),
 ('huggingface-blog',   'HuggingFace Blog',           'https://huggingface.co/blog/feed.xml',                                         'RSS',  'build',     'seedcat_b_oss_llm',     'en', '{}'::jsonb, FALSE, NULL),
 ('meta-ai-blog',       'Meta AI Blog',               'https://ai.meta.com/blog/rss/',                                                'RSS',  'build',     'seedcat_b_aicompanies', 'en', '{}'::jsonb, FALSE, NULL),
