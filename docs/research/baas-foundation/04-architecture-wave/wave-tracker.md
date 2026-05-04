@@ -177,3 +177,5 @@ S82 4 latent bug 재발 차단을 위한 PR 본문 필수 체크리스트:
 | 일자 | 세션 | 변경 |
 |---|---|---|
 | 2026-05-03 | S84 | 초기 작성 (S80~S83 실측 흡수) |
+| 2026-05-04 | S84+ | almanac-cleanup AGGREGATOR module 이전 (`f4bdf8f` + `f8caa26`) |
+| 2026-05-04 | S84+ | totp.test.ts AES-GCM tamper P2 flake 결정적 fix (`66689e9`, S82~83 누적 P2, base64url 패딩 비트 함정 root cause + 50/50 통과 검증) |
