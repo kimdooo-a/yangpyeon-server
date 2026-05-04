@@ -1,7 +1,54 @@
-# 다음 세션 프롬프트 (세션 84)
+# 다음 세션 프롬프트 (세션 85)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 84 종료 — 양 터미널 동시 진행: 메인 wave 평가 + S84-D Fix A/B + cleanup cron 부채 해소 + 다른 터미널 M4 UI Phase 1)
+
+세션 84 = 두 터미널 동시 진행 + 영역 분리 (backend/docs vs frontend) → 머지 충돌 0 운용. 5 commits push 완료 (`da39576` `0bcc283` `f4bdf8f` `f8caa26` 메인 + `f3bf611` 다른 터미널). prod 배포는 운영자 또는 다음 세션 (다른 터미널 WIP transient 가 일시 차단했으나 commit 후 해소됨).
+
+- **세션 84 메인 핵심** (4 commits): 1) **wave 진척도 종합 평가** — 4-Track 매트릭스 (A ~95% / B 100% / C 60% / D stabilized) + S81 5x 압축 통계 + S82 4 latent bug 분석. 2) **외부 plan 영속화** — `~/.claude/plans/wave-wiggly-axolotl.md` → git tracked `docs/research/baas-foundation/04-architecture-wave/wave-tracker.md`. 3) **CLAUDE.md PR 리뷰 게이트 룰 5 항목 정착** — RLS / withTenant / tenantPrismaFor closure / **non-BYPASSRLS 라이브 테스트** / timezone-sensitive 비교. 4) **S84-D dedupe Fix A** (TDD 26): WHERE tenantId 명시 (defense-in-depth, BYPASSRLS 회피). 5) **S84-D Fix B 데이터 마이그레이션** (직접 SQL, 사전 0 충돌 → UPDATE 130 default→almanac → 사후 cross-tenant FK 0). 6) **cleanup cron 부채 해소** (TDD 6) — `almanac-cleanup` SQL kind readonly 풀 한계 → AGGREGATOR module=cleanup 신설. DB row UPDATE + b8-runnow 라이브 SUCCESS 23ms deleted=0. 7) **다른 터미널 위임 프롬프트 작성** (M4 UI Phase 1 frontend chunk).
+
+- **세션 84 다른 터미널 핵심** (1 commit): M4 UI 보드 Phase 1 — 사이드바 "커뮤니케이션" 그룹 4 항목 + 시각 분류 헬퍼 2종 (TDD 8) + 컴포넌트 4종 (ConversationListItem/ConversationList/MessageBubble/MessageList) + 데이터 fetch hook 2종 (useConversations/useMessages, SWR 미설치 → 순수 fetch) + 라우트 2종 ((protected)/messenger + [id]). 위임 프롬프트 vs 실제 환경 갭 4건 적응 (페이지 위치 / SWR 미설치 / @testing-library 미설치 / lucide-react 정상). 검증 tsc 0 + vitest 547 + production build PASS.
+
+- **검증 통합**: tsc 0 / vitest 547 pass + 91 skip (회귀 0, 신규 14 = 메인 7 + 다른 터미널 8) / 메인 4 commits + 다른 터미널 1 commit 모두 push 완료. **WSL 배포 = 보류** (다른 터미널 WIP 시점 transient 가 차단했으나 그들 commit 후 해소됨, 다음 세션 또는 운영자 본인 1회 배포로 cleanup 모듈 + M4 Phase 1 동시 활성화).
+
+- **S82 부채 패턴 영구 차단 메커니즘 정착**: PR 리뷰 게이트 룰 5 항목 (특히 #4 non-BYPASSRLS 라이브 테스트) 가 S82 의 4 latent bug 와 S84-D 의 130 default-tenant 행 같은 prod-BYPASSRLS-가려진-RLS-bug 패턴을 머지 게이트 단계에서 차단. dedupe.ts case 26 (`expect(callArgs.where.tenantId).toBe(...)`) 가 그 unit test 모범.
+
+---
+
+## ⭐ 세션 85 첫 작업 우선순위 (세션 84 종료 시점, 2026-05-03)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| ~~S84-D dedupe~~ | ~~Fix A 코드 + Fix B 데이터~~ | — | — | ✅ **세션 84 메인 완료** (`da39576` Fix A + 직접 SQL Fix B, cross-tenant FK 0) |
+| ~~cleanup cron~~ | ~~AGGREGATOR module=cleanup~~ | — | — | ✅ **세션 84 메인 완료** (`f4bdf8f`, b8-runnow 라이브 SUCCESS) |
+| ~~S84-F1 M4 UI Phase 1~~ | ~~사이드바 + 라우트 + 컴포넌트 4 + hooks 2~~ | — | — | ✅ **세션 84 다른 터미널 완료** (`f3bf611`) |
+| **S85-DEPLOY** | **WSL 빌드+배포 (cleanup 모듈 prod 활성화 + M4 Phase 1 라이브)** | **P0** | **~10분** | 다른 터미널 commit `f3bf611` + 메인 4 commits 모두 push 완료. 단일 `wsl-build-deploy.sh` 실행으로 5 commits 동시 활성화. cleanup 모듈 다음 03:00 KST 자연 fire 시 SUCCESS deleted=0 자동. M4 라우트 (/messenger + /messenger/[id]) prod 가시화. |
+| **S85-F2** | **M4 UI Phase 2** — Composer 인터랙티브 + SSE wiring + User name lookup | **P0 messenger** | **5-6 작업일 chunk** | textarea autosize + Enter 송신 + clientGeneratedId UUIDv7 + 낙관적 업데이트 + 답장 인용 카드 + 멘션 popover cmdk + use-sse 로 conv/user 채널 구독 → 캐시 invalidate + DIRECT peer name 표시. backend 17 라우트 활용. |
+| **S84-A** | **prod DATABASE_URL `?options=-c TimeZone=UTC` 적용** | **P1 (사용자 의사결정)** | **~10분 + 24h 모니터** | audit §4.1 권고. 트래픽 저점 (KST 03:00~05:00). 영향 = 재로그인 1회. 데이터 손실 0. |
+| **S84-C** | **24h+ 관찰 후 sources 14 확장** (9 → 14) | P1 | ~30분 | S83 신규 5 소스 cron 자연 fire 안정성 확인 후 추가 5 활성. |
+| **S85-INFRA-1** | **SWR + jsdom + @testing-library/react 도입** | P2 인프라 | ~3h | M4 Phase 1 의 `useState + useEffect + fetch` 패턴 → SWR 표준화. vitest config 분기 (server lib = node, ui = jsdom). 컴포넌트 렌더 자체 테스트 가능. |
+| S84-E | M3 SSE browser publish/subscribe e2e | P1 | ~30분 | 운영자 본인 (auth cookie + 실 conversation). 또는 M4 Phase 2 진입 시 자연 검증. |
+| S84-G | M5 첨부 + 답장 + 멘션 + 검색 | P1 messenger | 3-4 작업일 | M4 Phase 2 후속. AttachmentPicker (filebox 통합) + cmdk 멘션 popover + 검색 페이지 (PG GIN trgm index). |
+| S84-H | M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰 | P1 messenger | 3-4 작업일 | M5 후속. in-app 알림 종 + NotificationPreference + BlockUserDialog + admin/messenger/{moderation,health,quota}. kdysharpedge 보안 리뷰. |
+| S84-I | totp.test.ts AES-GCM tamper flake fix | P2 | ~30분 | base64 last-char flip → middle byte flip 결정적 변조. |
+| S84-J | Phase 2 plugin (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. ADR-022 §1 Phase 2 트리거 (DAU 임계 도달 또는 두번째 컨슈머 등록). |
+| S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. |
+| S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. 운영자 본인. |
+
+### S85 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes`
+3. **S85-DEPLOY 실행** (P0 우선): `wsl -d Ubuntu -- bash -lic 'bash /mnt/e/00_develop/260406_luckystyle4u_server/scripts/wsl-build-deploy.sh'` — 5 commits 동시 활성화. PM2 ypserver restart 확인 + `b8-check.ts` 로 cleanup cron 정상 + `/messenger` 라우트 응답 확인.
+4. 배포 검증 후 → S85-F2 (M4 UI Phase 2 chunk 진입) 또는 S84-A timezone fix 사용자 확인.
+
+### 영구 룰 (세션 84 정착)
+
+**PR 리뷰 게이트 룰 5 항목** — CLAUDE.md §"PR 리뷰 게이트 룰 (S82 4 latent bug 재발 차단)" 정착. 모든 backend PR 본문에 5 항목 필수 명시. wave-tracker.md 가 영구 진척도 추적 (세션 종료마다 row 갱신).
 
 ---
 
