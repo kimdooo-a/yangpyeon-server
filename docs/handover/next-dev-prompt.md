@@ -1,9 +1,63 @@
-# 다음 세션 프롬프트 (세션 85)
+# 다음 세션 프롬프트 (세션 86)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 85 종료 — 양 chunk 동시 진행: 메인 wave 평가 + 보조 시크릿 회수 + git history purge)
+
+세션 85 = 두 터미널 동시 진행 + 영역 분리 (wave 평가 vs 보안 사건 대응) → 머지 충돌 0 운용. **메인 chunk** = 다른 터미널 wave 진척도 종합 평가 (S58~S84 27 세션 누적, A-(87/100), Track A 95% / B 100%코드+81%TDD / C 70% / D stabilized). **보조 chunk** = GitGuardian 시크릿 평문 회수 + filter-repo history purge.
+
+- **세션 85 보조 chunk 핵심** (commit `a4e1ef9` → filter-repo로 `5c56676` SHA rewrite, force pushed): GitGuardian 알람으로 admin 비밀번호 + Postgres superuser 비밀번호 평문 **21파일 31위치** 노출 (이전 분석 5파일 한정 → grep 6배 확대). 1) **노출 매트릭스**: scripts/ 10건 + src/lib/password.test.ts 1건 + docs/ 14건. 두 변형 동시 (`Knp13579!yan` 운영 + `Knp13579yan` postgres). 2) **1순위 코드 정리**: scripts/ env-only 강제 패턴 (`${VAR:?msg}`, fallback default 제거), `.spec.ts` 명시적 throw, password.test.ts 운영-fixture 분리 (`"test-password-fixture-only"`), docs/ placeholder (`<ADMIN_PASSWORD>` / `<DB_PASSWORD>`). 3) **memory 룰 신설** `feedback_no_secret_defaults_in_scripts.md` (재발 방지 게이트). 4) **사용자 회전 거부** ("회전은 안할꺼야. 2순위 진행해") → 2순위 직행. 5) **filter-repo 안전망 3중**: pip 설치 + 백업 브랜치 + working tree stash 3건 + `--force-with-lease`. 6) **filter-repo 실행**: 300 commits rewrite 4.31초, origin 자동 제거 후 수동 복구. HEAD = `3ae830f fix(cron): runNow에 recordResult` — 다른 터미널 cron/runNow circuit-breaker P2 fix 자연 합류 (보너스). 7) **force push**: main `847dbe3`→`fd29ca7`, spec/aggregator-fixes `9957798`→`3ae830f`. 8) **백업 브랜치 즉시 삭제** (사용자 명시적 요청, GitHub reflog 90일 잔존 → 안전).
+
+- **세션 85 메인 chunk 핵심** (다른 터미널, `260504-session85-wave-completion-eval.md` handover): kdywavecompletion 스킬 + 3 병렬 Explore 에이전트로 4-Track 매트릭스 평가. **Track A 100% 완료** (잔여 = prod TimeZone=UTC 의사결정 1건) / **Track B 100% 코드 + 81% TDD** (170 약속 → 139 실측, llm/promote/runner 32 case 미달, PR 게이트 룰 #4 미적용 영역) / **Track C 70% 실측** (60% 주장 보수적, M4 UI Phase 1 진입 + Phase 2~6 + M5 + M6 ~15작업일 잔여) / **Track D stabilized** (S78~S81 multipart + standalone proxy 정착). 다음 단일 가장 큰 가치 = Track C M4 UI Phase 2~6 + M5 + M6.
+
+- **검증 통합**: 시크릿 grep 0건 (전체 history `--all -p`) / `git push --force-with-lease` 양 브랜치 success / stash pop 2건 (anthropic RSS 복원 ✓ + cron/registry no-op = `3ae830f` 흡수 정상). **WSL 배포 = 보류** (S85에서 미수행 — 메인 chunk wave 평가는 코드 변경 없음, 보조 chunk는 git 작업만). S86에서 배포 처리 (cleanup 모듈 + M4 Phase 1 + cron/runNow P2 fix 동시 활성화).
+
+- **CK 신규**: `2026-05-04-secret-recovery-fallback-default-pattern.md` — fallback default = git history 영구 노출 매개체 패턴. memory `feedback_no_secret_defaults_in_scripts.md` 자매.
+
+---
+
+## ⭐ 세션 86 첫 작업 우선순위 (세션 85 종료 시점, 2026-05-04)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| ~~S85-DEPLOY~~ | ~~WSL 빌드+배포 cleanup + M4 Phase 1~~ | — | — | ⏸️ S85에서 미수행 (양 chunk 모두 코드 commit 0) → S86 첫 작업으로 이월 |
+| **S86-DEPLOY** | **WSL 빌드+배포** (cleanup 모듈 + M4 Phase 1 + cron/runNow P2 fix 동시 활성화) | **P0** | **~10분** | spec/aggregator-fixes 최신 = `3ae830f`. 단일 `wsl-build-deploy.sh` 실행으로 cleanup module + M4 Phase 1 + cron/runNow P2 fix 동시 활성화. b8-check.ts 로 cleanup cron 정상 + `/messenger` 라우트 응답 확인 + cf=0/last_ok_kst != NULL 회귀 검증. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | github.com/kimdooo-a/yangpyeon-server → Settings 확인. **public 이면 Archive Program/scraper 캐시 회수 불가** — 비밀번호 회전 권고 강화. private 이면 추가 조치 불필요. |
+| **S86-SEC-2** | **pre-commit hook gitleaks 도입** | P1 보안 | ~30분 | `pip install detect-secrets` 또는 `npm i -D @gitleaks/gitleaks` + husky 또는 `.git/hooks/pre-commit`. memory `feedback_no_secret_defaults_in_scripts` 게이트의 자동화 보강. 재발 방지. |
+| **S85-F2** | **M4 UI Phase 2** — Composer 인터랙티브 + SSE wiring + User name lookup | **P0 messenger** | **5-6 작업일 chunk** | (S85에서 미진입, 동일) textarea autosize + Enter 송신 + clientGeneratedId UUIDv7 + 낙관적 업데이트 + 답장 인용 카드 + 멘션 popover cmdk + use-sse 로 conv/user 채널 구독 → 캐시 invalidate + DIRECT peer name 표시. backend 17 라우트 활용. |
+| **S84-A** | **prod DATABASE_URL `?options=-c TimeZone=UTC` 적용** | **P1 (사용자 의사결정)** | **~10분 + 24h 모니터** | audit §4.1 권고. 트래픽 저점 (KST 03:00~05:00). 영향 = 재로그인 1회. 데이터 손실 0. |
+| **S84-C** | **24h+ 관찰 후 sources 14 확장** (9 → 14) | P1 | ~30분 | S83 신규 5 소스 cron 자연 fire 안정성 확인 후 추가 5 활성. |
+| **S85-INFRA-1** | **SWR + jsdom + @testing-library/react 도입** | P2 인프라 | ~3h | M4 Phase 1 의 `useState + useEffect + fetch` 패턴 → SWR 표준화. vitest config 분기 (server lib = node, ui = jsdom). 컴포넌트 렌더 자체 테스트 가능. |
+| S85-WAVE-1 | Track B TDD 81% → 100% (llm/promote/runner 32 case) | P1 | ~4h | 메인 chunk wave 평가 §최대 발견 갭 — non-BYPASSRLS 라이브 테스트 미적용 영역. |
+| S84-E | M3 SSE browser publish/subscribe e2e | P1 | ~30분 | 운영자 본인 (auth cookie + 실 conversation). 또는 M4 Phase 2 진입 시 자연 검증. |
+| S84-G | M5 첨부 + 답장 + 멘션 + 검색 | P1 messenger | 3-4 작업일 | M4 Phase 2 후속. |
+| S84-H | M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰 | P1 messenger | 3-4 작업일 | M5 후속. |
+| S84-I | totp.test.ts AES-GCM tamper flake fix | P2 | ~30분 | (이미 commit `66689e9` 으로 fix됨, 회귀 0 확인 후 close) |
+| S84-J | Phase 2 plugin (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. |
+| S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. |
+| S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. |
+| **S86-RSS** | anthropic-news RSS feed URL working tree commit | P2 | 5분 | 다른 터미널 WIP `prisma/seeds/almanac-aggregator-sources.sql` (Olshansk/rss-feeds GitHub Actions third-party scrape) — working tree 잔존. 검토 후 commit 또는 폐기. |
+
+### S86 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (보조 chunk force push로 새 SHA — fetch 시 fast-forward이 아닌 reset 필요할 수 있음, **세션 85 보조 chunk가 force push 했음에 주의**)
+3. **S86-DEPLOY 실행** (P0 우선): `wsl -d Ubuntu -- bash -lic 'bash /mnt/e/00_develop/260406_luckystyle4u_server/scripts/wsl-build-deploy.sh'` — cleanup module + M4 Phase 1 + cron/runNow P2 fix 동시 활성화.
+4. **S86-SEC-1** (운영자): GitHub repo visibility 확인 → public이면 비밀번호 회전 결정 재검토.
+5. 배포 검증 후 → S85-F2 (M4 UI Phase 2 chunk 진입) 또는 S84-A timezone fix 사용자 확인.
+
+### 영구 룰 (세션 85 정착)
+
+**fallback default = secret committed** — bash `${VAR:-default}` 또는 TS `??` 의 default가 시크릿이면 git history 영구 노출. memory `feedback_no_secret_defaults_in_scripts.md` 게이트. 다음 세션의 Claude가 검증 스크립트 작성 시 즉시 발화 차단.
+
+**force push 후 working tree 동기화 주의** — 세션 85 보조 chunk가 main + spec/aggregator-fixes 양 브랜치를 force push 했음. 다른 워크트리에서 작업 시 `git fetch && git reset --hard origin/<branch>` 또는 `git pull --rebase` 로 새 SHA 동기화 필요. **그 전에 working tree 변경분 stash 보호 필수**.
+
+---
+
+## (세션 84 종료 시점 컨텍스트 — 참고용 보존)
 
 ## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 84 종료 — 양 터미널 동시 진행: 메인 wave 평가 + S84-D Fix A/B + cleanup cron 부채 해소 + 다른 터미널 M4 UI Phase 1)
 
