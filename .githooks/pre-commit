@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# pre-commit hook — 시크릿 평문 노출 차단 (S86 GitGuardian 21파일 31위치 사건 후속)
+#
+# 활성화: scripts/setup-githooks.sh 1회 실행 (git config core.hooksPath .githooks)
+# 우회: git commit --no-verify (긴급 시만, 책임은 커미터)
+#
+# 검사 대상: staged 파일의 added line 만 (modified file 의 unchanged line 무시)
+#   → 기존 인덱스에 이미 들어있던 시크릿은 별도 history purge 대상 (S86 사례)
+#
+# False positive 시: SHELL 변수 SKIP_SECRET_HOOK=1 git commit ...
+
+set -uo pipefail
+
+if [[ "${SKIP_SECRET_HOOK:-0}" == "1" ]]; then
+  echo "[pre-commit] SKIP_SECRET_HOOK=1 — 시크릿 검사 건너뜀"
+  exit 0
+fi
+
+# .env / .env.local / .env.production 등 staging 자체 차단 (.gitignore 우회 방지)
+ENV_STAGED=$(git diff --cached --name-only | grep -E '^\.env(\.|$)' | grep -vE '\.example$|\.production\.example$|\.test\.example$' || true)
+if [[ -n "$ENV_STAGED" ]]; then
+  echo "[pre-commit] BLOCKED — .env 류 파일 staging 시도:"
+  echo "$ENV_STAGED" | sed 's/^/  - /'
+  echo ""
+  echo "  .env / .env.local / .env.production 은 절대 커밋 금지."
+  echo "  의도된 템플릿이면 .env.example / .env.production.example 로 이름 변경."
+  exit 1
+fi
+
+# added line 만 추출 (diff '+' line, header '+++' 제외)
+ADDED=$(git diff --cached --diff-filter=ACM -U0 | grep -E '^\+[^+]' || true)
+
+if [[ -z "$ADDED" ]]; then
+  exit 0
+fi
+
+VIOLATIONS=()
+
+# 1. 알려진 운영 시크릿 (S86 GitGuardian 사건 비밀번호 변형)
+if echo "$ADDED" | grep -qE 'Knp13579!?yan'; then
+  VIOLATIONS+=("운영 admin/postgres 비밀번호 평문 (S86 회수 대상 패턴)")
+fi
+
+# 2. API key prefix (Anthropic, OpenAI, GitHub, AWS)
+if echo "$ADDED" | grep -qE 'sk-ant-api03-[A-Za-z0-9_-]{20,}'; then
+  VIOLATIONS+=("Anthropic API key (sk-ant-api03-...)")
+fi
+if echo "$ADDED" | grep -qE 'sk-proj-[A-Za-z0-9_-]{20,}'; then
+  VIOLATIONS+=("OpenAI project key (sk-proj-...)")
+fi
+if echo "$ADDED" | grep -qE 'ghp_[A-Za-z0-9]{36}'; then
+  VIOLATIONS+=("GitHub Personal Access Token (ghp_...)")
+fi
+if echo "$ADDED" | grep -qE 'AKIA[0-9A-Z]{16}'; then
+  VIOLATIONS+=("AWS Access Key ID (AKIA...)")
+fi
+
+# 3. fallback default 패턴 (memory feedback_no_secret_defaults_in_scripts)
+#    bash `${VAR:-...}` 의 default 값이 시크릿 같은 길이/형식이면 차단
+if echo "$ADDED" | grep -qE '\$\{[A-Z_]+:-[A-Za-z0-9!@#$%^&*]{8,}\}'; then
+  if echo "$ADDED" | grep -qE '\$\{[A-Z_]*(PASS|SECRET|KEY|TOKEN|PWD)[A-Z_]*:-'; then
+    VIOLATIONS+=("bash fallback default 에 시크릿 의심 값 (\${VAR:-secret} 패턴)")
+  fi
+fi
+
+# 4. TypeScript/JS `?? "..."` 또는 `|| "..."` 의 default 가 시크릿 의심
+if echo "$ADDED" | grep -qE 'process\.env\.[A-Z_]*(PASS|SECRET|KEY|TOKEN|PWD)[A-Z_]*\s*[?]{2}\s*['\''"][A-Za-z0-9!@#$%^&*]{8,}['\''"]'; then
+  VIOLATIONS+=("TS fallback default 에 시크릿 의심 값 (process.env.X ?? \"secret\")")
+fi
+if echo "$ADDED" | grep -qE 'process\.env\.[A-Z_]*(PASS|SECRET|KEY|TOKEN|PWD)[A-Z_]*\s*\|\|\s*['\''"][A-Za-z0-9!@#$%^&*]{8,}['\''"]'; then
+  VIOLATIONS+=("TS fallback default 에 시크릿 의심 값 (process.env.X || \"secret\")")
+fi
+
+if [[ ${#VIOLATIONS[@]} -gt 0 ]]; then
+  echo ""
+  echo "[pre-commit] BLOCKED — 시크릿 패턴 ${#VIOLATIONS[@]}건 발견:"
+  for v in "${VIOLATIONS[@]}"; do
+    echo "  - $v"
+  done
+  echo ""
+  echo "  대응:"
+  echo "    1. 시크릿 제거 후 환경변수 참조로 변경 (\${VAR:?설명})"
+  echo "    2. 테스트 fixture 면 명시적 fixture-only 마커 (e.g. 'test-fixture-only-pwd')"
+  echo "    3. 의도된 false-positive 시: SKIP_SECRET_HOOK=1 git commit ... (책임은 커미터)"
+  echo ""
+  echo "  관련: memory/feedback_no_secret_defaults_in_scripts.md / docs/solutions/2026-05-04-secret-recovery-fallback-default-pattern.md"
+  exit 1
+fi
+
+exit 0

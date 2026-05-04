@@ -50,8 +50,8 @@ Desktop.ini
 # nul (Windows)
 nul
 
-# 백업 파일
-*.bak
+# 백업 파일 (.bak / .bak-{timestamp} / .bak.old 등 모든 변형)
+*.bak*
 
 /src/generated/prisma
 
