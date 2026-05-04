@@ -315,7 +315,15 @@ export function removeJob(id: string): void {
   }
 }
 
-/** ADMIN 의 수동 실행 — schedule 무시, 즉시 1회. circuit/lock 무시 (운영자 의도 우선). */
+/**
+ * ADMIN 의 수동 실행 — schedule 무시, 즉시 1회.
+ *
+ * dispatch 결정 단계의 circuit/lock 은 무시 (운영자 의도 우선).
+ * 단, 결과는 자연 tick(`runJob`) 과 동일하게 `recordResult` 로 circuit-breaker
+ * 카운터에 반영 — 그렇지 않으면 SUCCESS 후에도 cf/lastSuccessAt 이 묵은 값으로
+ * 남아 모니터링 대시보드가 false-negative 신호를 표시함 (S85 prod 라이브 검증
+ * 사례: cleanup runNow SUCCESS 후 cf=1, last_ok_kst=NULL 잔존).
+ */
 export async function runNow(
   id: string,
 ): Promise<{ status: string; message?: string }> {
@@ -340,5 +348,16 @@ export async function runNow(
       lastStatus: `${result.status}${result.message ? `: ${result.message}` : ""}`,
     },
   });
+  // circuit-breaker 결과 반영 — 자연 tick (`runJob`) 과 동일 기준.
+  // ADR-021 cross-cutting: circuit-breaker 실패가 운영자 응답을 깨면 안 됨.
+  if (
+    result.status === "SUCCESS" ||
+    result.status === "FAILURE" ||
+    result.status === "TIMEOUT"
+  ) {
+    await recordResult(row.id, result.status === "SUCCESS").catch(() => {
+      // silent — runJob 의 동일 패턴.
+    });
+  }
   return { status: result.status, message: result.message };
 }
