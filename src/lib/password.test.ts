@@ -5,7 +5,7 @@ import { hashPassword, verifyPasswordHash, needsRehash } from "./password";
 // Phase 15 Auth Advanced Step 2 — argon2id 도입 + bcrypt 점진 마이그레이션 검증
 // 참조: docs/research/spikes/spike-011-argon2-result.md (13× faster, ADR-019)
 
-const TEST_PASSWORD = "<ADMIN_PASSWORD>";
+const TEST_PASSWORD = "test-password-fixture-only";
 const WRONG_PASSWORD = "wrong-pw-x";
 
 describe("hashPassword", () => {

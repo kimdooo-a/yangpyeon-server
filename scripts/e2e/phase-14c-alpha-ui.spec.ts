@@ -1,8 +1,13 @@
 import { test, expect, type Page } from "@playwright/test";
 
 const BASE = process.env.E2E_BASE_URL ?? "https://stylelucky4u.com";
-const EMAIL = process.env.E2E_USERNAME ?? "kimdooo@stylelucky4u.com";
-const PASS = process.env.E2E_PASSWORD ?? "<ADMIN_PASSWORD>";
+const EMAIL = process.env.E2E_USERNAME;
+const PASS = process.env.E2E_PASSWORD;
+if (!EMAIL || !PASS) {
+  throw new Error(
+    "E2E_USERNAME and E2E_PASSWORD env vars required — set them in .env.test.local or export before running. 시크릿은 코드에 박지 말 것.",
+  );
+}
 
 /**
  * 공통 로그인 헬퍼.

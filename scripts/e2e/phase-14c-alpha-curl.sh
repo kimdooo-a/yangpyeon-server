@@ -2,8 +2,8 @@
 # Phase 14c-α 인라인 편집 낙관적 잠금 — API E2E
 # 실행: wsl -e bash -c "bash /mnt/e/00_develop/260406_luckystyle4u_server/scripts/e2e/phase-14c-alpha-curl.sh"
 
-DASH_EMAIL='kimdooo@stylelucky4u.com'
-DASH_PASS='<ADMIN_PASSWORD>'
+: "${DASH_EMAIL:?DASH_EMAIL env required (운영자 로그인 — export 후 재실행)}"
+: "${DASH_PASS:?DASH_PASS env required (시크릿은 코드에 박지 말 것 — .env.test.local 사용)}"
 DASH_BASE='http://localhost:3000'
 COOKIE=/tmp/dash-cookie-alpha.txt
 rm -f "$COOKIE"

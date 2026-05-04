@@ -4,7 +4,7 @@
 set -euo pipefail
 
 PWD_NEW=$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')
-export PGPASSWORD=<DB_PASSWORD>
+: "${PGPASSWORD:?PGPASSWORD env required (postgres superuser password — .env.test.local 또는 export PGPASSWORD=... 후 재실행)}"
 
 echo "GENERATED_PWD=$PWD_NEW"
 

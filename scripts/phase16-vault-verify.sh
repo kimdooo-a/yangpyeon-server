@@ -17,8 +17,8 @@
 set -euo pipefail
 
 BASE="${BASE:-https://stylelucky4u.com}"
-EMAIL="${EMAIL:-kimdooo@stylelucky4u.com}"
-PASSWORD="${PASSWORD:-<ADMIN_PASSWORD>}"
+: "${EMAIL:?EMAIL env required (admin login email)}"
+: "${PASSWORD:?PASSWORD env required (시크릿은 코드에 박지 말 것 — .env.test.local 또는 export PASSWORD=...)}"
 
 echo "=== Phase 16 Vault Verify ($BASE) ==="
 

@@ -5,12 +5,12 @@
 set +e  # 중간 실패에도 계속 진행
 
 DASH_BASE='http://localhost:3000'
-ADMIN_EMAIL='kimdooo@stylelucky4u.com'
-ADMIN_PASS='<ADMIN_PASSWORD>'
-MANAGER_EMAIL='gamma-manager@test.local'
-MANAGER_PASS='GammaTest123!'
-USER_EMAIL='gamma-user@test.local'
-USER_PASS='GammaTest123!'
+: "${ADMIN_EMAIL:?ADMIN_EMAIL env required (운영자 로그인 — export 후 재실행)}"
+: "${ADMIN_PASS:?ADMIN_PASS env required (시크릿은 코드에 박지 말 것 — .env.test.local 사용)}"
+: "${MANAGER_EMAIL:=gamma-manager@test.local}"
+: "${MANAGER_PASS:?MANAGER_PASS env required (테스트 매니저 비밀번호 — export 후 재실행)}"
+: "${USER_EMAIL:=gamma-user@test.local}"
+: "${USER_PASS:?USER_PASS env required (테스트 유저 비밀번호 — export 후 재실행)}"
 
 ADMIN_COOKIE=/tmp/dash-cookie-γ-admin.txt
 MANAGER_COOKIE=/tmp/dash-cookie-γ-manager.txt

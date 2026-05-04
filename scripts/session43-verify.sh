@@ -3,13 +3,15 @@
 set -e
 URL="http://localhost:3000"
 source ~/dashboard/.env
+: "${EMAIL:?EMAIL env required (admin login email — export 후 재실행)}"
+: "${PASSWORD:?PASSWORD env required (시크릿은 코드에 박지 말 것)}"
 # strip ?schema=public for psql
 DB_URL_CLEAN=$(echo "$DATABASE_URL" | sed 's/?schema=public//')
 
 echo "=== 1) login ==="
 curl -sS -X POST "$URL/api/v1/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"kimdooo@stylelucky4u.com","password":"<ADMIN_PASSWORD>"}' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
   -D /tmp/h.txt -o /tmp/b.json -w "HTTP=%{http_code}\n"
 
 ACCESS=$(python3 - <<'PY'
@@ -39,7 +41,7 @@ echo
 echo "=== 5) GET /api/settings/users (dashboard cookie 경로) ==="
 curl -sS -X POST "$URL/api/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"kimdooo@stylelucky4u.com","password":"<ADMIN_PASSWORD>"}' \
+  -d "{\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}" \
   -c /tmp/dc.jar -o /tmp/dc_body.json -w "dashboard login HTTP=%{http_code}\n"
 curl -sS "$URL/api/settings/users" -b /tmp/dc.jar | python3 -m json.tool
 
@@ -52,5 +54,5 @@ psql "$DB_URL_CLEAN" -At -c "
     to_char(last_login_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MSZ')     AS last_login_utc_iso,
     to_char(updated_at    AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.MSZ')     AS updated_utc_iso
   FROM users
-  WHERE email='kimdooo@stylelucky4u.com';
+  WHERE email='$EMAIL';
 "

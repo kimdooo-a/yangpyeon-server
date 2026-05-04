@@ -12,8 +12,8 @@
 set -euo pipefail
 
 BASE="${BASE:-http://localhost:3000}"
-EMAIL="${EMAIL:-kimdooo@stylelucky4u.com}"
-PASSWORD="${PASSWORD:-<ADMIN_PASSWORD>}"
+: "${EMAIL:?EMAIL env required (admin login email — 운영자 자격 증명, .env.test.local export 후 재실행)}"
+: "${PASSWORD:?PASSWORD env required (시크릿은 코드에 박지 말 것 — .env.test.local 또는 export PASSWORD=...)}"
 
 cd "$(dirname "$0")/.."
 DSN="$(node -e "console.log(process.env.DATABASE_URL || require('dotenv').config().parsed.DATABASE_URL)" | sed 's/?schema=public//')"

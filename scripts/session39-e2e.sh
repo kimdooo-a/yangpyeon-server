@@ -8,8 +8,8 @@ source ~/.nvm/nvm.sh
 
 BASE=http://localhost:3000
 ORIGIN="-H Origin:http://localhost:3000 -H Referer:http://localhost:3000/login"
-EMAIL=kimdooo@stylelucky4u.com
-PASS='<ADMIN_PASSWORD>'
+: "${EMAIL:?EMAIL env required (admin login email — export 후 재실행)}"
+: "${PASS:?PASS env required (시크릿은 코드에 박지 말 것 — .env.test.local 또는 export PASS=...)}"
 COOKIES_A=/tmp/session39-ck-A.txt
 COOKIES_B=/tmp/session39-ck-B.txt
 HELPER=/mnt/e/00_develop/260406_luckystyle4u_server/scripts/session39-helper.cjs
