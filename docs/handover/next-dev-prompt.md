@@ -1,4 +1,4 @@
-# 다음 세션 프롬프트 (세션 86)
+# 다음 세션 프롬프트 (세션 87)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
@@ -16,6 +16,53 @@
 - **검증 통합**: 시크릿 grep 0건 (전체 history `--all -p`) / `git push --force-with-lease` 양 브랜치 success / stash pop 2건 (anthropic RSS 복원 ✓ + cron/registry no-op = `3ae830f` 흡수 정상). **WSL 배포 = 보류** (S85에서 미수행 — 메인 chunk wave 평가는 코드 변경 없음, 보조 chunk는 git 작업만). S86에서 배포 처리 (cleanup 모듈 + M4 Phase 1 + cron/runNow P2 fix 동시 활성화).
 
 - **CK 신규**: `2026-05-04-secret-recovery-fallback-default-pattern.md` — fallback default = git history 영구 노출 매개체 패턴. memory `feedback_no_secret_defaults_in_scripts.md` 자매.
+
+---
+
+## ⭐ 세션 87 첫 작업 우선순위 (세션 86 메인 후속 chunk 종료 시점, 2026-05-04)
+
+세션 86 메인 후속 chunk 결과: S85 P0 prod 배포 + 라이브 발견 P2 fix + S83 이월 + S82/S83 의사결정 **4건 동시 처리 완료**. commits `d438303→3ae830f`(P2 fix, force push 후 SHA 변환) + `ce50988`(anthropic-news Olshansk). prod 라이브 검증 1 cron 실행으로 P2 fix + TimeZone fix 동시 측정 (cf 1→0, last_success_at NULL→22:42:57, last_run_at = wall clock 일치). 세션 86 우선순위 표 (line 79+ § "세션 86 첫 작업 우선순위") 의 S86-DEPLOY/S84-A/S86-RSS/S86-CRON-P2 모두 완료.
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **S87-CRON-VERIFY** | **23:00/23:30/03:00 KST 자연 cron tick 후 stored value 정확화 검증** | **P0** | 각 ~5분 (3 회) | TimeZone=UTC 자연 path 검증. rss-fetch 23:00 → classify+promote 23:30 → cleanup 03:00. 신규 stored value `last_run_at` 가 wall clock 과 일치하는지 확인 + cf=0 / state=CLOSED 유지. dedupe Fix B 8 source fetch 정합 (sources=8 fetched=N inserted/duplicates 분포). |
+| **S86-PUSH** | **origin push 1 commit (`ce50988`)** | **P1 사용자** | 즉시 | spec/aggregator-fixes 1 commit ahead. 사용자 push 명령 대기. |
+| **S87-ENV-CLEANUP** | **`.env.bak-*` 3개 정리 + `.gitignore` 패턴 검토** | P2 운영자 | 5분 | windows + build + ypserver 3 백업 (.env.bak-20260504-223541 등). 안전 보존 후 삭제 + `.gitignore` 에 `.env.bak-*` 패턴 추가 검토. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=false → true** (+ 4 feed 확장 결정) | P2 운영자 | 30분 | DB url 갱신 완료 (Olshansk/rss-feeds GitHub Actions hourly scrape). 운영자 결정 = (a) news 1 feed 만 활성화 (b) 4 feed 모두 (engineering/research/red 추가 source) (c) 라이선스 검토 후 결정. |
+| **S87-CK-WSL** | **Compound Knowledge 산출 — WSL2 SIGHUP 함정 + tsx .env 미로드** | P2 | 30분 | `docs/solutions/2026-05-04-wsl2-background-sighup-trap.md` — `setsid + nohup + disown` 으로도 wsl 외부 호출 시 child SIGHUP. 단일 foreground wsl 호출 패턴 표준화. tsx 가 .env 자동 로드 안 함 — PowerShell `$env:DATABASE_URL = ...` 우회 패턴. |
+| **S87-TZ-MONITOR** | **24h TimeZone=UTC 모니터링 마일스톤** | P2 | 03:00 KST cleanup tick 후 5분 + 24h 후 5분 | active session 강제 만료 영향 (본인 운영자만 = 자기만 재로그인) 관찰. UI 시각 비일관 24~48h. M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
+| ~~S86-DEPLOY~~ | ~~WSL 빌드+배포 cleanup + M4 Phase 1 + cron/runNow P2 fix~~ | — | — | ✅ **세션 86 메인 후속 완료** (PM2 ypserver pid 670992→688860, ↺22→24, ELF Linux x86-64 verified). |
+| ~~S84-A~~ | ~~prod DATABASE_URL `?options=-c TimeZone=UTC` 적용~~ | — | — | ✅ **세션 86 메인 후속 완료** (3계층 .env 동기화 + PM2 restart `--update-env` 자동 활성화 + prod 검증 wall=stored=display 일치). |
+| ~~S86-RSS~~ | ~~anthropic-news RSS feed URL working tree commit~~ | — | — | ✅ **세션 86 메인 후속 완료** (commit `ce50988`, 8 후보 404 검증 + Olshansk/rss-feeds 채택, 205 items RSS 2.0 verified). |
+| ~~S86-CRON-P2~~ | ~~runNow recordResult 누락 P2 fix~~ | — | — | ✅ **세션 86 메인 후속 완료** (commit `3ae830f` after force push, TDD 6/6, cron 19/19 회귀 0, prod 라이브 cf 1→0 + last_success_at 갱신 검증). |
+| **S85-F2** | **M4 UI Phase 2** — Composer 인터랙티브 + SSE wiring + User name lookup | **P0 messenger** | 5-6 작업일 | (S85+86에서 미진입) textarea autosize + Enter 송신 + clientGeneratedId UUIDv7 + 낙관적 업데이트 + 답장 인용 카드 + 멘션 popover cmdk + use-sse 로 conv/user 채널 구독 → 캐시 invalidate + DIRECT peer name 표시. backend 17 라우트 활용. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86 미수행) github.com/kimdooo-a/yangpyeon-server → Settings 확인. **public 이면 Archive Program/scraper 캐시 회수 불가** — 비밀번호 회전 권고 강화. |
+| **S86-SEC-2** | **pre-commit hook gitleaks 도입** | P1 보안 | ~30분 | (S86 미수행) `pip install detect-secrets` 또는 `npm i -D @gitleaks/gitleaks` + husky 또는 `.git/hooks/pre-commit`. memory `feedback_no_secret_defaults_in_scripts` 게이트의 자동화 보강. |
+| **S84-C** | **24h+ 관찰 후 sources 14 확장** (9 → 14) | P1 | ~30분 | S83 신규 5 소스 cron 자연 fire 안정성 확인 후 추가 5 활성. (S87-CRON-VERIFY 결과로 24h 관찰 충족) |
+| **S85-INFRA-1** | **SWR + jsdom + @testing-library/react 도입** | P2 인프라 | ~3h | M4 Phase 1 의 `useState + useEffect + fetch` 패턴 → SWR 표준화. vitest config 분기 (server lib = node, ui = jsdom). 컴포넌트 렌더 자체 테스트 가능. |
+| S85-WAVE-1 | Track B TDD 81% → 100% (llm/promote/runner 32 case) | P1 | ~4h | 메인 chunk wave 평가 §최대 발견 갭 — non-BYPASSRLS 라이브 테스트 미적용 영역. |
+| S84-E | M3 SSE browser publish/subscribe e2e | P1 | ~30분 | 운영자 본인 (auth cookie + 실 conversation). 또는 M4 Phase 2 진입 시 자연 검증. |
+| S84-G | M5 첨부 + 답장 + 멘션 + 검색 | P1 messenger | 3-4 작업일 | M4 Phase 2 후속. |
+| S84-H | M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰 | P1 messenger | 3-4 작업일 | M5 후속. |
+| ~~S84-I~~ | ~~totp.test.ts AES-GCM tamper flake fix~~ | — | — | ✅ **이미 commit `66689e9` 으로 fix됨**, 회귀 0 확인 후 close. |
+| S84-J | Phase 2 plugin (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. |
+| S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. |
+| S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. |
+
+### S87 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (세션 86 1 commit ahead `ce50988` 가 사용자 push 후 자연 합류)
+3. **S87-CRON-VERIFY P0 우선** — 자연 cron tick 시각 (23:00/23:30/03:00 KST) 도래 시 즉시 측정. 측정 SQL: `PGPASSWORD=<...> psql -h localhost -U postgres -d luckystyle4u -t -A -c "SELECT name||' | last_run='||to_char(last_run_at AT TIME ZONE 'Asia/Seoul', 'MM-DD HH24:MI')||' | cf='||consecutive_failures FROM cron_jobs WHERE name LIKE 'almanac-%' ORDER BY name"`. 적용 후 신규 stored value 가 wall clock 정확 일치하는지 확인.
+4. 배포 검증 후 → S85-F2 (M4 UI Phase 2) 진입 또는 S87-CK-WSL Compound Knowledge 산출.
+
+### 영구 룰 (세션 86 정착)
+
+**WSL 빌드 = 단일 foreground wsl 호출** — `setsid + nohup + disown` 으로도 다음 wsl 외부 호출 시 child process SIGHUP (WSL2 HCS 추정). 빌드 같은 long-running task 는 `wsl -d Ubuntu -- bash -lc "bash /mnt/e/.../wsl-build-deploy.sh 2>&1 | tail -80"` 형태로 단일 호출 + Bash tool timeout 600s 내 완료. 본 패턴 메모리 등록 후보.
+
+**WSL DB 호출 = PGPASSWORD direct + 명시적 -h/-U** — `sudo -u postgres psql` 은 password prompt 로 hang. `PGPASSWORD=<...> psql -h localhost -U postgres -d luckystyle4u` 패턴 통일. 테이블명 정정 (`source` → `content_sources`, `tenant` → `tenants`, `audit_log` → `audit_logs`).
+
+**tsx CLI script 실행 시 .env auto-load 안 함** — DATABASE_URL 미설정 에러. PowerShell `$env:DATABASE_URL = (Get-Content .env | Select-String '^DATABASE_URL=').ToString() -replace '^DATABASE_URL="?', '' -replace '"$', ''` 패턴 또는 `dotenv-cli` 도입.
 
 ---
 
