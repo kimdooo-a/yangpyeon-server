@@ -73,6 +73,7 @@ vi.mock("@/lib/aggregator/classify", () => ({
 }));
 vi.mock("@/lib/aggregator/llm", () => ({ enrichItem: enrichMock }));
 vi.mock("@/lib/aggregator/promote", () => ({ promotePending: promoteMock }));
+vi.mock("@/lib/aggregator/cleanup", () => ({ runCleanup: vi.fn(async () => ({ deleted: 0 })) }));
 vi.mock("@/lib/db/prisma-tenant-client", () => ({
   tenantPrismaFor: tenantPrismaForMock,
   withTenantTx: vi.fn(),
@@ -319,5 +320,140 @@ describe("runAggregatorModule — module 디스패처 (multi-tenant)", () => {
     expect(updateSourceMock).toHaveBeenCalledTimes(2);
     expect(result.status).toBe("SUCCESS");
     consoleSpy.mockRestore();
+  });
+
+  // ===========================================================================
+  // S87 추가 5 케이스 (Track B TDD 10→15, R-W1 갭 보강)
+  // ===========================================================================
+
+  it("11. module='cleanup' → runCleanup 호출 + deleted=N 메시지", async () => {
+    const result = await runAggregatorModule(FAKE_CTX, { module: "cleanup" });
+
+    expect(result.status).toBe("SUCCESS");
+    expect(result.message).toMatch(/deleted=0/);
+  });
+
+  it("12. buildPendingRow boundary slice — title 500 / summary 5000 / contentHtml 50000 / author 200 / imageUrl 1000", async () => {
+    findManySourceMock.mockResolvedValue([makeSource({ id: 99 })]);
+    fetchSourceMock.mockResolvedValue([
+      {
+        url: "https://x.com/long",
+        title: "a".repeat(700), // > 500
+        summary: "b".repeat(7000), // > 5000
+        contentHtml: "c".repeat(60_000), // > 50000
+        author: "d".repeat(300), // > 200
+        imageUrl: "https://x.com/img/" + "e".repeat(2000), // > 1000
+      },
+    ]);
+    dedupeMock.mockResolvedValue({
+      fresh: [
+        {
+          url: "https://x.com/long",
+          title: "a".repeat(700),
+          summary: "b".repeat(7000),
+          contentHtml: "c".repeat(60_000),
+          author: "d".repeat(300),
+          imageUrl: "https://x.com/img/" + "e".repeat(2000),
+        },
+      ],
+      duplicates: 0,
+    });
+    createManyIngestedMock.mockResolvedValue({ count: 1 });
+    updateSourceMock.mockResolvedValue({});
+
+    await runAggregatorModule(FAKE_CTX, { module: "rss-fetcher" });
+
+    const createArg = createManyIngestedMock.mock.calls[0]?.[0] as {
+      data: Array<{
+        title: string;
+        summary: string | null;
+        contentHtml: string | null;
+        author: string | null;
+        imageUrl: string | null;
+      }>;
+    };
+    const row = createArg.data[0];
+    expect(row.title.length).toBe(500);
+    expect(row.summary?.length).toBe(5000);
+    expect(row.contentHtml?.length).toBe(50_000);
+    expect(row.author?.length).toBe(200);
+    expect(row.imageUrl?.length).toBe(1000);
+  });
+
+  it("13. classifier — enrichItem throw → errors++ + 다음 row 진행 (격리)", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      { id: 1, url: "https://x/a", title: "T1", summary: null, contentHtml: null, author: null, imageUrl: null, publishedAt: null },
+      { id: 2, url: "https://x/b", title: "T2", summary: null, contentHtml: null, author: null, imageUrl: null, publishedAt: null },
+      { id: 3, url: "https://x/c", title: "T3", summary: null, contentHtml: null, author: null, imageUrl: null, publishedAt: null },
+    ]);
+    let n = 0;
+    enrichMock.mockImplementation(async () => {
+      n += 1;
+      if (n === 2) throw new Error("LLM 일시 장애");
+      return {
+        url: "https://x/x",
+        title: "T",
+        urlHash: "h",
+        suggestedTrack: "build",
+        suggestedCategorySlug: null,
+        aiSummary: null,
+        aiTags: [],
+        aiLanguage: null,
+      };
+    });
+    updateIngestedMock.mockResolvedValue({});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await runAggregatorModule(FAKE_CTX, {
+      module: "classifier",
+      batch: 50,
+    });
+
+    expect(result.status).toBe("SUCCESS");
+    expect(result.message).toMatch(/pending=3 classified=2 errors=1/);
+    expect(updateIngestedMock).toHaveBeenCalledTimes(2); // 성공 2건만 update
+    consoleSpy.mockRestore();
+  });
+
+  it("14. promoter promoted=0 + errors>0 → status='FAILURE' (전체 실패 분기)", async () => {
+    promoteMock.mockResolvedValue({ promoted: 0, errors: 3 });
+
+    const result = await runAggregatorModule(FAKE_CTX, {
+      module: "promoter",
+      batch: 50,
+    });
+
+    expect(result.status).toBe("FAILURE");
+    expect(result.message).toMatch(/promoted=0 errors=3/);
+  });
+
+  it("15. processSingleSource — url 또는 title 비어있는 raw item 필터링 (dedupe 입력 단계)", async () => {
+    findManySourceMock.mockResolvedValue([makeSource({ id: 50 })]);
+    fetchSourceMock.mockResolvedValue([
+      { url: "https://x.com/valid", title: "OK" },
+      { url: "", title: "no-url" }, // url empty → filter
+      { url: "https://x.com/no-title", title: "" }, // title empty → filter
+      { url: "https://x.com/another", title: "OK2" },
+    ]);
+    dedupeMock.mockResolvedValue({
+      fresh: [
+        { url: "https://x.com/valid", title: "OK" },
+        { url: "https://x.com/another", title: "OK2" },
+      ],
+      duplicates: 0,
+    });
+    createManyIngestedMock.mockResolvedValue({ count: 2 });
+    updateSourceMock.mockResolvedValue({});
+
+    const result = await runAggregatorModule(FAKE_CTX, { module: "rss-fetcher" });
+
+    // dedupeAgainstDb 에 전달된 valid 배열은 2건 (url+title 둘 다 truthy)
+    const dedupeArg = dedupeMock.mock.calls[0]?.[0] as Array<{ url: string }>;
+    expect(dedupeArg).toHaveLength(2);
+    expect(dedupeArg.map((i) => i.url)).toEqual([
+      "https://x.com/valid",
+      "https://x.com/another",
+    ]);
+    expect(result.message).toMatch(/fetched=4 inserted=2/);
   });
 });

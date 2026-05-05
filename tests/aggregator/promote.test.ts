@@ -358,4 +358,238 @@ describe("promotePending — ingested → content_items 승격 (multi-tenant)", 
     expect(result.promoted).toBe(3);
     expect(result.errors).toBe(0);
   });
+
+  // ===========================================================================
+  // S87 추가 13 케이스 (Track B TDD 14→27, R-W1 갭 보강)
+  // ===========================================================================
+
+  it("15. slugify 한글 음절 보존 (NFKD→NFC 재결합 — jamo 분해 차단)", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({
+        id: 1,
+        title: "양평 부엌",
+        urlHash: "11111111".repeat(8),
+        suggestedCategorySlug: null,
+      }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const upsertArg = upsertItemMock.mock.calls[0]?.[0] as { create: { slug: string } };
+    // 한글이 그대로 보존돼야 함 (jamo 로 분해되면 정규식이 매치 못해 빈 슬러그가 됨)
+    expect(upsertArg.create.slug).toMatch(/양평-부엌/);
+  });
+
+  it("16. slugify Latin 분음부호 제거 (café → cafe)", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({
+        id: 1,
+        title: "Café résumé",
+        urlHash: "22222222".repeat(8),
+        suggestedCategorySlug: null,
+      }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const upsertArg = upsertItemMock.mock.calls[0]?.[0] as { create: { slug: string } };
+    expect(upsertArg.create.slug).toMatch(/^cafe-resume-/);
+  });
+
+  it("17. slugify 60자 + suffix 8자 — base slice 60자 제한", async () => {
+    const longTitle = "a".repeat(100);
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({
+        id: 1,
+        title: longTitle,
+        urlHash: "33333333".repeat(8),
+        suggestedCategorySlug: null,
+      }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const upsertArg = upsertItemMock.mock.calls[0]?.[0] as { create: { slug: string } };
+    // base = 60자 'a' + '-' + 8자 hash = 69자
+    expect(upsertArg.create.slug).toBe("a".repeat(60) + "-33333333");
+  });
+
+  it("18. slugify 빈 결과 → 'item' 폴백", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({
+        id: 1,
+        title: "!!!@@@###",
+        urlHash: "44444444".repeat(8),
+        suggestedCategorySlug: null,
+      }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const upsertArg = upsertItemMock.mock.calls[0]?.[0] as { create: { slug: string } };
+    expect(upsertArg.create.slug).toBe("item-44444444");
+  });
+
+  it("19. batch 명시 인수가 findMany.take 로 전달된다 (기본 50 vs custom)", async () => {
+    findManyIngestedMock.mockResolvedValue([]);
+
+    await promotePending(FAKE_CTX, 25);
+
+    const callArg = findManyIngestedMock.mock.calls[0]?.[0] as { take: number };
+    expect(callArg.take).toBe(25);
+  });
+
+  it("20. batch 기본값은 50", async () => {
+    findManyIngestedMock.mockResolvedValue([]);
+
+    await promotePending(FAKE_CTX);
+
+    const callArg = findManyIngestedMock.mock.calls[0]?.[0] as { take: number };
+    expect(callArg.take).toBe(50);
+  });
+
+  it("21. upsert.update 분기에 categoryId/excerpt/tags 갱신 명시 (재실행 시 update path)", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({ id: 1, suggestedCategorySlug: "ai-tools" }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([{ id: "cat-1", slug: "ai-tools" }]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const upsertArg = upsertItemMock.mock.calls[0]?.[0] as {
+      update: { categoryId: string | null; track: string; tags: string[] };
+    };
+    expect(upsertArg.update.categoryId).toBe("cat-1");
+    expect(upsertArg.update.track).toBe("build");
+    expect(upsertArg.update.tags).toEqual(["ai"]);
+  });
+
+  it("22. ready 의 모든 slug=null/empty 면 contentCategory.findMany 호출 안 함 (slugs.length=0 분기)", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({ id: 1, suggestedCategorySlug: null }),
+      makeIngested({ id: 2, suggestedCategorySlug: "" }),
+    ]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    expect(findManyCategoryMock).not.toHaveBeenCalled();
+  });
+
+  it("23. categoryRows.findMany 의 slug.in 은 중복 제거된 unique 목록 (Set 처리)", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({ id: 1, suggestedCategorySlug: "ai-tools" }),
+      makeIngested({ id: 2, suggestedCategorySlug: "ai-tools" }),
+      makeIngested({ id: 3, suggestedCategorySlug: "ai-tools" }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([{ id: "cat-1", slug: "ai-tools" }]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const callArg = findManyCategoryMock.mock.calls[0]?.[0] as {
+      where: { slug: { in: string[] } };
+    };
+    expect(callArg.where.slug.in).toEqual(["ai-tools"]); // 1개 (중복 3 제거됨)
+  });
+
+  it("24. excerpt — title slice 200자 제한 (aiSummary, summary 모두 null/공백)", async () => {
+    const longTitle = "긴 제목입니다 ".repeat(50); // 350자+
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({
+        id: 1,
+        title: longTitle,
+        aiSummary: null,
+        summary: null,
+        suggestedCategorySlug: null,
+      }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const upsertArg = upsertItemMock.mock.calls[0]?.[0] as { create: { excerpt: string } };
+    expect(upsertArg.create.excerpt.length).toBe(200);
+    expect(upsertArg.create.excerpt).toBe(longTitle.slice(0, 200));
+  });
+
+  it("25. tags 폴백 — aiTags 가 빈 배열이어도 그대로 사용 (?? 가 [] 통과)", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({ id: 1, aiTags: [], suggestedCategorySlug: null }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const upsertArg = upsertItemMock.mock.calls[0]?.[0] as { create: { tags: string[] } };
+    expect(upsertArg.create.tags).toEqual([]);
+  });
+
+  it("26. withTenantTx fn throw → errors++ + 다음 row 흐름 보존 (격리)", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({ id: 1, suggestedCategorySlug: null }),
+      makeIngested({ id: 2, suggestedCategorySlug: null }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([]);
+    let txCallCount = 0;
+    withTenantTxMock.mockImplementation(
+      async (_tenantId: string, fn: (tx: unknown) => Promise<unknown>) => {
+        txCallCount += 1;
+        if (txCallCount === 1) throw new Error("tx 격리 실패 시뮬");
+        return fn({
+          contentItem: { upsert: upsertItemMock },
+          contentIngestedItem: { update: updateIngestedMock },
+        });
+      },
+    );
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await promotePending(FAKE_CTX);
+
+    expect(result.promoted).toBe(1);
+    expect(result.errors).toBe(1);
+    expect(withTenantTxMock).toHaveBeenCalledTimes(2);
+    consoleSpy.mockRestore();
+  });
+
+  it("27. excerpt 폴백 — aiSummary 공백만 → trim 후 falsy → summary 폴백", async () => {
+    findManyIngestedMock.mockResolvedValue([
+      makeIngested({
+        id: 1,
+        aiSummary: "    ",
+        summary: "원본 요약 폴백",
+        suggestedCategorySlug: null,
+      }),
+    ]);
+    findManyCategoryMock.mockResolvedValue([]);
+    upsertItemMock.mockResolvedValue({});
+    updateIngestedMock.mockResolvedValue({});
+
+    await promotePending(FAKE_CTX);
+
+    const upsertArg = upsertItemMock.mock.calls[0]?.[0] as { create: { excerpt: string } };
+    expect(upsertArg.create.excerpt).toBe("원본 요약 폴백");
+  });
 });
