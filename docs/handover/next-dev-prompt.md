@@ -1,11 +1,15 @@
-# 다음 세션 프롬프트 (세션 89)
+# 다음 세션 프롬프트 (세션 91)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 88 보조 chunk 종료 — sticky_notes 운영 콘솔 fix: app_admin role GRANT 누락 systemic 4개월 prod latent)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 90 sweep cont chunk 종료 — silent catch ops 영역 sweep 30 후보 → 8 fix + 23 보존)
+
+세션 90 = S89 마무리 chunk (commit `d10b5e9`) 의 sticky-board + filebox 2 위치 silent catch 표면화 자연 follow-up. 30 catch 후보 (components 7 + protected 23) grep 후 위험도×UX 매트릭스 분류로 6 추가 fix (HIGH 1: command-menu PM2 restart silent fail / primary 2: filebox 폴더 내용 + processes detail 클릭 / secondary 2: 대시보드 PM2 status + sql-editor saved queries / polling 1: realtime channels 10s) + 합리적 skip 23건 보존 (JSON parse / capability fallback / re-throw / collect / UI state error / polling 재시도 / SSE malformed / fallback inline) + P3 SKIP 1 (sticky-note-card.tsx:107 paired capability fallback cosmetic). commit `5f64675` (6 src files, 34+/13-). vitest 585 PASS / 91 skipped (S87 baseline 정확 일치, 회귀 0). **다른 터미널 동시 commit `67461da`** S89 마무리 chunk /cs docs (handover S89 + index row 89 + current row 89 + logs row 89 + journal 세션 89 + next-dev-prompt 정정) 영역 분리 자연 정합 = 머지 충돌 0. **세션 89 마무리 chunk 와 영역 분리** (S89 = 코드 fix sticky-board+filebox + 룰 정착, S90 = ops 영역 sweep + 합리적 skip 분류 + cosmetic SKIP 분류).
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 88 보조 chunk 종료 시점 컨텍스트, 참고 보존)
 
 세션 88 = 사용자 보고 "iPhone Safari /notes 미작동" 진입 → systematic-debugging Phase 1~4 전체 사이클 → root cause = `app_admin` PostgreSQL role 의 `BYPASSRLS=t + zero GRANT` (37 테이블 + 1 시퀀스 + DEFAULT PRIVILEGES 모두 누락). 마이그레이션 1건 직접 적용 + DEFAULT PRIVILEGES 등록으로 systemic 차단 + 향후 신설 객체 자동 GRANT. **세션 87 메인 chunk 와 영역 분리 — 보조 chunk** (DB role grants 영역 — S87 메인은 aggregator/cron/security/TDD 영역, 머지 충돌 0).
 
@@ -22,12 +26,13 @@
 
 ---
 
-## ⭐ 세션 89 첫 작업 우선순위 (세션 88 보조 chunk 종료 시점, 2026-05-05)
+## ⭐ 세션 91 첫 작업 우선순위 (세션 90 sweep cont chunk 종료 시점, 2026-05-05)
 
 | # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
 |---|------|------|------|----------|
-| **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도 → 정상 작동 확인** | **P0 사용자** | 1분 | 본 fix 가 1차 보고 해결했는지 final 검증. 만약 여전히 안 되면 (확률 낮음) 다음 가설 = (a) 브라우저 캐시 401 (시크릿 탭 1회) (b) 별개 버그 (sticky-board.tsx 의 다른 catch 또는 인증 플로우). |
-| **S88-SILENT-CATCH-SWEEP** | **silent catch 패턴 전수 정리 (cont.)** — S89 마무리 chunk 에서 `sticky-board.tsx:35` ✅ + `filebox/page.tsx:79` ✅ 처리 (commit `d10b5e9`). ops route 17개 client component catch{} grep 후 일괄 fix | P1 | ~30분 | `grep -rn "} catch {" src/components/` + `grep -rn "} catch (.*)" src/app/(protected)/` 로 잔여 후보 추출 → `toast.error` (user-facing) / `console.error` (사이드바 등 비-blocking) 위계 적용. |
+| **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도 → 정상 작동 확인** | **P0 사용자** | 1분 | 본 fix 가 1차 보고 해결했는지 final 검증. silent catch 표면화 후 (S89+S90 = 8 위치 처리, commits `d10b5e9` + `5f64675`) 실패 시 toast 로 노출 가능. 만약 여전히 안 되면 = (a) 브라우저 캐시 401 (시크릿 탭 1회) (b) 별개 버그. |
+| ~~S88-SILENT-CATCH-SWEEP~~ | ~~silent catch 패턴 전수 정리~~ ✅ **S90 sweep cont 종료** (commits `d10b5e9` + `5f64675`) — 30 catch 후보 grep + 위험도×UX 매트릭스 분류: 8 위치 fix (sticky-board:35 + filebox:79 + filebox:64 + page.tsx:90 + sql-editor:40 + realtime:40 + processes:133 + command-menu:87) + 합리적 skip 23건 보존 (JSON parse / capability fallback / polling 재시도 / re-throw / UI state error / SSE malformed / fallback inline). 위계 차등 = HIGH/primary→`console+toast`, secondary/polling→`console만`. | — | ✅ | 회귀 0 (vitest 585 PASS / tsc 본 변경 무관). |
+| **S88-SILENT-CATCH-P3** | **`sticky-note-card.tsx:107` paired capability fallback 주석 정합** — sibling line 81 의 setPointerCapture pair 주석 일관성 보강 (cosmetic) | P3 | ~5분 | logical 동등 — 기능 영향 0. cosmetic refactor scope, 우선도 낮음. |
 | **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** — Webhooks/SQL Editor/Cron 콘솔 등 systemic fix 검증 | **P1** | ~30분 | 본 마이그레이션이 37 테이블 모두 GRANT 부여했지만 실제 호출 검증 미실행. 운영자가 운영 콘솔 메뉴 5~7개 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. S89 마무리 chunk 의 audit 스크립트 (`scripts/diag-readwrite-grants.sh`) 가 raw pg client 경로 (`app_readonly`/`app_readwrite`) 정상성 정적 확인 완료 (37/0/0/0 + 37/37/37/37) — 라이브 검증은 운영자 직접. |
 | ~~S88-PR-GATE-EXPAND~~ | ~~CLAUDE.md PR 리뷰 게이트 룰 #4 확장~~ | — | — | ✅ **세션 89 마무리 chunk 완료** (commit `d10b5e9`, CLAUDE.md line 167 BYPASSRLS=t 게이트 추가 + S88 마이그레이션 명시 참조 + memory `feedback_grant_check_for_bypassrls_roles.md` 신규 자매 룰) |
 | ~~S88-CK-MEMORY~~ | ~~`feedback_postgres_bypassrls_not_grants.md` memory 룰 승격~~ | — | — | ✅ **세션 88 종료 직후 사용자 처리** — `feedback_grant_check_for_bypassrls_roles.md` 신설 + MEMORY.md 색인 line 21 추가 (외부 수정). |
@@ -48,14 +53,14 @@
 | S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. |
 | S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. |
 
-### S89 진입 시 첫 행동
+### S91 진입 시 첫 행동
 
 1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
 2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
-3. **S88-USER-VERIFY P0 우선** — 사용자에게 "휴대폰에서 메모 다시 시도해보셨나요?" 확인. silent catch 표면화 후 (commit `d10b5e9`) 메시지가 실패 시 toast 로 노출되므로 root cause 1라운드 진단. 정상이면 다음 단계, 안 되면 추가 디버깅.
-4. **S88-SILENT-CATCH-SWEEP P1 cont.** — 2 위치 처리 완료 (sticky-board + filebox). 잔여 ops route 17개 client component catch{} grep + `toast.error` / `console.error` 위계 적용 (~30분).
+3. **S88-USER-VERIFY P0 우선** — 사용자에게 "휴대폰에서 메모 다시 시도해보셨나요?" 확인. silent catch sweep S89+S90 = 8 위치 표면화 후 (commits `d10b5e9` + `5f64675`) 실패 시 toast/console 로 노출되므로 root cause 1라운드 진단. 정상이면 다음 단계, 안 되면 추가 디버깅 (확률 낮음).
+4. ~~S88-SILENT-CATCH-SWEEP~~ ✅ **S90 sweep cont 종료** — 30 후보 grep + 8 fix + 23 보존 분류 완료. 잔여 P3 = `sticky-note-card.tsx:107` cosmetic 만.
 5. **S88-OPS-LIVE P1** — 운영자 본인이 운영 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터 (운영자 직접). audit 스크립트로 정적 확인 완료, 라이브 검증만 잔여.
-6. 또는 → **S85-F2 단독 chunk 진입** (5-6 작업일, S88 마무리 chunk 종료로 큰 chunk 진입 적절).
+6. 또는 → **S85-F2 단독 chunk 진입** (5-6 작업일, S88~S90 silent catch sweep 종료로 큰 chunk 진입 적절).
 
 ### 영구 룰 (S88 정착 — CLAUDE.md PR 게이트 룰 확장 후보)
 
