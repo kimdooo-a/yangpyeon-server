@@ -27,9 +27,9 @@
 | # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
 |---|------|------|------|----------|
 | **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도 → 정상 작동 확인** | **P0 사용자** | 1분 | 본 fix 가 1차 보고 해결했는지 final 검증. 만약 여전히 안 되면 (확률 낮음) 다음 가설 = (a) 브라우저 캐시 401 (시크릿 탭 1회) (b) 별개 버그 (sticky-board.tsx 의 다른 catch 또는 인증 플로우). |
-| **S88-SILENT-CATCH** | **silent catch 패턴 전수 정리** — `sticky-board.tsx:35` `toast.error` 교체 + 다른 ops route catch{} grep 후 일괄 fix | **P1** | ~30분 | 본 사고에서 디버깅 비용 9배 증폭 잠재력의 진짜 원인. `grep -rn "} catch {" src/` + `grep -rn "} catch (.*)" src/components/` 로 후보 추출 → `toast.error` + `console.error` 최소 표준 적용. |
-| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** — Webhooks/SQL Editor/Cron 콘솔 등 systemic fix 검증 | **P1** | ~30분 | 본 마이그레이션이 37 테이블 모두 GRANT 부여했지만 실제 호출 검증 미실행. 운영자가 운영 콘솔 메뉴 5~7개 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. |
-| **S88-PR-GATE-EXPAND** | **CLAUDE.md PR 리뷰 게이트 룰 #4 확장 — "app_admin (BYPASSRLS=t) 라이브 테스트도 게이트"** | **P1 룰** | ~15분 | 룰 #4 가 non-BYPASSRLS 영역만 게이트화 — BYPASSRLS=t 영역 (운영 콘솔) 도 같은 게이트 적용. 신규 모델 추가 시 app_admin GRANT 도 검증 강제. CLAUDE.md 룰 PR 단독. |
+| **S88-SILENT-CATCH-SWEEP** | **silent catch 패턴 전수 정리 (cont.)** — S89 마무리 chunk 에서 `sticky-board.tsx:35` ✅ + `filebox/page.tsx:79` ✅ 처리 (commit `d10b5e9`). ops route 17개 client component catch{} grep 후 일괄 fix | P1 | ~30분 | `grep -rn "} catch {" src/components/` + `grep -rn "} catch (.*)" src/app/(protected)/` 로 잔여 후보 추출 → `toast.error` (user-facing) / `console.error` (사이드바 등 비-blocking) 위계 적용. |
+| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** — Webhooks/SQL Editor/Cron 콘솔 등 systemic fix 검증 | **P1** | ~30분 | 본 마이그레이션이 37 테이블 모두 GRANT 부여했지만 실제 호출 검증 미실행. 운영자가 운영 콘솔 메뉴 5~7개 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. S89 마무리 chunk 의 audit 스크립트 (`scripts/diag-readwrite-grants.sh`) 가 raw pg client 경로 (`app_readonly`/`app_readwrite`) 정상성 정적 확인 완료 (37/0/0/0 + 37/37/37/37) — 라이브 검증은 운영자 직접. |
+| ~~S88-PR-GATE-EXPAND~~ | ~~CLAUDE.md PR 리뷰 게이트 룰 #4 확장~~ | — | — | ✅ **세션 89 마무리 chunk 완료** (commit `d10b5e9`, CLAUDE.md line 167 BYPASSRLS=t 게이트 추가 + S88 마이그레이션 명시 참조 + memory `feedback_grant_check_for_bypassrls_roles.md` 신규 자매 룰) |
 | ~~S88-CK-MEMORY~~ | ~~`feedback_postgres_bypassrls_not_grants.md` memory 룰 승격~~ | — | — | ✅ **세션 88 종료 직후 사용자 처리** — `feedback_grant_check_for_bypassrls_roles.md` 신설 + MEMORY.md 색인 line 21 추가 (외부 수정). |
 | **S88-ENDDRAG-FIX** | **`sticky-note-card.tsx:114` endDrag stale closure 별도 PR** | P2 | ~30분 | 본 root cause 와 무관한 부수 잠재 버그. `endDrag` 가 `position` 클로저 캡처 → 드래그 종료 시 시작 좌표 저장 가능성. `position` 대신 `draggingRef.current` 좌표 누적 또는 useRef 로 latest position 추적. |
 | **S85-F2** | **M4 UI Phase 2** — Composer 인터랙티브 + SSE wiring + User name lookup + SWR 도입 + 정보패널 시동 | **P0 messenger** | **5-6 작업일 단독 chunk** | (S85, S86, S87, S88 모두 단독 chunk 대기로 보류) wave 평가 §5.1 진입 패턴 = 단독 세션 chunk. 5 sub-task 분할. |
@@ -52,11 +52,10 @@
 
 1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
 2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
-3. **S88-USER-VERIFY P0 우선** — 사용자에게 "휴대폰에서 메모 다시 시도해보셨나요?" 확인. 정상이면 다음 단계, 안 되면 (확률 낮음) 추가 디버깅 (브라우저 캐시 / sticky-board 의 다른 분기 / 인증 플로우).
-4. **S88-SILENT-CATCH P1** — 사용자 검증 후 곧장 진입 (~30분). 본 사고의 디버깅 비용 증폭 진짜 원인 정리.
-5. **S88-OPS-LIVE P1** — 운영자 본인이 운영 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터 (운영자 직접).
-6. **S88-PR-GATE-EXPAND P1 룰** — CLAUDE.md PR 게이트 룰 #4 확장 PR (15분).
-7. 또는 → **S85-F2 단독 chunk 진입** (5-6 작업일, 본 세션이 깔끔히 종료된 만큼 큰 chunk 진입 적절).
+3. **S88-USER-VERIFY P0 우선** — 사용자에게 "휴대폰에서 메모 다시 시도해보셨나요?" 확인. silent catch 표면화 후 (commit `d10b5e9`) 메시지가 실패 시 toast 로 노출되므로 root cause 1라운드 진단. 정상이면 다음 단계, 안 되면 추가 디버깅.
+4. **S88-SILENT-CATCH-SWEEP P1 cont.** — 2 위치 처리 완료 (sticky-board + filebox). 잔여 ops route 17개 client component catch{} grep + `toast.error` / `console.error` 위계 적용 (~30분).
+5. **S88-OPS-LIVE P1** — 운영자 본인이 운영 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터 (운영자 직접). audit 스크립트로 정적 확인 완료, 라이브 검증만 잔여.
+6. 또는 → **S85-F2 단독 chunk 진입** (5-6 작업일, S88 마무리 chunk 종료로 큰 chunk 진입 적절).
 
 ### 영구 룰 (S88 정착 — CLAUDE.md PR 게이트 룰 확장 후보)
 
