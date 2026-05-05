@@ -1,9 +1,71 @@
-# 다음 세션 프롬프트 (세션 87)
+# 다음 세션 프롬프트 (세션 88)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 87 종료 — S87 다중 작업 5건 압축 + Track B TDD 100% 도달)
+
+세션 87 = 단일 메인 터미널 5 작업 압축 + 2 commits (`b46bf2e` cleanup+hook+CK / `effd6fa` aggregator TDD). 베이스라인 검증 시 S86-PUSH 자동 완료 발견 (origin sync 0/0 = `ce50988` 다른 터미널/사용자 push). next-dev-prompt §S87 7 작업 후보 중 5건 압축 + 1건 (S87-RSS-ACTIVATE) 운영자 결정 + 1건 (S85-F2 5-6일 chunk) 단독 세션 보류.
+
+- **S87-CRON-VERIFY P0**: PGPASSWORD direct + `AT TIME ZONE 'Asia/Seoul'` SQL 측정. 6 cron 모두 wall clock 정확 일치 (rss-fetch 06:00 / classify 08:30 / promote 08:30 / cleanup 03:00 / api-poll 06:00 / html-scrape 06:00 KST) + cf=0 + state=CLOSED + last_success_at = last_run_at 동기화. **3 fix 동시 자연 path 영구 통과** (TimeZone=UTC PrismaPg shift 소멸 + S86 P2 recordResult fix + S84-D dedupe Fix A/B 회복: rss-fetch inserted=9 duplicates=123). 메타 발견: next-dev-prompt 가 예측한 schedule (23:00/23:30/03:00) 가 실제 (`every 30m` / `every 6h` / `0 3 * * *`) 와 다름 — 인수인계서 추정 vs 실측 차이 (memory `feedback_baseline_check_before_swarm` 적용 사례 추가).
+- **S87-ENV-CLEANUP P2**: `.gitignore` `*.bak` → `*.bak*` 확장 (`.bak-{timestamp}` 변형 매칭, `.env.bak-test` 검증 PASS). `.env.bak-20260504-223541` Windows + WSL build 양측 삭제 (~/ypserver측은 인수인계서 기재와 달리 이미 부재).
+- **S87-CK-WSL P2**: 2 CK 신규 — (1) `2026-05-04-wsl2-background-sighup-trap.md` (84 lines, WSL2 HCS session 종료 시 모든 child SIGHUP, 단일 foreground wsl 호출 + Bash timeout 표준화, memory 룰 후보) (2) `2026-05-04-tsx-env-not-loaded.md` (98 lines, tsx CLI 가 `.env` 자동 로드 안 함, PowerShell `$env:` / dotenv-cli / `import "dotenv/config"` 4종 우회 매트릭스, memory 룰 후보).
+- **S86-SEC-2 P1 보안**: git native `core.hooksPath` 채택 (husky 등 dev dep 회피). `.githooks/pre-commit` 90 lines 차단 패턴 (운영 password 변형 + API key prefix 4종 Anthropic/OpenAI/GitHub/AWS + bash `${VAR:-secret}` + TS `process.env.X ?? "secret"` + `.env` 직접 staging 차단). `scripts/setup-githooks.sh` 26 lines 1회 실행. **5/5 자체 검증 PASS** (BLOCK 3 + PASS 1 + SKIP_SECRET_HOOK=1 우회 1). 본 commit `b46bf2e` 자체 통과 = false positive 회피 메타-검증.
+- **S85-WAVE-1 P1**: wave 평가 §5.4 R-W1 갭 (Track B TDD 81% → 32 case 미달) 해소. llm 13→27 (+14: getDailyBudget 폴백/systemInstruction/config 정확도/catch/타입 가드 4종/prompt 폴백/client 싱글톤 testTimeout 8000/일자 reset/빈 배열 구분), promote 14→27 (+13: slugify 분기 4종/batch/upsert update/Set unique/boundary slice/tags 폴백/tx throw 격리), runner 10→15 (+5: cleanup 분기/buildPendingRow boundary 5종/classifier 격리/promoter FAILURE 분기/item filter). 1차 2 fail (T21 ruleResult.track undefined 가능 → 가드 방향 반전, T25 throttle 6500ms × 2 → testTimeout 8000) 즉시 fix. **전체 vitest 585 PASS / 91 skipped** (S86 baseline 553 + 32 신규 일치, 회귀 0).
+- **S85-F2 보류 결정**: 5-6 작업일 chunk = 단독 세션 권장 (wave 평가 §5.1 진입 패턴 명시). 본 세션 5 작업 누적분 인계가 다음 세션 가치 보전에 더 효과적.
+- **다른 터미널 산출 7건 stage 제외** (memory `feedback_concurrent_terminal_overlap`): `scripts/diag-app-admin-grants.sh` + `scripts/diag-app-admin-missing.sh` + `scripts/diag-app-runtime-test.sh` + `scripts/diag-monitor-stderr-30s.sh` + `scripts/diag-sticky-notes-grants.sh` + `scripts/apply-migration-grant-app-admin.sh` + `prisma/migrations/20260505000000_grant_app_admin_all_public/`. 그 터미널이 commit 처리 예상.
+- **검증 매트릭스**: vitest 585 PASS / 91 skip (회귀 0) + tsc 0 (사전 존재 `phase-14c-alpha-ui.spec.ts` 2건 무관) + `.githooks/pre-commit` 5/5 자체 검증 + prod cron 6/6 wall clock 일치 + WSL 빌드+배포 SKIP (코드 변경 = test 파일 + hook + CK 문서, prod 운영 영향 0 → 다음 세션 M4 UI Phase 2 진입 시 자연 흡수).
+
+---
+
+## ⭐ 세션 88 첫 작업 우선순위 (세션 87 종료 시점, 2026-05-05)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **S85-F2** | **M4 UI Phase 2** — Composer 인터랙티브 (textarea autosize + Enter 송신 + clientGeneratedId UUIDv7 + 낙관적 업데이트 + 답장 인용 카드 + 멘션 popover cmdk) + SSE wiring (use-sse 로 conv/user 채널 구독 → 캐시 invalidate) + User name lookup (DIRECT peer name) | **P0 messenger** | **5-6 작업일 단독 chunk** | (S85, S86, S87 모두 단독 chunk 대기로 보류) wave 평가 §5.1 진입 패턴 = 단독 세션 chunk. backend 17 라우트 활용 (POST /messages + PATCH /messages/:id 편집 + DELETE /messages/:id 회수 + POST /typing + POST /receipts). S85-INFRA-1 SWR 도입 동시 또는 선행 권장. 5 sub-task 분할: Composer / SSE wiring / peer name / SWR 도입 / 정보패널 시동. |
+| **S87-INFRA-1** | **SWR + jsdom + @testing-library/react 도입** — 컴포넌트 렌더 테스트 인프라 정착 | P2 인프라 | ~3h | S85-F2 진입 직전 또는 동시. SWR 표준화 (S84-F1 `useState + useEffect + fetch` 대체) + vitest config 분기 (server lib = node, ui = jsdom) + 컴포넌트 렌더 테스트. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86, S87 미수행) github.com/kimdooo-a/yangpyeon-server → Settings 확인. **public 이면 Archive Program/scraper 캐시 회수 불가** — 비밀번호 회전 권고 강화. private 이면 추가 조치 불필요. |
+| **S87-WAVE-1-CONT** | **wave 평가 §5.4 sweep cont. — R-W2 wave-tracker 모델 수 정정 (11 → 9 모델 + 6 enum) + R-W6 ops 카운트 cross-check + R-W7 git tag s81-first-cards-live 소급 부여** | P1 sweep | ~30분 | S85-WAVE-1 R-W1 완료 후속. 단일 sweep PR 으로 묶기 가능. |
+| **S87-CK-MEMORY** | **S87-CK-WSL 2 CK → memory/feedback_*.md 룰 승격** | P2 | ~30분 | `feedback_wsl2_single_foreground_call.md` + `feedback_tsx_no_dotenv_autoload.md`. MEMORY.md 색인 추가. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=false → true** (+ 4 feed 확장 결정) | P2 운영자 | 30분 | DB url 갱신 완료 (Olshansk/rss-feeds GitHub Actions hourly scrape). 운영자 결정 = (a) news 1 feed 만 (b) 4 feed 모두 (engineering/research/red 추가) (c) 라이선스 검토 후. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 (관찰만) | active session 강제 만료 영향 본인 운영자만. UI 시각 24~48h 비일관. M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
+| ~~S87-CRON-VERIFY~~ | ~~자연 cron tick stored value 정확화~~ | — | — | ✅ **세션 87 완료** (6 cron wall clock 일치, 3 fix 동시 검증) |
+| ~~S87-ENV-CLEANUP~~ | ~~`.env.bak-*` 정리 + `.gitignore` 패턴~~ | — | — | ✅ **세션 87 완료** (`*.bak*` 확장 + 양측 삭제) |
+| ~~S87-CK-WSL~~ | ~~Compound Knowledge 2건 산출~~ | — | — | ✅ **세션 87 완료** (CK 신규 2건) |
+| ~~S86-SEC-2~~ | ~~pre-commit hook gitleaks 도입~~ | — | — | ✅ **세션 87 완료** (git native + 5/5 자체 검증) |
+| ~~S85-WAVE-1~~ | ~~Track B TDD 81%→100% (32 case)~~ | — | — | ✅ **세션 87 완료** (llm +14 / promote +13 / runner +5) |
+| ~~S86-PUSH~~ | ~~`ce50988` push~~ | — | — | ✅ **세션 87 진입 시 자동 완료 발견** (origin sync 0/0) |
+| S84-C | 24h+ 관찰 후 sources 14 확장 (9 → 14) | P1 | ~30분 | S87 cron 안정성 확인됨 (cf=0 24h 유지) → 추가 5 활성 가능. |
+| S84-G | M5 첨부 + 답장 + 멘션 + 검색 | P1 messenger | 3-4 작업일 | M4 Phase 2 후속. |
+| S84-H | M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰 | P1 messenger | 3-4 작업일 | M5 후속. |
+| ~~S84-I~~ | ~~totp.test.ts AES-GCM tamper flake fix~~ | — | — | ✅ commit `66689e9` 으로 fix 완료 |
+| S84-J | Phase 2 plugin (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. |
+| S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. |
+| S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. |
+
+### S88 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성, S87 untracked 7건 그쪽 commit 처리 예상)
+3. **S85-F2 진입** — wireframes.md §1 + PRD §9 정독 + 5 sub-task 분할 (Composer / SSE wiring / peer name / SWR 도입 / 정보패널 시동)
+4. Phase 2 첫 commit = textarea autosize + Enter 송신 (TDD ~10) → S87-INFRA-1 SWR 도입 권장 동시 또는 선행
+5. 또는 → S87-WAVE-1-CONT sweep (R-W2/R-W6/R-W7 30분) 가벼운 진입 옵션
+
+### 영구 룰 (S87 정착)
+
+**`.gitignore` 백업 패턴 = `*.bak*` (변형 포함)** — 기존 `*.bak` 가 `.bak-{timestamp}` 매칭 못함. `*.bak.old`, `*.bak-20260504-223541` 등 모든 변형 차단.
+
+**git native `core.hooksPath` 충분** — husky / lint-staged / commitlint 등 dev dep 도입 회피 가능. `.githooks/` 디렉토리 추적 + `scripts/setup-githooks.sh` 1회 실행 패턴.
+
+**hook 우회는 의도 명시 환경변수 우선** — `--no-verify` 는 모든 hook 우회 (의도 불명) → 보안 hook 한정 우회는 `SKIP_SECRET_HOOK=1` 같은 명시적 환경변수가 책임 분명.
+
+**다른 터미널 산출 untracked 인 채로 두기** — 세션 종료 시 `git status --short` 의 untracked 가 본 세션 외 산출이면 stage 제외 + 인수인계서에 명시 (memory `feedback_concurrent_terminal_overlap`).
+
+---
+
+## (세션 86 종료 시점 컨텍스트 — 참고용 보존)
 
 ## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 85 종료 — 양 chunk 동시 진행: 메인 wave 평가 + 보조 시크릿 회수 + git history purge)
 
