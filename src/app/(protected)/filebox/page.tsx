@@ -76,7 +76,11 @@ export default function FileboxPage() {
         const { data } = await res.json();
         setUsage(data);
       }
-    } catch { /* 무시 */ }
+    } catch (e) {
+      // S88 — silent catch 패턴 제거. 사이드바 표시용이라 user-blocking 아니므로
+      // toast 없이 console.error 만으로 표면화 (다음 prod 디버깅 시간 단축).
+      console.error("[filebox] usage fetch failed", e);
+    }
   }, []);
 
   useEffect(() => {

@@ -164,7 +164,7 @@ CLAUDE.md (루트 — 지금 이 파일)
 1. **신규 모델 = `tenantId` 첫 컬럼 + RLS 정책 + composite unique 검증**
 2. **신규 라우트 = `withTenant()` 가드 + cross-tenant 격리 테스트** (다른 tenant id 로 조회 시 0 rows 또는 403 검증)
 3. **Prisma 호출 = `tenantPrismaFor(ctx)` closure 패턴** (ALS 의존 X, 메모리 룰 `project_workspace_singleton_globalthis` 적용). raw operation 시 args array spread 로 tx binding.
-4. **non-BYPASSRLS role 로 라이브 테스트 1회 통과** — `bash scripts/run-integration-tests.sh tests/<domain>/` (PowerShell 권장 = WSL→Win cross-OS env 손실 회피). prod 가 BYPASSRLS postgres 사용해서 가려지는 RLS bug 차단.
+4. **non-BYPASSRLS role 로 라이브 테스트 1회 통과** — `bash scripts/run-integration-tests.sh tests/<domain>/` (PowerShell 권장 = WSL→Win cross-OS env 손실 회피). prod 가 BYPASSRLS postgres 사용해서 가려지는 RLS bug 차단. **추가 게이트 (S88 정착)**: BYPASSRLS=t 운영 role (`app_admin` 등) 도 라이브 SET ROLE 테스트 통과 — RLS 우회 ≠ ACL 우회 (PG ACL 검사가 RLS 보다 먼저 실행). `app_admin` GRANT 누락이 4개월 prod hidden 이었던 S88 사례 (`prisma/migrations/20260505000000_grant_app_admin_all_public/`) 재발 차단. 신규 BYPASSRLS=t role 추가 시 GRANT migration 동시 작성 필수, 신규 모델 추가 시 ALTER DEFAULT PRIVILEGES 가 자동 적용 (S88 마이그레이션 등록분 = postgres role 의 향후 객체에 5 roles 자동 GRANT).
 5. **timezone-sensitive 비교** = (a) Prisma round-trip cancel 패턴 (write/read 양방향 동시) **또는** (b) `expires_at <= NOW()` raw SQL workaround 명시 + 영향 분석 (`docs/solutions/2026-05-02-prismapg-timezone-prod-audit.md` 참조). prod TimeZone=UTC 적용 후 (S84-A 완료 시) 본 항목은 자동 통과.
 
 **신규 도메인** (messenger 외 추가 시): 본 룰의 4번 게이트가 통과하기 전에는 prod 머지 금지. 통합 테스트 인프라 (`scripts/setup-test-db-role.sh` + `scripts/run-integration-tests.sh` + `.env.test.local`) 가 이미 정착되어 있으니 신규 도메인은 첫 라이브 테스트를 머지 게이트로 두는 것이 4 latent bug 패턴 재발 차단의 가장 확실한 정책.

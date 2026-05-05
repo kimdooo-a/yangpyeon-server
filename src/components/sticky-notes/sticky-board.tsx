@@ -31,9 +31,16 @@ export const StickyBoard = forwardRef<StickyBoardHandle>(function StickyBoard(_,
     try {
       const res = await fetch("/api/v1/sticky-notes");
       const json = await res.json();
-      if (json.success) setNotes(json.data);
-    } catch {
-      // 무시
+      if (json.success) {
+        setNotes(json.data);
+      } else {
+        toast.error(json.error?.message ?? "메모 불러오기 실패");
+      }
+    } catch (e) {
+      // S88 — silent catch 가 4개월간 PG 42501 (app_admin GRANT 누락) 을 가렸던 사고
+      // 후속. fetch 실패 시 console + toast 양쪽으로 표면화.
+      console.error("[sticky-notes] fetch failed", e);
+      toast.error(e instanceof Error ? `메모 불러오기 실패: ${e.message}` : "메모 불러오기 실패");
     } finally {
       setLoading(false);
     }
