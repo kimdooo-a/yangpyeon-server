@@ -1,9 +1,76 @@
-# 다음 세션 프롬프트 (세션 88)
+# 다음 세션 프롬프트 (세션 89)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 88 보조 chunk 종료 — sticky_notes 운영 콘솔 fix: app_admin role GRANT 누락 systemic 4개월 prod latent)
+
+세션 88 = 사용자 보고 "iPhone Safari /notes 미작동" 진입 → systematic-debugging Phase 1~4 전체 사이클 → root cause = `app_admin` PostgreSQL role 의 `BYPASSRLS=t + zero GRANT` (37 테이블 + 1 시퀀스 + DEFAULT PRIVILEGES 모두 누락). 마이그레이션 1건 직접 적용 + DEFAULT PRIVILEGES 등록으로 systemic 차단 + 향후 신설 객체 자동 GRANT. **세션 87 메인 chunk 와 영역 분리 — 보조 chunk** (DB role grants 영역 — S87 메인은 aggregator/cron/security/TDD 영역, 머지 충돌 0).
+
+- **사용자 1차 보고**: "핸드폰(아이폰16프로맥스)에서 사파리로 들어왔는데도 메모 작동이 안돼" → AskUserQuestion 4개 후 "데스크톱도 동일" 답변으로 모바일 가설 폐기 → 환경 무관 = 배포된 빌드/DB 문제.
+- **PM2 stderr 결정타** (`pm2 logs ypserver --err --lines 500`): **`Error [DriverAdapterError]: permission denied for table sticky_notes`** (PG 42501) 12건 + webhooks(3) + sql_queries(3) + cron_jobs(3) — 4 ops 테이블 동시 broken. `sticky-board.tsx:35` `} catch { /* 무시 */ }` silent catch 가 UI 에서 차단 (메타 단서: 디버깅 비용 9배 증폭 잠재력).
+- **1차 가설 자가 반박** (Phase 2 Pattern Analysis): DATABASE_URL=postgres BYPASSRLS=t + sticky_notes ACL 다른 multi-tenant 테이블과 완전 동일 → "GRANT 누락" 단순 가설 폐기. CLAUDE.md PR 게이트 룰 #3 ("Prisma 호출 = `tenantPrismaFor(ctx)` closure") 단서 → `prisma-tenant-client.ts:187-188` 의 `bypassRls=true → SET LOCAL ROLE app_admin` 발견.
+- **2차 가설 확정**: `has_table_privilege('app_admin', ...)` 4 broken 테이블 모두 sel/ins/upd/del=f. 스코프 확장 검증 (`feedback_verification_scope_depth`) → public schema **37 테이블 + 1 시퀀스 모두 0 권한 + DEFAULT PRIVILEGES 누락** = app_admin role 자체가 처음부터 GRANT 받은 적 없는 시스템 결함. **S82 4 latent bug 패턴 5번째 사례** (PR 게이트 룰 #4 의 BYPASSRLS=t 영역 미커버).
+- **마이그레이션** (`prisma/migrations/20260505000000_grant_app_admin_all_public/migration.sql`, 123 lines): role 가드 + GRANT ALL TABLES/SEQUENCES/FUNCTIONS + 3종 ALTER DEFAULT PRIVILEGES (재발 차단) + 검증 블록 (실패 시 RAISE EXCEPTION 자동 rollback).
+- **직접 적용** (`scripts/apply-migration-grant-app-admin.sh`): prisma migrate deploy cross-mount 안정성 의심 → psql `--single-transaction -f` + `_prisma_migrations` 메타 row 수동 삽입 (sha256sum + uuidgen). idempotent skip 로직 + 라이브 검증 + 후 검증 자동.
+- **검증 매트릭스**: NOTICE "37 테이블 모두 ALL 권한 부여" + 라이브 SET ROLE app_admin 4 broken 테이블 SELECT 통과 (sticky_notes=1 / webhooks=0 / sql_queries=0 / cron_jobs=6) + has_table_privilege granted/total = **37/37** + 30s PM2 stderr 0 new lines + curl probe `/api/v1/sticky-notes` 401 + `/notes` 307→/login (정상).
+- **PM2 restart 의도적 SKIP**: CLAUDE.md "PM2 운영 서버 임의 종료 금지" + GRANT catalog-only 변경 = restart 불필요 (PostgreSQL ACL 매 query catalog lookup, prepared statement plan 에 hardcode 안 됨). 두 제약 정합.
+- **CK 신규**: `docs/solutions/2026-05-05-app-admin-bypassrls-grants-trap.md` — PostgreSQL `BYPASSRLS=t ≠ 모든 권한` 함정 + DEFAULT PRIVILEGES systemic 패턴 + silent catch 디버깅 비용 증폭 + Phase 2 자가 반박의 결정적 지점.
+- **터치 안 함**: PM2 운영 서버 4종 / S87 메인 chunk commits / `sticky-note-card.tsx:114` endDrag stale closure (별도 PR 권고) / silent catch 패턴 전수 정리 (별도 PR) / 다른 ops route 라이브 검증 (systemic fix 가 막지만 미실행) / PR 게이트 룰 #4 확장 (별도 PR).
+
+---
+
+## ⭐ 세션 89 첫 작업 우선순위 (세션 88 보조 chunk 종료 시점, 2026-05-05)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도 → 정상 작동 확인** | **P0 사용자** | 1분 | 본 fix 가 1차 보고 해결했는지 final 검증. 만약 여전히 안 되면 (확률 낮음) 다음 가설 = (a) 브라우저 캐시 401 (시크릿 탭 1회) (b) 별개 버그 (sticky-board.tsx 의 다른 catch 또는 인증 플로우). |
+| **S88-SILENT-CATCH** | **silent catch 패턴 전수 정리** — `sticky-board.tsx:35` `toast.error` 교체 + 다른 ops route catch{} grep 후 일괄 fix | **P1** | ~30분 | 본 사고에서 디버깅 비용 9배 증폭 잠재력의 진짜 원인. `grep -rn "} catch {" src/` + `grep -rn "} catch (.*)" src/components/` 로 후보 추출 → `toast.error` + `console.error` 최소 표준 적용. |
+| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** — Webhooks/SQL Editor/Cron 콘솔 등 systemic fix 검증 | **P1** | ~30분 | 본 마이그레이션이 37 테이블 모두 GRANT 부여했지만 실제 호출 검증 미실행. 운영자가 운영 콘솔 메뉴 5~7개 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. |
+| **S88-PR-GATE-EXPAND** | **CLAUDE.md PR 리뷰 게이트 룰 #4 확장 — "app_admin (BYPASSRLS=t) 라이브 테스트도 게이트"** | **P1 룰** | ~15분 | 룰 #4 가 non-BYPASSRLS 영역만 게이트화 — BYPASSRLS=t 영역 (운영 콘솔) 도 같은 게이트 적용. 신규 모델 추가 시 app_admin GRANT 도 검증 강제. CLAUDE.md 룰 PR 단독. |
+| ~~S88-CK-MEMORY~~ | ~~`feedback_postgres_bypassrls_not_grants.md` memory 룰 승격~~ | — | — | ✅ **세션 88 종료 직후 사용자 처리** — `feedback_grant_check_for_bypassrls_roles.md` 신설 + MEMORY.md 색인 line 21 추가 (외부 수정). |
+| **S88-ENDDRAG-FIX** | **`sticky-note-card.tsx:114` endDrag stale closure 별도 PR** | P2 | ~30분 | 본 root cause 와 무관한 부수 잠재 버그. `endDrag` 가 `position` 클로저 캡처 → 드래그 종료 시 시작 좌표 저장 가능성. `position` 대신 `draggingRef.current` 좌표 누적 또는 useRef 로 latest position 추적. |
+| **S85-F2** | **M4 UI Phase 2** — Composer 인터랙티브 + SSE wiring + User name lookup + SWR 도입 + 정보패널 시동 | **P0 messenger** | **5-6 작업일 단독 chunk** | (S85, S86, S87, S88 모두 단독 chunk 대기로 보류) wave 평가 §5.1 진입 패턴 = 단독 세션 chunk. 5 sub-task 분할. |
+| **S87-INFRA-1** | **SWR + jsdom + @testing-library/react 도입** | P2 인프라 | ~3h | S85-F2 진입 직전 또는 동시. SWR 표준화 + vitest config 분기 + 컴포넌트 렌더 테스트. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86, S87, S88 미수행) github.com/kimdooo-a/yangpyeon-server → Settings 확인. **public 이면 Archive Program/scraper 캐시 회수 불가** — 비밀번호 회전 권고 강화. |
+| **S87-WAVE-1-CONT** | **wave 평가 §5.4 sweep cont. — R-W2 wave-tracker 모델 수 정정 + R-W6 ops 카운트 + R-W7 git tag s81-first-cards-live 소급** | P1 sweep | ~30분 | S85-WAVE-1 R-W1 완료 후속. 단일 sweep PR 으로 묶기. |
+| **S87-CK-MEMORY** | **S87-CK-WSL 2 CK → memory/feedback_*.md 룰 승격** | P2 | ~30분 | `feedback_wsl2_single_foreground_call.md` + `feedback_tsx_no_dotenv_autoload.md`. MEMORY.md 색인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=false → true** (+ 4 feed 확장 결정) | P2 운영자 | 30분 | DB url 갱신 완료. 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
+| ~~S87-CRON-VERIFY~~ ~~S87-ENV-CLEANUP~~ ~~S87-CK-WSL~~ ~~S86-SEC-2~~ ~~S85-WAVE-1~~ ~~S86-PUSH~~ | ~~6 작업~~ | — | — | ✅ **세션 87 완료** |
+| ~~S88 sticky_notes fix~~ | ~~app_admin role GRANT systemic + DEFAULT PRIVILEGES~~ | — | — | ✅ **세션 88 완료** (37/37 + 라이브 검증 + 30s stderr clean) |
+| S84-C | 24h+ 관찰 후 sources 14 확장 (9 → 14) | P1 | ~30분 | S87 cron 안정성 확인됨. |
+| S84-G | M5 첨부 + 답장 + 멘션 + 검색 | P1 messenger | 3-4 작업일 | M4 Phase 2 후속. |
+| S84-H | M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰 | P1 messenger | 3-4 작업일 | M5 후속. |
+| S84-J | Phase 2 plugin (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. |
+| S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. |
+| S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. |
+
+### S89 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **S88-USER-VERIFY P0 우선** — 사용자에게 "휴대폰에서 메모 다시 시도해보셨나요?" 확인. 정상이면 다음 단계, 안 되면 (확률 낮음) 추가 디버깅 (브라우저 캐시 / sticky-board 의 다른 분기 / 인증 플로우).
+4. **S88-SILENT-CATCH P1** — 사용자 검증 후 곧장 진입 (~30분). 본 사고의 디버깅 비용 증폭 진짜 원인 정리.
+5. **S88-OPS-LIVE P1** — 운영자 본인이 운영 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터 (운영자 직접).
+6. **S88-PR-GATE-EXPAND P1 룰** — CLAUDE.md PR 게이트 룰 #4 확장 PR (15분).
+7. 또는 → **S85-F2 단독 chunk 진입** (5-6 작업일, 본 세션이 깔끔히 종료된 만큼 큰 chunk 진입 적절).
+
+### 영구 룰 (S88 정착 — CLAUDE.md PR 게이트 룰 확장 후보)
+
+**`BYPASSRLS=t` 는 RLS 만 우회 — ACL 검사는 별개**. role 생성 마이그레이션 (`CREATE ROLE ... BYPASSRLS`) 직후 반드시 GRANT 단계 동반. 누락 시 "RLS 는 통과시키지만 모든 테이블 액세스 거부" 라는 가장 모순적인 latent.
+
+**DEFAULT PRIVILEGES 가 단순 GRANT 보다 systemic**. `ALTER DEFAULT PRIVILEGES FOR ROLE <table-creator> IN SCHEMA public GRANT ... TO <role>` 가 향후 신설 객체에 자동 GRANT — 단일 지점에서 동일 latent bug 재발 차단.
+
+**silent catch (`} catch { /* 무시 */ }`) 는 디버깅 비용 증폭기**. PM2 stderr 의 명백한 에러를 UI 에서 차단하면 가설 thrashing 불가피. 최소 표준 = `catch (err) { console.error(err); toast.error(...) }` — 다음 사고 시 1 round 에 root cause 단서.
+
+**마이그레이션 적용 = 즉시 적용 + 라이브 검증** (memory `feedback_migration_apply_directly` 적용). 본 세션 = SQL 작성 → psql --single-transaction → SET ROLE 라이브 검증 → 30s stderr 모니터 4단계 자동 묶음 (`scripts/apply-migration-*.sh` 패턴).
+
+---
+
+## (세션 87 종료 시점 컨텍스트 — 참고용 보존)
 
 ## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 87 종료 — S87 다중 작업 5건 압축 + Track B TDD 100% 도달)
 
