@@ -130,8 +130,11 @@ export default function ProcessesPage() {
     try {
       const res = await fetch(`/api/pm2/detail?name=${encodeURIComponent(name)}`);
       if (res.ok) setDetail(await res.json());
-    } catch {
-      // 무시
+    } catch (e) {
+      // S88 후속 — silent catch 표면화. 사용자가 process row 명시적 클릭한 후
+      // 호출되므로 무반응 시 디버깅 비용 9배 → console + toast 양쪽 표면화.
+      console.error("[processes] detail fetch failed", e);
+      toast.error(e instanceof Error ? e.message : "프로세스 상세 조회 실패");
     } finally {
       setDetailLoading(false);
     }

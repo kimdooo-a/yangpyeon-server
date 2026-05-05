@@ -87,8 +87,10 @@ export default function DashboardPage() {
       if (!res.ok) return;
       const json = await res.json();
       setProcesses(json.processes ?? []);
-    } catch {
-      // PM2 fetch 실패는 무시 — 대시보드 주요 기능에 영향 없음
+    } catch (e) {
+      // S88 후속 — silent catch 표면화. 주요 기능 영향 없는 secondary fetch 라
+      // toast 없이 console.error 만으로 prod 디버깅 단서 보존.
+      console.error("[dashboard] PM2 status fetch failed", e);
     }
   }, []);
 

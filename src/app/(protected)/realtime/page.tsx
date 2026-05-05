@@ -37,8 +37,10 @@ export default function RealtimePage() {
       const res = await fetch("/api/v1/realtime/channels");
       const json = await res.json();
       if (json.success) setChannels(json.data);
-    } catch {
-      // ignore
+    } catch (e) {
+      // S88 후속 — silent catch 표면화. 10s polling 패턴이라 toast 추가 시
+      // 실패 지속 시 spam 위험 → console.error 만 (다음 polling 자동 회복).
+      console.error("[realtime] channels fetch failed", e);
     }
   }, []);
 

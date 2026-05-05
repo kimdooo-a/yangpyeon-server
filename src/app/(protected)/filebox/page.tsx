@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { IconFilebox, IconNewFolder } from "@/components/ui/icons";
@@ -61,8 +62,11 @@ export default function FileboxPage() {
         setFolders(data.folders);
         setFiles(data.files);
       }
-    } catch {
-      // 네트워크 오류
+    } catch (e) {
+      // S88 후속 — silent catch 표면화. 폴더 내용은 파일박스의 primary content
+      // 라 fetch 실패 시 사용자가 빈 화면 → console + toast 양쪽 표면화.
+      console.error("[filebox] folder contents fetch failed", e);
+      toast.error(e instanceof Error ? e.message : "폴더 내용 조회 실패");
     } finally {
       setLoading(false);
     }

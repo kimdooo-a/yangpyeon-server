@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Command } from "cmdk";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   IconDashboard,
@@ -83,9 +84,16 @@ export function CommandMenu() {
     setOpen(false);
     try {
       const res = await fetch("/api/pm2/restart", { method: "POST" });
-      if (!res.ok) throw new Error("재시작 실패");
-    } catch {
-      // 에러 처리는 토스트 등에서 별도 처리
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error?.message ?? `재시작 실패 (${res.status})`);
+      }
+      toast.success("PM2 재시작 요청됨");
+    } catch (err) {
+      // S88 후속 — silent catch 표면화. PM2 restart 는 critical ops 호출이라
+      // 무반응 시 사용자가 실패 인지 불가능 → console + toast 양쪽 표면화.
+      console.error("[command-menu] PM2 restart failed", err);
+      toast.error(err instanceof Error ? err.message : "PM2 재시작 실패");
     }
   }, []);
 

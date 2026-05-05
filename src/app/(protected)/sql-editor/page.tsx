@@ -37,8 +37,10 @@ export default function SqlEditorPage() {
       const res = await fetch("/api/v1/sql/queries");
       const json = await res.json();
       if (json.success) setSavedQueries(json.data);
-    } catch {
-      // 무시
+    } catch (e) {
+      // S88 후속 — silent catch 표면화. saved queries 는 secondary feature 라
+      // toast 없이 console.error 만 (UI 빈 배열 fallback).
+      console.error("[sql-editor] saved queries fetch failed", e);
     }
   }, []);
 
