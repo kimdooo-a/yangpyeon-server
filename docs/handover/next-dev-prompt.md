@@ -37,19 +37,21 @@
 
 ---
 
-## ⭐ 세션 92 첫 작업 우선순위 (세션 91 infra/docs chunk 종료 시점, 2026-05-08)
+## ⭐ 세션 93 첫 작업 우선순위 (세션 92 wave eval delta + F2-1 chunk 종료 시점, 2026-05-08)
 
 | # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
 |---|------|------|------|----------|
+| **S93-F2-2-CONT** | **다른 터미널 F2-2 (낙관적 송신) commit 합류 + follow-up** — `optimistic-messages.ts`/`useMessages` lift 영역 | **P0 messenger** | 변경 따라 다름 | S92 /cs 시점에 다른 터미널 working tree 진행 중 (5 modified + 2 untracked). 본 세션 `ac09ebd` (F2-1) 위에서 작업 중. 본 /cs 후 다른 터미널 commit + push 합류 필요. |
 | **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도 → 정상 작동 확인** | **P0 사용자** | 1분 | S88 + S89 + S90 = 8 위치 silent catch 표면화 (commits `d10b5e9` + `5f64675` origin 반영) + `app_admin` GRANT 마이그레이션 prod 적용 후 final 검증. 실패 시 toast/console 로 노출 가능 → root cause 1라운드 진단. (a) 브라우저 캐시 401 (시크릿 탭 1회) (b) 별개 버그. |
 | **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** — Webhooks/SQL Editor/Cron 콘솔 등 systemic fix 검증 | **P1** | ~30분 | S88 마이그레이션이 37 테이블 모두 GRANT 부여했지만 실제 호출 검증 미실행. 운영자가 운영 콘솔 메뉴 5~7개 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. S89 마무리 chunk audit 스크립트 (`scripts/diag-readwrite-grants.sh`) 가 raw pg client 경로 (`app_readonly`/`app_readwrite`) 정상성 정적 확인 완료 (37/0/0/0 + 37/37/37/37) — 라이브 검증은 운영자 직접. |
 | **S91-CK-MEMORY** | **GCM credential 룰 메모리 승격 검토** | P3 | 5분 | S91 CK `2026-05-08-gcm-multi-account-credential-rejected-trap.md` → `memory/feedback_git_push_403_credential_layer_check.md` 승격 + MEMORY.md 색인. 사용자 결정 영역. |
-| **S85-F2** | **M4 UI Phase 2** — Composer 인터랙티브 + SSE wiring + User name lookup + SWR 도입 + 정보패널 시동 | **P0 messenger** | **5-6 작업일 단독 chunk** | (S85, S86, S87, S88, S89, S90, S91 모두 단독 chunk 대기로 보류) wave 평가 §5.1 진입 패턴 = 단독 세션 chunk. 5 sub-task 분할. |
-| **S88-SILENT-CATCH-P3** | **`sticky-note-card.tsx:107` paired capability fallback 주석 정합** — sibling line 81 의 setPointerCapture pair 주석 일관성 보강 (cosmetic) | P3 | ~5분 | logical 동등 — 기능 영향 0. cosmetic refactor scope, 우선도 낮음. |
+| **S85-F2-CONT** | **M4 UI Phase 2 후속** — F2-3 (답장 인용 + 멘션 popover cmdk) / F2-4 (use-sse hook 운영 wiring) / F2-5 (DIRECT peer 이름 lookup) | **P0 messenger** | F2-3~5 = ~3 세션 | F2-1 ✅ S92 commit `ac09ebd` (composer + UUIDv7 + Enter 송신, TDD 17). F2-2 = 다른 터미널 진행 중. **거버넌스 단언 적용 = M4 Phase 2 진입 전 다른 작업 사용자 명시 승인 필수** (자율 실행 메모리 미적용). INFRA-1 (~3h, F2-3 직전 또는 동시) 동반 권고. |
+| **S87-INFRA-1** | **SWR + jsdom + @testing-library/react 도입** | **P0** (F2-3 직전 동반) | ~3h | F2-2 낙관적 송신 안정화 + F2-3 멘션 popover + F2-4 SSE wiring 의 컴포넌트 렌더 테스트 도입. logic-only 분리 패턴(S92 정착) 의 한계 해소. |
+| ~~S88-SILENT-CATCH-P3~~ | ~~`sticky-note-card.tsx:107` paired capability fallback 주석 정합~~ | — | — | ✅ **세션 92 완료** (commit `b77cdcc`, STYLE-1) |
 | **S88-ENDDRAG-FIX** | **`sticky-note-card.tsx:114` endDrag stale closure 별도 PR** | P2 | ~30분 | 본 root cause 와 무관한 부수 잠재 버그. `endDrag` 가 `position` 클로저 캡처 → 드래그 종료 시 시작 좌표 저장 가능성. `position` 대신 `draggingRef.current` 좌표 누적 또는 useRef 로 latest position 추적. |
-| **S87-INFRA-1** | **SWR + jsdom + @testing-library/react 도입** | P2 인프라 | ~3h | S85-F2 진입 직전 또는 동시. SWR 표준화 + vitest config 분기 + 컴포넌트 렌더 테스트. |
-| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86, S87, S88, S89, S90, S91 미수행) github.com/kimdooo-a/yangpyeon-server → Settings 확인. **public 이면 Archive Program/scraper 캐시 회수 불가** — 비밀번호 회전 권고 강화. |
-| **S87-WAVE-1-CONT** | **wave 평가 §5.4 sweep cont. — R-W2 wave-tracker 모델 수 정정 + R-W6 ops 카운트 + R-W7 git tag s81-first-cards-live 소급** | P1 sweep | ~30분 | S85-WAVE-1 R-W1 완료 후속. 단일 sweep PR 으로 묶기. |
+| ~~S87-INFRA-1 (중복)~~ | ~~SWR + jsdom + @testing-library/react 도입~~ | — | — | ✅ 위 row 와 중복 (S93 P0 으로 격상, F2-3 직전 동반) |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86, S87, S88, S89, S90, S91, S92 미수행) github.com/kimdooo-a/yangpyeon-server → Settings 확인. **public 이면 Archive Program/scraper 캐시 회수 불가** — 비밀번호 회전 권고 강화. |
+| ~~S87-WAVE-1-CONT~~ | ~~R-W2 wave-tracker 모델 수 정정 + R-W6 ops 카운트 + R-W7 git tag 소급~~ | — | — | ✅ **세션 92 완료** (commit `b77cdcc`: wave-tracker §4.1 R-W2/R-W6 정정 + 5 git tags 소급) |
 | **S87-CK-MEMORY** | **S87-CK-WSL 2 CK → memory/feedback_*.md 룰 승격** | P2 | ~30분 | `feedback_wsl2_single_foreground_call.md` + `feedback_tsx_no_dotenv_autoload.md`. MEMORY.md 색인. |
 | **S87-RSS-ACTIVATE** | **anthropic-news active=false → true** (+ 4 feed 확장 결정) | P2 운영자 | 30분 | DB url 갱신 완료. 운영자 결정. |
 | **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
