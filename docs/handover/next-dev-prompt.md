@@ -20,6 +20,23 @@
 
 ---
 
+## 🚨 거버넌스 단언 — M4 Phase 2 진입 우선 (G-NEW-3/G-NEW-6 재발 방지, S91 wave eval delta 정착)
+
+**Why**: S85 wave eval 권고 commit 시퀀스 14건 중 0건 진행, 6 세션(S85~S90) 동안 반응적 긴급 fix 가 100% 대역 점유 — 큰 가치 chunk(M4 Phase 2 = 5~7 작업일) 가 작은 sweep 에 계속 자연 우선 양보됨. M4 본진 정체일 = 6+ 세션 누적, M5+M6 까지 합치면 14 작업일 미진입.
+
+**Rule**: 다음 세션부터 **M4 Phase 2 진입 전 다른 작업 진입 시 사용자 명시 승인 필수** — 자율 실행 메모리(`feedback_autonomy.md`) 적용 안 함. 단, 진짜 긴급 사고(사용자 보고 + production down + 보안 알람) 만 자율 처리 가능, 그 외 sweep/cosmetic/문서화/룰 정착 은 사용자 승인 후.
+
+**Exceptions** (자율 처리 허용):
+- production down / PG fatal / GitGuardian 알람 / 사용자 직접 보고
+- M4 Phase 2 진행 중 자연 발생한 dependency (예: SWR 도입 = INFRA-1)
+- 5분 이내 cosmetic sweep 으로 본 chunk 와 같은 commit 으로 흡수 가능한 항목
+
+**Sunset**: M5 + M6 완료 시점에 본 단언 해제 — 그 시점에 wave-tracker 본진 가치가 90%+ 도달 후 sweep cycle 정상화.
+
+**연관 자료**: [S91 wave eval delta](./260508-session91-wave-completion-eval-delta.md) §2.3 G-NEW-3 / §6 우선순위 결정 / §8 거버넌스 조치.
+
+---
+
 ## ⭐ 세션 92 첫 작업 우선순위 (세션 91 infra/docs chunk 종료 시점, 2026-05-08)
 
 | # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |

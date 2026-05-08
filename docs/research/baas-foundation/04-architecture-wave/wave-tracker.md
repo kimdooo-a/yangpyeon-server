@@ -12,16 +12,18 @@
 
 S80~S83 4 세션 동안 wave-wiggly-axolotl 시퀀스(원래 5 세션 분량)가 5x 압축 실행됨. **Track A ~95% / Track B 100% / Track C 60% / Track D stabilized**. 다음 단일 가장 큰 가치 = **Track C M4 UI 보드 (5~7 작업일 chunk)**.
 
+**S85~S91 갱신 (2026-05-08)**: Track A 품질 깊이 ↑ (S88 systemic GRANT fix 4-month prod latent 차단 + S89~S90 silent catch sweep 8 위치 표면화 + S91 origin push 해소) / Track B TDD 81→100% (R-W1 해소, llm 27/promote 27/runner 15) / Track C **M4 Phase 2 0% 진행 (6 세션 정체, G-NEW-3 거버넌스 단언 정착)** / Track D 변화 없음. 종합 등급 S85 87/100 → S91 82/100 (-5, Track C 정체 페널티). 상세: [S91 wave eval delta](../../../handover/260508-session91-wave-completion-eval-delta.md).
+
 ---
 
 ## 1. 4-Track 매트릭스
 
 | Track | 영역 | 시퀀스 | 완료 % | 마지막 마일스톤 (commit) |
 |---|---|---|---|---|
-| **A** | BaaS Foundation | Phase 0~4 (T1.1~T1.7 + R1/R2 + RLS) | **~95%** | S82 라이브 검증으로 4 latent bug fix (`8bef896`). PrismaPg shift fix 권고 대기 (P1). |
-| **B** | Almanac Aggregator | T1~T9 (B-pre + B1~B8) | **100%** | S81 첫 라이브 카드 50개 가시화 (`ffdd2dd`). S83 9 RSS active. |
-| **C** | Messenger Phase 1 | M0~M6 (PRD + 11 모델 + 19 API + SSE + UI + 안전 + 알림) | **60%** | S82 M3 user 채널 4 이벤트 + SSE wire format (`152562d` + `5449f9e`). M4 UI 미진입. |
-| **D** | Filebox | R2→SeaweedFS pivot + multipart + body limit | **stabilized** | S79 Next.js 16 standalone 100mb fix (`fd4d666`). S83 multipart cleanup cron. |
+| **A** | BaaS Foundation | Phase 0~4 (T1.1~T1.7 + R1/R2 + RLS) | **~95% (품질 깊이 ↑)** | S88 `app_admin` GRANT systemic fix 4개월 prod latent (`d18154e`) + S89~S90 silent catch 8 위치 표면화 (`d10b5e9` `5f64675`) + S91 origin push 해소 (`899090b`). prod TimeZone=UTC 운영 .env 검증 PASS (S91). |
+| **B** | Almanac Aggregator | T1~T9 (B-pre + B1~B8) | **100% (TDD 100%, R-W1 해소)** | S81 첫 라이브 카드 50개 (`ffdd2dd`). S83 9 RSS active. **S87 TDD 81→100% (`effd6fa`, llm 27/promote 27/runner 15 = +32 case 정확 일치)**. |
+| **C** | Messenger Phase 1 | M0~M6 (PRD + 9 모델 + 6 enum + 17 라우트 + SSE + UI + 안전 + 알림) | **70% (M4 Phase 2 정체)** | S84 M4 UI Phase 1 라이브 (`f3bf611`). **M4 Phase 2 6 세션 정체 (S85~S91 = 0건 진행, G-NEW-3 거버넌스 단언 정착)**. M5/M6 미시작. |
+| **D** | Filebox | R2→SeaweedFS pivot + multipart + body limit | **stabilized** | S79 Next.js 16 standalone 100mb fix (`fd4d666`). S83 multipart cleanup cron. 변화 없음. |
 
 ---
 
@@ -50,8 +52,11 @@ S80~S83 4 세션 동안 wave-wiggly-axolotl 시퀀스(원래 5 세션 분량)가
 
 ### 2.3 잔여
 
-- [ ] **prod DATABASE_URL TimeZone=UTC 적용** (S84-A, P1, 사용자 의사결정 대기)
-- [ ] PR 리뷰 게이트 룰 정착 (RLS + tenantPrismaFor closure + non-BYPASSRLS test)
+- [x] **prod DATABASE_URL TimeZone=UTC 적용** ✅ S91 운영 `~/ypserver/.env` grep 검증 — `options=-c TimeZone%3DUTC` URL-encoded 적용 확인.
+- [x] **PR 리뷰 게이트 룰 정착** (RLS + tenantPrismaFor closure + non-BYPASSRLS test) ✅ + S88 후속 #4 BYPASSRLS=t 라이브 SET ROLE 게이트 확장 (`d10b5e9`).
+- [x] **`app_admin` GRANT systemic fix** ✅ S88 — `prisma/migrations/20260505000000_grant_app_admin_all_public/migration.sql` 직접 적용 + ALTER DEFAULT PRIVILEGES 3종 + 37/37 ALL 검증.
+- [x] **silent catch 30 후보 sweep** ✅ S89~S90 — 8 위치 fix (HIGH/primary `console+toast` / secondary/polling `console만` 차등) + 합리적 skip 23건 보존.
+- [x] **origin push 4 commits** ✅ S91 — `899090b` `e33a318..2120769` fast-forward + GCM credential reject 우회 패턴 정착.
 
 ---
 
@@ -93,13 +98,14 @@ S81 anthropic-news 404 → consecutiveFailures=1, 다른 4 소스 fetch 차단 0
 | 마일스톤 | 영역 | 상태 | 진입 세션 |
 |---|---|---|---|
 | M0 | PRD + ADR-030 + wireframes + data-model + api-surface | ✅ | S58 (ADR) + S64 (PRD) |
-| M1 | 11 데이터 모델 + 마이그레이션 | ✅ | S67 |
-| M2 | 도메인 헬퍼 + Zod + 17 API 라우트 | ✅ | S67~S68 helpers, **S81 17 ops 4 그룹 라우트** |
+| M1 | **9 데이터 모델 + 6 enum** + 마이그레이션 | ✅ (R-W2 정정 — wave-tracker 기존 "11 모델" 오기, 실측 9 모델 + 6 enum) | S67 |
+| M2 | 도메인 헬퍼 + Zod + **17 라우트 파일** (다중 HTTP method 포함, route.ts 단위 카운트) | ✅ (R-W6 정정 — wave-tracker 기존 "23 ops 19 라우트" 는 ops 단위 추정, 실측 route.ts 17 파일) | S67~S68 helpers, **S81 17 ops 4 그룹 라우트** |
 | M3 | SSE conv 8 + user 4 이벤트 + bus + wire format 헬퍼 | ✅ | S81 conv, **S82 user + 헬퍼 추출** |
 | M3 라이브 e2e | 통합 테스트 32 + 4 latent bug fix + events route 라이브 | ✅ unit / ⚠️ browser e2e 운영자 본인 | S82 + S83 빌드+배포 |
-| **M4** | **UI 보드 (대화목록 + 채팅창 + composer)** | **❌ 미진입 (5~7 작업일 chunk)** | S84+ |
-| M5 | 첨부 + 답장 + 멘션 + 검색 (filebox 통합 + cmdk + GIN trgm) | ❌ | S85+ |
-| M6 | 알림 + 차단/신고 + 운영자 패널 + kdysharpedge 보안 리뷰 | ❌ | S86+ |
+| **M4 Phase 1** | **UI 보드 (사이드바 + 대화목록 + 채팅창 기본)** | ✅ S84 다른 터미널 (`f3bf611`) | S84 |
+| **M4 Phase 2** | **Composer + clientGeneratedId UUIDv7 + 낙관적 업데이트 + 답장 + 멘션 + use-sse 운영 + DIRECT peer 이름 lookup + SWR** | **❌ 6 세션 정체 (S85~S91 = 0건 진행, G-NEW-3)** | **S92+ 무조건 단독 chunk 진입** |
+| M5 | 첨부 + 답장 + 멘션 + 검색 (filebox 통합 + cmdk + GIN trgm) | ❌ | M4 Phase 2 후속 |
+| M6 | 알림 + 차단/신고 + 운영자 패널 + kdysharpedge 보안 리뷰 | 🟡 모델만 (UserBlock + AbuseReport M2 흡수), UI/패널 미시작 | M5 후속 |
 
 ### 4.2 백엔드 라이브 인프라
 
@@ -179,3 +185,10 @@ S82 4 latent bug 재발 차단을 위한 PR 본문 필수 체크리스트:
 | 2026-05-03 | S84 | 초기 작성 (S80~S83 실측 흡수) |
 | 2026-05-04 | S84+ | almanac-cleanup AGGREGATOR module 이전 (`f4bdf8f` + `f8caa26`) |
 | 2026-05-04 | S84+ | totp.test.ts AES-GCM tamper P2 flake 결정적 fix (`66689e9`, S82~83 누적 P2, base64url 패딩 비트 함정 root cause + 50/50 통과 검증) |
+| 2026-05-04 | S85 | wave eval 1차 (87/100 A-, 7 갭 R-W1~R-W7 식별) + 시크릿 회수 + history purge (`5c56676` `626068e`) + Anthropic RSS URL fix (`ce50988`) + cron runNow recordResult (`3ae830f`) |
+| 2026-05-04 | S86 | cron runnow + anthropic-news + timezone prod 흔적 (`c0624d3`) |
+| 2026-05-05 | S87 | **R-W1 완전 해소** — aggregator TDD 81→100% (`effd6fa`, +32 case) + cleanup pre-commit hook + secret-scan hook (`b46bf2e` `8bc785b`) |
+| 2026-05-05 | S88 | **5번째 4개월 prod latent fix** — `app_admin` BYPASSRLS=t + zero GRANT systemic 회복 (`d18154e` `e33a318` + `prisma/migrations/20260505000000_grant_app_admin_all_public/`) + ALTER DEFAULT PRIVILEGES |
+| 2026-05-05 | S89~S90 | silent catch 30 후보 sweep + PR 게이트 룰 #4 BYPASSRLS=t 확장 (`d10b5e9` `5f64675` `67461da` `2120769`) — 8 위치 fix + 23 합리적 skip 보존 |
+| 2026-05-08 | S91 | origin push 4 commits + GCM credential reject 우회 패턴 정착 (`899090b`) — G-NEW-5 자연 해소 |
+| 2026-05-08 | S91+ | **wave eval 2차 (delta, 82/100 B+ -5점)** — R-W1/R-W3/R-W4 해소 + G-NEW-1~6 신규 갭 + M4 Phase 2 6 세션 정체 진단 → 거버넌스 단언 정착 |

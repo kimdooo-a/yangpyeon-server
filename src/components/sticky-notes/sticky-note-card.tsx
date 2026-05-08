@@ -105,7 +105,7 @@ export function StickyNoteCard({
           target.releasePointerCapture(pe.pointerId);
         }
       } catch {
-        // ignore
+        // releasePointerCapture 미지원 환경(구형) 무시 — line 81 setPointerCapture pair.
       }
     }
     const d = draggingRef.current;
