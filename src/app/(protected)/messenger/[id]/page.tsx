@@ -6,8 +6,10 @@
  * 데스크톱 ≥lg: 좌 320px 대화목록 (활성 강조) + 우 채팅창 (헤더 + 메시지 + composer).
  * 모바일 <lg: 채팅창만 (목록은 /messenger 로 ←뒤로가기).
  *
- * F2-1 (M4 Phase 2 첫 단계): MessageComposer 활성. textarea autosize + Enter 송신
- * + IME composing 처리 + clientGeneratedId UUIDv7. 낙관적 업데이트 + SSE wiring 은 F2-2/F2-4.
+ * F2-1 — composer + UUIDv7 + Enter 송신.
+ * F2-2 — 낙관적 송신: useMessages 를 page 레벨로 lift, MessageList 와 cache 공유.
+ *        sendOptimistic 이 prepend → POST → 201 swap / 4xx-5xx mark failed.
+ *        SSE wiring + 재시도 트리거 UI = F2-4+.
  */
 import { useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -17,48 +19,34 @@ import { ConversationList } from "@/components/messenger/ConversationList";
 import { MessageList } from "@/components/messenger/MessageList";
 import { MessageComposer } from "@/components/messenger/MessageComposer";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useMessages } from "@/hooks/messenger/useMessages";
 import type { SendPayload } from "@/lib/messenger/composer-logic";
-
-const TENANT_SLUG = "default";
 
 export default function MessengerConversationPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { user } = useCurrentUser();
   const conversationId = params.id;
+  const { messages, loading, error, sendOptimistic } = useMessages(conversationId);
 
   const handleSelect = (id: string) => {
     router.push(`/messenger/${id}`);
   };
 
-  /**
-   * F2-1 송신 — 단순 POST + 결과 토스트. 낙관적 업데이트 + 캐시 invalidate 는 F2-2.
-   * useMessages 가 cursor-only 라 reload 는 SWR 도입 (S87-INFRA-1) 후 자연스러움.
-   * 임시: 송신 성공/실패 토스트만 + window reload 회피 — 사용자가 새로 누르면 자연 반영.
-   */
   const handleSend = useCallback(
     async (payload: SendPayload) => {
-      try {
-        const res = await fetch(
-          `/api/v1/t/${TENANT_SLUG}/messenger/conversations/${conversationId}/messages`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          },
-        );
-        const json = await res.json();
-        if (!res.ok || !json?.success) {
-          throw new Error(json?.error?.message ?? `송신 실패 (${res.status})`);
-        }
-        // F2-2 에서 useMessages 캐시 prepend 로 교체 예정.
-        // 본 stage 에서는 송신만 — 자연 polling/refresh 또는 SSE 도입 시 자연 반영.
-      } catch (err) {
-        console.error("[messenger] send failed", err);
-        toast.error(err instanceof Error ? err.message : "송신 실패");
+      if (!user?.sub) {
+        toast.error("로그인 정보가 없어 송신할 수 없습니다");
+        return;
+      }
+      const result = await sendOptimistic(payload, user.sub);
+      if (!result.ok) {
+        // pending 메시지는 cache 에 _optimistic.status='failed' 로 남아 빨간 점 노출됨.
+        // toast 는 보조 알림 — 사용자가 다른 대화 보고 있을 때도 인지 가능.
+        toast.error(result.error ?? "송신 실패");
       }
     },
-    [conversationId],
+    [sendOptimistic, user?.sub],
   );
 
   return (
@@ -90,7 +78,10 @@ export default function MessengerConversationPage() {
             >
               <ChevronLeft size={18} />
             </button>
-            <div className="w-8 h-8 rounded-full bg-surface-300 flex-shrink-0" aria-hidden="true" />
+            <div
+              className="w-8 h-8 rounded-full bg-surface-300 flex-shrink-0"
+              aria-hidden="true"
+            />
             <div>
               <div className="text-sm font-semibold text-gray-800">
                 {conversationId.slice(0, 8)}
@@ -122,17 +113,22 @@ export default function MessengerConversationPage() {
 
         {/* 메시지 영역 */}
         {user ? (
-          <MessageList conversationId={conversationId} currentUserId={user.sub} />
+          <MessageList
+            messages={messages}
+            loading={loading}
+            error={error}
+            currentUserId={user.sub}
+          />
         ) : (
           <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
             로그인 정보 확인 중…
           </div>
         )}
 
-        {/* Composer (F2-1 — TEXT 송신 활성, 첨부/이모지/멘션/답장 = F2-3+) */}
+        {/* Composer (F2-1 + F2-2 — 낙관적 송신 활성, 첨부/이모지/멘션/답장 = F2-3+) */}
         <MessageComposer onSend={handleSend} disabled={!user} />
         <p className="text-[10px] text-gray-400 px-3 pb-1.5">
-          ⓘ F2-1 — TEXT 송신 활성. 첨부/멘션/답장 + 낙관적 업데이트는 F2-2~F2-3 에서 활성화됩니다
+          ⓘ F2-2 — 낙관적 송신 활성 (전송 중 = 흐림, 실패 시 ⚠ 실패 표시). 첨부/멘션/답장 = F2-3+
         </p>
       </section>
     </div>

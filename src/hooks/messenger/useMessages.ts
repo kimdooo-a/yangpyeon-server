@@ -1,32 +1,44 @@
 "use client";
 
 /**
- * useMessages — 단일 conversation 의 메시지 stream.
+ * useMessages — 단일 conversation 의 메시지 stream + 낙관적 송신.
  *
  * Phase 1:
- *   - keyset cursor 첫 페이지만 로드 (limit 30).
- *   - 역방향 무한스크롤 (loadOlder) + SSE message.created → 캐시 prepend 는 Phase 2.
- *   - tenantSlug = 'default' 하드코드.
+ *   - keyset cursor 첫 페이지 (limit 30) 만 로드.
+ *   - 역방향 무한스크롤 + SSE message.created prepend = F2-3+.
  *
- * Backend 응답: { success: true, data: { items: [...], nextCursor, hasMore } }
- *   items 는 desc(createdAt) — 컴포넌트 레벨에서 reverse 해 표시 시 오름차순.
+ * Phase 2 (F2-2 — 본 commit):
+ *   - sendOptimistic: prepend → POST → 201 swap / 4xx-5xx mark failed.
+ *   - retry: 같은 clientGeneratedId 로 재호출 시 server 멱등성 (UNIQUE 인덱스) 의존.
+ *
+ * tenantSlug = 'default' 하드코드 (multi-tenant routing 도입 전).
+ *
+ * Backend 응답 shape:
+ *   GET  → { success: true, data: { items: [...], nextCursor, hasMore } }
+ *   POST → { success: true, data: { message: {...}, created: boolean } }
+ *
+ *   items 는 desc(createdAt) — 컴포넌트 레벨에서 reverse 해 표시.
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  buildOptimisticMessage,
+  prependOptimistic,
+  replaceOptimisticWithServer,
+  markOptimisticFailed,
+  type MessageRow,
+} from "@/lib/messenger/optimistic-messages";
 
-export interface MessageRow {
-  id: string;
-  kind: "TEXT" | "IMAGE" | "FILE" | "SYSTEM";
-  body: string | null;
-  senderId: string;
-  replyToId: string | null;
+export type { MessageRow } from "@/lib/messenger/optimistic-messages";
+
+interface SendOptimisticPayload {
+  kind: "TEXT";
+  body: string;
   clientGeneratedId: string;
-  editedAt: string | null;
-  editCount: number;
-  deletedAt: string | null;
-  deletedBy: string | null;
-  createdAt: string;
-  attachments: Array<{ id: string; fileId: string; kind: string; displayOrder: number }>;
-  mentions: Array<{ id: string; mentionedUserId: string }>;
+}
+
+interface SendOptimisticResult {
+  ok: boolean;
+  error?: string;
 }
 
 interface UseMessagesResult {
@@ -34,6 +46,10 @@ interface UseMessagesResult {
   loading: boolean;
   error: string | null;
   hasMore: boolean;
+  sendOptimistic: (
+    payload: SendOptimisticPayload,
+    senderId: string,
+  ) => Promise<SendOptimisticResult>;
 }
 
 const TENANT_SLUG = "default";
@@ -79,5 +95,54 @@ export function useMessages(conversationId: string): UseMessagesResult {
     };
   }, [conversationId]);
 
-  return { messages, loading, error, hasMore };
+  const sendOptimistic = useCallback(
+    async (
+      payload: SendOptimisticPayload,
+      senderId: string,
+    ): Promise<SendOptimisticResult> => {
+      const optimistic = buildOptimisticMessage({ payload, senderId });
+      setMessages((prev) => prependOptimistic(prev, optimistic));
+
+      try {
+        const res = await fetch(
+          `/api/v1/t/${TENANT_SLUG}/messenger/conversations/${conversationId}/messages`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        );
+        const json = await res.json();
+        if (!res.ok || !json?.success) {
+          const errMsg =
+            json?.error?.message ?? `송신 실패 (HTTP ${res.status})`;
+          setMessages((prev) =>
+            markOptimisticFailed(prev, payload.clientGeneratedId, errMsg),
+          );
+          return { ok: false, error: errMsg };
+        }
+        const serverMsg: MessageRow | undefined = json.data?.message;
+        if (!serverMsg) {
+          const errMsg = "서버 응답 누락";
+          setMessages((prev) =>
+            markOptimisticFailed(prev, payload.clientGeneratedId, errMsg),
+          );
+          return { ok: false, error: errMsg };
+        }
+        setMessages((prev) =>
+          replaceOptimisticWithServer(prev, payload.clientGeneratedId, serverMsg),
+        );
+        return { ok: true };
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : "네트워크 오류";
+        setMessages((prev) =>
+          markOptimisticFailed(prev, payload.clientGeneratedId, errMsg),
+        );
+        return { ok: false, error: errMsg };
+      }
+    },
+    [conversationId],
+  );
+
+  return { messages, loading, error, hasMore, sendOptimistic };
 }

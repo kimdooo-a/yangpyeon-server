@@ -3,26 +3,38 @@
 /**
  * MessageList — 채팅창 메시지 영역 (overflow-y-auto, 역순 표시).
  *
- * useMessages 훅으로 cursor-based fetch.
- * Phase 1: 첫 페이지만 로드. 역방향 무한스크롤 + SSE wiring 은 Phase 2.
+ * F2-2 (M4 Phase 2):
+ *   - messages/loading/error 를 부모 page.tsx 에서 props 로 주입 (낙관적 송신과 cache 공유).
+ *   - pending/failed 시각 표식: optimistic 메시지에 opacity / 빨간 점.
  *
- * 자동 스크롤: 첫 로드 시 맨 아래로 (메시지 가장 최근).
+ * Phase 1 보존:
+ *   - 첫 로드 후 맨 아래 자동 스크롤. 역방향 무한스크롤 + SSE wiring 은 F2-4.
  */
 import { useEffect, useRef } from "react";
-import { useMessages } from "@/hooks/messenger/useMessages";
 import { MessageBubble } from "./MessageBubble";
+import {
+  isOptimisticPending,
+  isOptimisticFailed,
+  type MessageRow,
+} from "@/lib/messenger/optimistic-messages";
 
 export interface MessageListProps {
-  conversationId: string;
+  messages: MessageRow[];
+  loading: boolean;
+  error: string | null;
   /** 현재 사용자 sub — isOwn 분기. */
   currentUserId: string;
 }
 
-export function MessageList({ conversationId, currentUserId }: MessageListProps) {
-  const { messages, loading, error } = useMessages(conversationId);
+export function MessageList({
+  messages,
+  loading,
+  error,
+  currentUserId,
+}: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 첫 로드 후 맨 아래로 스크롤 (오름차순 표시 가정).
+  // 첫 로드 후 맨 아래로 스크롤. 메시지 prepend 시에도 새 메시지 자동 노출.
   useEffect(() => {
     if (!loading && messages.length > 0) {
       bottomRef.current?.scrollIntoView({ behavior: "auto" });
@@ -31,7 +43,11 @@ export function MessageList({ conversationId, currentUserId }: MessageListProps)
 
   if (loading) {
     return (
-      <div className="flex-1 p-4 space-y-3" aria-busy="true" aria-label="메시지 로딩 중">
+      <div
+        className="flex-1 p-4 space-y-3"
+        aria-busy="true"
+        aria-label="메시지 로딩 중"
+      >
         {[0, 1, 2].map((i) => (
           <div key={i} className="flex justify-start">
             <div className="bg-surface-300 animate-pulse rounded-xl h-10 w-48" />
@@ -72,6 +88,9 @@ export function MessageList({ conversationId, currentUserId }: MessageListProps)
           key={msg.id}
           message={msg}
           isOwn={msg.senderId === currentUserId}
+          pending={isOptimisticPending(msg)}
+          failed={isOptimisticFailed(msg)}
+          failureReason={msg._optimistic?.error}
         />
       ))}
       <div ref={bottomRef} />
