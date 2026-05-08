@@ -1,7 +1,82 @@
-# 다음 세션 프롬프트 (세션 92)
+# 다음 세션 프롬프트 (세션 94)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 93 F2-2 단독 chunk 종료 — M4 Phase 2 낙관적 송신, commit `b750186`, TDD 17 / vitest 619 회귀 0)
+
+세션 93 = S92 F2-1 (composer + UUIDv7 + Enter 송신) 위 자연 dependency 진입 — 거버넌스 단언 §31 "Phase 2 dependency" 예외 자동 적용 (사용자 추가 승인 면제 자율). **optimistic-messages.ts** (140 lines, 8 pure functions) + TDD 17 → useMessages 에 sendOptimistic 추가 (MessageRow 타입 SOT 이동) → MessageList props lift + MessageBubble pending/failed 분기 → page.tsx useMessages page 레벨 lift + handleSend 교체. commit `b750186` 6 files +603/-69. **메타 가치**: G-NEW-3 진척 = 1/14 → **2/14 commit**. 거버넌스 단언 첫 자율 적용.
+
+- **`_optimistic` discriminator 패턴 = type-level invariant**: server fetch 시 undefined / pending → server swap 시 제거 / failed → 보존 + error. server 메시지 protect (markFailed/remove 가 `_optimistic` 없는 메시지 변경 차단 = production row 안전).
+- **server 멱등성 위임 = 클라이언트 dedup 0**: server `(tenantId, conversationId, clientGeneratedId)` UNIQUE + UNIQUE_VIOLATION race catch + fetchByCgid fallback 이미 완비. retry 시 같은 cgid 재호출 → server created=false + 같은 message 자연 swap.
+- **TDD 자가 발견 함정**: `expect(next).toBe([server])` 새 배열 리터럴 영원 fail → 변수 캐싱 (`const arr = [server]; expect(next).toBe(arr)`) 즉시 수정. JS 참조 동등성 함정 사례.
+- **MessageList props lift = cache 공유**: 두 인스턴스 (page hook + MessageList 내부 hook) cache 공유 X 함정 회피. SWR 도입 (S87-INFRA-1) 후 자연 처리 가능하지만 본 commit 은 INFRA-1 미진입 → props lift 가 가장 단순 우회.
+- **알려진 이슈 (S94+ 검토)**: pending 메시지 page reload 시 손실 (브라우저 storage 미도입, F2-5+ localStorage drafts 검토) / retry UI 부재 — failed 메시지에 빨간 점만 노출, 사용자 직접 재입력 시 새 cgid 로 새 row 생성 (F2-3+ retry 트리거 필요) / e2e 사전 존재 tsc 2 errors (`phase-14c-alpha-ui.spec.ts:19/20`, S85 secret recovery 도입, 별도 sweep PR).
+- **터치 안 함**: F2-3~F2-5 (S94+) / INFRA-1 (~3h, F2-3/F2-4 동반 권고) / M5 / M6 / S88-USER-VERIFY / S88-OPS-LIVE / S87 carry-over / DB password 회전.
+
+---
+
+## 🚨 거버넌스 단언 — M4 Phase 2 진입 우선 (G-NEW-3/G-NEW-6 재발 방지, S91 wave eval delta 정착, S93 첫 자율 적용)
+
+**Why**: S85 wave eval 권고 commit 시퀀스 14건 중 S92 F2-1 + S93 F2-2 = **2/14 진척**. M4 Phase 2 본진 정체 첫 해소 시작. 작은 sweep 들이 큰 가치 chunk 에 자연 우선 양보되도록 거버넌스 단언 유지.
+
+**Rule**: M4 Phase 2 진입 전 다른 작업 진입 시 사용자 명시 승인 필수 — 자율 실행 메모리(`feedback_autonomy.md`) 적용 안 함. 단, 진짜 긴급 사고(사용자 보고 + production down + 보안 알람) 만 자율 처리, 그 외 sweep/cosmetic/문서화/룰 정착 은 사용자 승인 후.
+
+**Exceptions** (자율 처리 허용):
+- production down / PG fatal / GitGuardian 알람 / 사용자 직접 보고
+- M4 Phase 2 진행 중 자연 발생한 dependency (예: F2-2 가 F2-1 의 자연 dependency, S93 자율 적용 사례)
+- 5분 이내 cosmetic sweep 으로 본 chunk 와 같은 commit 으로 흡수 가능한 항목
+
+**Sunset**: M5 + M6 완료 시점에 본 단언 해제 — 그 시점에 wave-tracker 본진 가치가 90%+ 도달 후 sweep cycle 정상화.
+
+**자율 적용 사례**:
+- S93 F2-2: F2-1 의 자연 dependency 로 사용자 추가 승인 면제 (Phase 2 진척 1/14 → 2/14).
+
+**연관 자료**: [S91 wave eval delta](./260508-session91-wave-completion-eval-delta.md) §2.3 G-NEW-3 / §6 우선순위 결정 / §8 거버넌스 조치, [S93 F2-2 인계서](./260508-session93-f2-2-optimistic-send.md).
+
+---
+
+## ⭐ 세션 94 첫 작업 우선순위 (세션 93 F2-2 단독 chunk 종료 시점, 2026-05-08)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **F2-3** | **답장 인용 카드 + 멘션 popover cmdk** (TDD ~15) | **P0 messenger** | ~1.5 작업일 | 같은 logic-only 분리 패턴 (replyTo 검증 + mention parse pure logic). retry 트리거 UI 자연 동봉 검토 (failed 메시지 클릭 시 같은 cgid 로 재송신). M4 Phase 2 진척 2/14 → 3/14. |
+| **F2-4** | **use-sse hook 운영 wiring + SWR 캐시 invalidate** (TDD ~10) | **P0 messenger** | ~1 작업일 | SSE message.created 이벤트 수신 시 dedup prepend (cgid 매치 = optimistic swap 등가). INFRA-1 동시 도입 권장 (SWR + jsdom + @testing-library/react). M4 Phase 2 진척 3/14 → 4/14. |
+| **INFRA-1** | **SWR + jsdom + @testing-library/react 도입** | P2 인프라 | ~3h | F2-3 또는 F2-4 직전/동시 도입 가치. SWR 도입 시 useMessages 가 `mutate(cgid, server, false)` 패턴으로 더 단순. 컴포넌트 렌더 테스트 가능. |
+| **F2-5** | **DIRECT peer name lookup + User profile cache** (TDD ~8) | P1 messenger | ~1 작업일 | peer 정보 패널 시동. localStorage drafts (pending reload 손실 방지) 동봉 검토. M4 Phase 2 진척 4/14 → 5/14. |
+| **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도 → 정상 작동 확인** | **P0 사용자** | 1분 | S88+S89+S90 = 8 위치 silent catch 표면화 + S91 origin push 후 final 검증. 정상이면 S88 chunk 완전 종결. |
+| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** (Webhooks/SQL Editor/Cron) | **P1 운영자** | ~30분 | S88 마이그레이션이 37 테이블 모두 GRANT 부여, 라이브 검증만 잔여. 운영자가 운영 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. |
+| **S91-CK-MEMORY** | **GCM credential 룰 메모리 승격 검토** | P3 | 5분 | S91 CK `2026-05-08-gcm-multi-account-credential-rejected-trap.md` → `memory/feedback_git_push_403_credential_layer_check.md` 승격. 사용자 결정. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86~S93 미수행) github.com/kimdooo-a/yangpyeon-server → Settings 확인. **public 이면 Archive Program/scraper 캐시 회수 불가** — 비밀번호 회전 권고 강화. |
+| **S87-CK-MEMORY** | **S87-CK-WSL 2 CK → memory/feedback_*.md 룰 승격** | P2 | ~30분 | `feedback_wsl2_single_foreground_call.md` + `feedback_tsx_no_dotenv_autoload.md`. MEMORY.md 색인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=false → true** (+ 4 feed 확장 결정) | P2 운영자 | 30분 | DB url 갱신 완료. 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
+| **STYLE-2** | **e2e 사전 존재 tsc 2 errors fix** (`phase-14c-alpha-ui.spec.ts:19/20`) | P3 sweep | 5분 | S85 secret recovery 시 `process.env.X ?? "literal"` → 명시적 throw 패턴 변경 후 type narrowing 누락. 별도 sweep PR. |
+| ~~S91 origin push~~ | ~~4 commits origin sync~~ | — | — | ✅ **세션 91 완료** |
+| ~~F2-1~~ | ~~composer + UUIDv7 + Enter 송신~~ | — | — | ✅ **세션 92 완료** (commit `ac09ebd`) |
+| ~~F2-2~~ | ~~낙관적 송신~~ | — | — | ✅ **세션 93 완료** (commit `b750186`) |
+| ~~S88-PR-GATE-EXPAND~~ ~~S88-CK-MEMORY~~ ~~S88-SILENT-CATCH~~ ~~S87-CRON-VERIFY~~ ~~S87-ENV-CLEANUP~~ ~~S87-CK-WSL~~ ~~S86-SEC-2~~ ~~S85-WAVE-1~~ ~~S86-PUSH~~ | ~~9 작업~~ | — | — | ✅ **이전 세션들 완료** |
+| ~~S88 sticky_notes fix~~ | ~~app_admin role GRANT systemic + DEFAULT PRIVILEGES~~ | — | — | ✅ **세션 88 완료** |
+| S84-C | 24h+ 관찰 후 sources 14 확장 (9 → 14) | P1 | ~30분 | S87 cron 안정성 확인됨. |
+| S84-G | M5 첨부 + 답장 + 멘션 + 검색 | P1 messenger | 3-4 작업일 | M4 Phase 2 후속. |
+| S84-H | M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰 | P1 messenger | 3-4 작업일 | M5 후속. |
+| S84-J | Phase 2 plugin (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. |
+| S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. |
+| S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. |
+
+### S94 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **F2-3 진입** (M4 Phase 2 진척 2/14 → 3/14) — 같은 logic-only 분리 패턴 적용. composer 통합으로 retry 트리거 UI 자연 동봉.
+4. 또는 **F2-4 + INFRA-1 동시 진입** — SWR 도입이 useMessages 단순화 + 컴포넌트 렌더 테스트 가능. F2-2 의 props lift 가 SWR 도입 시 자연 진화.
+5. P0 운영자 carry-over: S88-USER-VERIFY + S88-OPS-LIVE + S86-SEC-1 (운영자 직접 영역).
+
+### S95 wave 평가 권장 시점
+
+`kdywavecompletion --compare session-92` — F2-3 + F2-4 완료 후 Track C 가치 진척 측정. M4 Phase 2 진척 4/14 도달 시점이 자연 측정 임계.
 
 ---
 
