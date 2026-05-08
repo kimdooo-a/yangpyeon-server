@@ -1,15 +1,20 @@
 "use client";
 
 /**
- * useMessages — 단일 conversation 의 메시지 stream + 낙관적 송신.
+ * useMessages — 단일 conversation 의 메시지 stream + 낙관적 송신 + SSE 실시간 수신.
  *
  * Phase 1:
  *   - keyset cursor 첫 페이지 (limit 30) 만 로드.
- *   - 역방향 무한스크롤 + SSE message.created prepend = F2-3+.
+ *   - 역방향 무한스크롤 = F2-5+ (Phase 1.x).
  *
- * Phase 2 (F2-2 — 본 commit):
+ * Phase 2 (F2-2):
  *   - sendOptimistic: prepend → POST → 201 swap / 4xx-5xx mark failed.
  *   - retry: 같은 clientGeneratedId 로 재호출 시 server 멱등성 (UNIQUE 인덱스) 의존.
+ *
+ * Phase 2 (F2-4 — INFRA-1 동반):
+ *   - SSE wiring: use-sse hook 으로 events route 구독 → message.created/updated/deleted
+ *     applyEventToMessages reducer 로 cache 변형. clientGeneratedId 매칭 시 optimistic swap.
+ *   - SWR 도입은 별도 chunk (현재는 useState/useEffect 패턴 유지).
  *
  * tenantSlug = 'default' 하드코드 (multi-tenant routing 도입 전).
  *
@@ -27,6 +32,8 @@ import {
   markOptimisticFailed,
   type MessageRow,
 } from "@/lib/messenger/optimistic-messages";
+import { applyEventToMessages } from "@/lib/messenger/sse-events";
+import { useSse } from "./use-sse";
 
 export type { MessageRow } from "@/lib/messenger/optimistic-messages";
 
@@ -50,6 +57,8 @@ interface UseMessagesResult {
   loading: boolean;
   error: string | null;
   hasMore: boolean;
+  /** F2-4 — SSE 채널 연결 상태 (UI 인디케이터 용도). */
+  sseConnected: boolean;
   sendOptimistic: (
     payload: SendOptimisticPayload,
     senderId: string,
@@ -148,5 +157,25 @@ export function useMessages(conversationId: string): UseMessagesResult {
     [conversationId],
   );
 
-  return { messages, loading, error, hasMore, sendOptimistic };
+  // F2-4 — SSE 실시간 수신. message.created/updated/deleted 만 cache 변형.
+  // typing/receipt/member 이벤트는 추후 trail (별도 hook 분리 예정).
+  const sseUrl = conversationId
+    ? `/api/v1/t/${TENANT_SLUG}/messenger/conversations/${conversationId}/events`
+    : null;
+  const handleSseEvent = useCallback(
+    (event: Parameters<Parameters<typeof useSse>[1]>[0]) => {
+      if (
+        event.type !== "message.created" &&
+        event.type !== "message.updated" &&
+        event.type !== "message.deleted"
+      ) {
+        return;
+      }
+      setMessages((prev) => applyEventToMessages([event], prev));
+    },
+    [],
+  );
+  const { connected: sseConnected } = useSse(sseUrl, handleSseEvent);
+
+  return { messages, loading, error, hasMore, sseConnected, sendOptimistic };
 }

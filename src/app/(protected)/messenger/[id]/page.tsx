@@ -41,7 +41,8 @@ export default function MessengerConversationPage() {
   const router = useRouter();
   const { user } = useCurrentUser();
   const conversationId = params.id;
-  const { messages, loading, error, sendOptimistic } = useMessages(conversationId);
+  const { messages, loading, error, sendOptimistic, sseConnected } =
+    useMessages(conversationId);
 
   const [members, setMembers] = useState<ConversationMemberRow[]>([]);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
@@ -148,7 +149,20 @@ export default function MessengerConversationPage() {
               <div className="text-sm font-semibold text-gray-800">
                 {conversationId.slice(0, 8)}
               </div>
-              <div className="text-[11px] text-gray-500">대화 ID</div>
+              <div className="text-[11px] text-gray-500 flex items-center gap-1">
+                대화 ID
+                <span
+                  aria-label={
+                    sseConnected ? "실시간 연결됨" : "실시간 연결 시도 중"
+                  }
+                  title={
+                    sseConnected ? "실시간 연결됨" : "실시간 연결 시도 중"
+                  }
+                  className={`inline-block w-1.5 h-1.5 rounded-full ${
+                    sseConnected ? "bg-emerald-500" : "bg-gray-400"
+                  }`}
+                />
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -197,7 +211,7 @@ export default function MessengerConversationPage() {
           onClearReply={() => setReplyTo(null)}
         />
         <p className="text-[10px] text-gray-400 px-3 pb-1.5">
-          ⓘ F2-3 — 답장 + 멘션 활성. 첨부/이모지/SSE 실시간 = F2-4+
+          ⓘ F2-4 — SSE 실시간 수신 활성 (헤더 점 = 연결 상태). 첨부/이모지 = F2-5+
         </p>
       </section>
     </div>
