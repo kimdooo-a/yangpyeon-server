@@ -1,7 +1,66 @@
-# 다음 세션 프롬프트 (세션 91)
+# 다음 세션 프롬프트 (세션 92)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 91 infra/docs chunk 종료 — origin push 4 commits + GCM multi-account credential workaround)
+
+세션 91 = S90 종료 시점 4 commits ahead 상태 (`d10b5e9` PR 게이트 룰 #4 BYPASSRLS=t 확장 + `5f64675` silent catch sweep 6 fix + `67461da` S89 docs + `2120769` S90 docs) 에서 origin push 추진. 1차 시도 403 (`Permission to kimdooo-a/yangpyeon-server.git denied to aromaseoro-lab`) — `git config user.email = smartkdy7@gmail.com` (commit author 정상) + `git remote -v` 정상이지만 transport layer GitHub PAT 가 다른 GitHub 계정 (`aromaseoro-lab`) 으로 caching 된 multi-account 함정. 코드 변경 0, 인프라/docs 만.
+
+- **3계층 인증 모델 명확화**: (1) commit author = `user.name/email` 메타데이터 (검증 안 됨, 변조 가능) / (2) transport auth = OS credential store 의 GitHub PAT (실제 push 권한 결정) / (3) helper bridge = `credential.helper` (이 repo = `manager` = Git Credential Manager) 가 1↔2 사이 어댑터.
+- **WCM UI 부재 + cmdkey 한국어 인코딩 함정**: Windows 11 시작 메뉴 검색이 자격 증명 관리자 미노출 (사용자 환경 특성) + Bash 경유 `cmdkey /list | findstr` garbled "잘못된 매개 변수" → Git 자체 명령으로 우회 결정.
+- **표준 우회**: `printf "protocol=https\nhost=github.com\n\n" | git credential reject` (silent success, host 정확 매칭으로 다른 도메인 entry 영향 0). cross-platform 호환 (macOS Keychain / Linux libsecret 동일).
+- **2차 push 성공**: `e33a318..2120769` fast-forward (force push 아님, `+` prefix 없음). 브라우저 OAuth prompt 미발생 — GCM 2.x multi-account credential 동시 보관 + reject 후 default 떨어진 자리에 보관된 `kimdooo-a` token 자동 fallback 추정.
+- **PR 게이트 룰 #4 origin level 활성화**: `d10b5e9` push 으로 spec/aggregator-fixes 의 BYPASSRLS=t 게이트가 origin 에 활성. 다음 PR 머지 시 신규 BYPASSRLS=t role 도 GRANT 검증 필수.
+- **CK 신규**: `docs/solutions/2026-05-08-gcm-multi-account-credential-rejected-trap.md` — 3계층 인증 모델 진단 매트릭스 + 표준 우회 패턴 + GCM auto-fallback 메커니즘 + memory 룰 승격 후보 (`feedback_git_push_403_credential_layer_check`).
+- **알려진 이슈 (S92+ 검토)**: GCM default token 이 여전히 `aromaseoro-lab` 일 가능성 미확인 → 다음 push 시 같은 403 재발 가능 (낮은 확률), SSH 전환 (`git remote set-url origin git@github.com:kimdooo-a/yangpyeon-server.git`) 을 영구 해결책으로 검토.
+- **터치 안 함**: 코드 (`src/`/`prisma/`/`tests/` 변경 0) / PM2 운영 서버 4종 / WCM 의 다른 도메인/repo entry / 기존 S88-S90 carry-over (사용자 폰 / ops live / S85-F2).
+
+---
+
+## ⭐ 세션 92 첫 작업 우선순위 (세션 91 infra/docs chunk 종료 시점, 2026-05-08)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도 → 정상 작동 확인** | **P0 사용자** | 1분 | S88 + S89 + S90 = 8 위치 silent catch 표면화 (commits `d10b5e9` + `5f64675` origin 반영) + `app_admin` GRANT 마이그레이션 prod 적용 후 final 검증. 실패 시 toast/console 로 노출 가능 → root cause 1라운드 진단. (a) 브라우저 캐시 401 (시크릿 탭 1회) (b) 별개 버그. |
+| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** — Webhooks/SQL Editor/Cron 콘솔 등 systemic fix 검증 | **P1** | ~30분 | S88 마이그레이션이 37 테이블 모두 GRANT 부여했지만 실제 호출 검증 미실행. 운영자가 운영 콘솔 메뉴 5~7개 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. S89 마무리 chunk audit 스크립트 (`scripts/diag-readwrite-grants.sh`) 가 raw pg client 경로 (`app_readonly`/`app_readwrite`) 정상성 정적 확인 완료 (37/0/0/0 + 37/37/37/37) — 라이브 검증은 운영자 직접. |
+| **S91-CK-MEMORY** | **GCM credential 룰 메모리 승격 검토** | P3 | 5분 | S91 CK `2026-05-08-gcm-multi-account-credential-rejected-trap.md` → `memory/feedback_git_push_403_credential_layer_check.md` 승격 + MEMORY.md 색인. 사용자 결정 영역. |
+| **S85-F2** | **M4 UI Phase 2** — Composer 인터랙티브 + SSE wiring + User name lookup + SWR 도입 + 정보패널 시동 | **P0 messenger** | **5-6 작업일 단독 chunk** | (S85, S86, S87, S88, S89, S90, S91 모두 단독 chunk 대기로 보류) wave 평가 §5.1 진입 패턴 = 단독 세션 chunk. 5 sub-task 분할. |
+| **S88-SILENT-CATCH-P3** | **`sticky-note-card.tsx:107` paired capability fallback 주석 정합** — sibling line 81 의 setPointerCapture pair 주석 일관성 보강 (cosmetic) | P3 | ~5분 | logical 동등 — 기능 영향 0. cosmetic refactor scope, 우선도 낮음. |
+| **S88-ENDDRAG-FIX** | **`sticky-note-card.tsx:114` endDrag stale closure 별도 PR** | P2 | ~30분 | 본 root cause 와 무관한 부수 잠재 버그. `endDrag` 가 `position` 클로저 캡처 → 드래그 종료 시 시작 좌표 저장 가능성. `position` 대신 `draggingRef.current` 좌표 누적 또는 useRef 로 latest position 추적. |
+| **S87-INFRA-1** | **SWR + jsdom + @testing-library/react 도입** | P2 인프라 | ~3h | S85-F2 진입 직전 또는 동시. SWR 표준화 + vitest config 분기 + 컴포넌트 렌더 테스트. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86, S87, S88, S89, S90, S91 미수행) github.com/kimdooo-a/yangpyeon-server → Settings 확인. **public 이면 Archive Program/scraper 캐시 회수 불가** — 비밀번호 회전 권고 강화. |
+| **S87-WAVE-1-CONT** | **wave 평가 §5.4 sweep cont. — R-W2 wave-tracker 모델 수 정정 + R-W6 ops 카운트 + R-W7 git tag s81-first-cards-live 소급** | P1 sweep | ~30분 | S85-WAVE-1 R-W1 완료 후속. 단일 sweep PR 으로 묶기. |
+| **S87-CK-MEMORY** | **S87-CK-WSL 2 CK → memory/feedback_*.md 룰 승격** | P2 | ~30분 | `feedback_wsl2_single_foreground_call.md` + `feedback_tsx_no_dotenv_autoload.md`. MEMORY.md 색인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=false → true** (+ 4 feed 확장 결정) | P2 운영자 | 30분 | DB url 갱신 완료. 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
+| ~~S91 origin push~~ | ~~4 commits origin sync~~ | — | — | ✅ **세션 91 완료** (`e33a318..2120769` fast-forward, GCM credential reject 우회) |
+| ~~S88-PR-GATE-EXPAND~~ ~~S88-CK-MEMORY~~ ~~S88-SILENT-CATCH~~ ~~S87-CRON-VERIFY~~ ~~S87-ENV-CLEANUP~~ ~~S87-CK-WSL~~ ~~S86-SEC-2~~ ~~S85-WAVE-1~~ ~~S86-PUSH~~ | ~~9 작업~~ | — | — | ✅ **이전 세션들 완료** |
+| ~~S88 sticky_notes fix~~ | ~~app_admin role GRANT systemic + DEFAULT PRIVILEGES~~ | — | — | ✅ **세션 88 완료** |
+| S84-C | 24h+ 관찰 후 sources 14 확장 (9 → 14) | P1 | ~30분 | S87 cron 안정성 확인됨. |
+| S84-G | M5 첨부 + 답장 + 멘션 + 검색 | P1 messenger | 3-4 작업일 | M4 Phase 2 후속. |
+| S84-H | M6 알림 + 차단/신고 + 운영자 패널 + 보안 리뷰 | P1 messenger | 3-4 작업일 | M5 후속. |
+| S84-J | Phase 2 plugin (`packages/tenant-almanac/`) | P2 | ~5h | M3 게이트 통과 후. |
+| S84-K | Windows port 3000 leftover node.exe (pid 6608) 정리 | P3 | 5분 | ypserver 무관 dev 잔재. |
+| S84-L | Almanac Vercel `ALMANAC_TENANT_KEY` env + redeploy | P0 운영자 | 5분 | almanac-flame.vercel.app /explore 가시화. |
+
+### S92 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **S88-USER-VERIFY P0 우선** — 사용자에게 "휴대폰에서 메모 다시 시도해보셨나요?" 확인. silent catch sweep S89+S90 = 8 위치 표면화 + S91 origin push 로 PR 게이트 룰 #4 활성 후 final 검증. 정상이면 다음 단계, 안 되면 추가 디버깅 (확률 낮음).
+4. **S88-OPS-LIVE P1** — 운영자 본인이 운영 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터 (운영자 직접). audit 스크립트로 정적 확인 완료, 라이브 검증만 잔여.
+5. 또는 → **S85-F2 단독 chunk 진입** (5-6 작업일, S88~S91 부수 작업 모두 종료로 큰 chunk 진입 적절 시점).
+
+### S91 정착 룰 (CLAUDE.md PR 게이트 룰 확장 후보)
+
+**Push 403 시 진단 분기 = `git config credential.helper` + OS credential store** (commit author `user.email` 보지 마라). 본 사고 = 1차 진단 함정 = commit author 와 transport auth 혼동. **Why**: GitHub 의 `denied to <username>` 에 명시된 username 이 실제 사용된 token owner — commit author 와 다르면 곧 계층 2 문제.
+
+**Multi-account git 사용 시 GCM 의 우아한 처리**: reject 가 entry 무효화가 아니라 우선순위 떨어뜨림. 적합한 다른 token 이 있으면 자동 fallback. `gh auth login` 재시작이 늘 필요한 건 아님.
+
+**Bash + 한국어 Windows + cmdkey 인코딩 함정 회피**: PowerShell 직접 실행 또는 Git 자체 명령 (`git credential ...`) 우선. `cmdkey` Bash 경유는 한국어 환경에서 신뢰 불가.
 
 ---
 
