@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { ConversationList } from "@/components/messenger/ConversationList";
+import { MessageSearch } from "@/components/messenger/MessageSearch";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
 export default function MessengerPage() {
@@ -46,17 +47,16 @@ export default function MessengerPage() {
         </div>
       </aside>
 
-      {/* 우측 — 빈 상태 (데스크톱 only) */}
-      <div className="hidden lg:flex flex-1 items-center justify-center bg-surface-100">
-        <div className="text-center text-gray-500">
-          <div
-            className="mx-auto w-16 h-16 rounded-full bg-surface-300 flex items-center justify-center mb-4 text-3xl"
-            aria-hidden="true"
-          >
-            💬
-          </div>
-          <p className="text-sm mb-1">대화를 선택해 주세요</p>
-          <p className="text-xs text-gray-400">왼쪽 목록에서 대화를 클릭하세요</p>
+      {/* 우측 — 검색 영역 (데스크톱 only). 대화 미선택 시 30일 본문 검색 진입점. */}
+      <div className="hidden lg:flex flex-1 flex-col bg-surface-100 overflow-y-auto">
+        <div className="h-14 flex items-center px-4 border-b border-border bg-surface-200">
+          <h2 className="text-sm font-semibold text-gray-700">
+            메시지 본문 검색
+          </h2>
+        </div>
+        <MessageSearch />
+        <div className="text-center text-gray-400 text-xs px-4 pb-6">
+          또는 왼쪽 목록에서 대화를 선택해 주세요
         </div>
       </div>
     </div>
