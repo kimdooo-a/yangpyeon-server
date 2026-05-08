@@ -27,6 +27,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useMessages } from "@/hooks/messenger/useMessages";
 import type { SendPayload } from "@/lib/messenger/composer-logic";
 import type { MentionCandidate } from "@/lib/messenger/mention-search";
+import { derivePeerLabel } from "@/lib/messenger/peer-label";
 
 const TENANT_SLUG = "default";
 
@@ -34,6 +35,19 @@ interface ConversationMemberRow {
   userId: string;
   role: string;
   user?: { email: string; name?: string | null } | null;
+}
+
+interface ConversationDetail {
+  id: string;
+  kind: "DIRECT" | "GROUP" | "CHANNEL";
+  title: string | null;
+  members: ConversationMemberRow[];
+}
+
+function subtitleForKind(conv: ConversationDetail): string {
+  if (conv.kind === "DIRECT") return "1:1 메시지";
+  if (conv.kind === "GROUP") return `그룹 (${conv.members.length}명)`;
+  return "채널";
 }
 
 export default function MessengerConversationPage() {
@@ -44,13 +58,16 @@ export default function MessengerConversationPage() {
   const { messages, loading, error, sendOptimistic, sseConnected } =
     useMessages(conversationId);
 
-  const [members, setMembers] = useState<ConversationMemberRow[]>([]);
+  const [conv, setConv] = useState<ConversationDetail | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
 
-  // F2-3 — conv detail fetch (멤버 목록, email/name include). SWR 미도입 상태라 useEffect 직접.
-  // INFRA-1 도입 후 SWR mutate 로 자연 교체 (F2-4 동반).
+  // F2-3/F2-5 — conv detail fetch (멤버 목록 + kind/title, email/name include).
+  // SWR 미도입 상태라 useEffect 직접. SWR 도입 시 자연 교체.
   useEffect(() => {
-    if (!conversationId) return;
+    if (!conversationId) {
+      setConv(null);
+      return;
+    }
     let alive = true;
     (async () => {
       try {
@@ -59,21 +76,22 @@ export default function MessengerConversationPage() {
         );
         const json = await res.json();
         if (!alive) return;
-        if (json?.success && Array.isArray(json.data?.conversation?.members)) {
-          setMembers(json.data.conversation.members as ConversationMemberRow[]);
+        if (json?.success && json.data?.conversation) {
+          setConv(json.data.conversation as ConversationDetail);
         } else {
-          // 멤버 fetch 실패는 멘션 popover 비활성화로만 표시 (composer 의 @ 버튼 disabled).
-          // 메시지 송수신 자체에는 영향 없음.
-          setMembers([]);
+          // 멤버 fetch 실패는 멘션 popover 비활성화 + 헤더 fallback 으로만 표시.
+          setConv(null);
         }
       } catch {
-        if (alive) setMembers([]);
+        if (alive) setConv(null);
       }
     })();
     return () => {
       alive = false;
     };
   }, [conversationId]);
+
+  const members = conv?.members ?? [];
 
   const mentionCandidates = useMemo<MentionCandidate[]>(
     () =>
@@ -146,11 +164,20 @@ export default function MessengerConversationPage() {
               aria-hidden="true"
             />
             <div>
-              <div className="text-sm font-semibold text-gray-800">
-                {conversationId.slice(0, 8)}
+              <div
+                className="text-sm font-semibold text-gray-800 truncate max-w-[260px]"
+                title={
+                  conv
+                    ? derivePeerLabel(conv, user?.sub)
+                    : conversationId.slice(0, 8)
+                }
+              >
+                {conv
+                  ? derivePeerLabel(conv, user?.sub)
+                  : conversationId.slice(0, 8)}
               </div>
               <div className="text-[11px] text-gray-500 flex items-center gap-1">
-                대화 ID
+                {conv ? subtitleForKind(conv) : "대화 ID"}
                 <span
                   aria-label={
                     sseConnected ? "실시간 연결됨" : "실시간 연결 시도 중"

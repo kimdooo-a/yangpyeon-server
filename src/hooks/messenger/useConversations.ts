@@ -16,7 +16,12 @@ export interface ConversationRow {
   title: string | null;
   lastMessageAt: string | null;
   archivedAt: string | null;
-  members: Array<{ userId: string; role: string }>;
+  members: Array<{
+    userId: string;
+    role: string;
+    /** F2-5 — DIRECT peer 이름 / GROUP fallback 표시용 (backend GET include 확장). */
+    user?: { email: string | null; name: string | null } | null;
+  }>;
 }
 
 interface UseConversationsResult {

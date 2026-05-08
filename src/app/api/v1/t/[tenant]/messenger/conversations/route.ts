@@ -38,7 +38,12 @@ export const GET = withTenant(async (_request, user, tenant) => {
       include: {
         members: {
           where: { leftAt: null },
-          select: { userId: true, role: true },
+          // F2-5 — DIRECT peer 이름 / GROUP fallback 표시용 user.email/name include.
+          select: {
+            userId: true,
+            role: true,
+            user: { select: { email: true, name: true } },
+          },
         },
       },
       take: 100,

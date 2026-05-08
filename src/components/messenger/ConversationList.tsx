@@ -8,6 +8,7 @@
  */
 import { useConversations } from "@/hooks/messenger/useConversations";
 import { ConversationListItem } from "./ConversationListItem";
+import { derivePeerLabel } from "@/lib/messenger/peer-label";
 
 export interface ConversationListProps {
   /** 현재 활성 conversation id. URL `/messenger/[id]` 의 id 와 일치. */
@@ -94,19 +95,3 @@ export function ConversationList({
   );
 }
 
-/**
- * Phase 1: backend conversations include.members 만 노출 (peer name 미포함).
- *   - DIRECT: peer userId 의 8자 prefix (Phase 2 = User name lookup)
- *   - GROUP/CHANNEL: title
- */
-function derivePeerLabel(
-  conv: { kind: "DIRECT" | "GROUP" | "CHANNEL"; title: string | null; members?: Array<{ userId: string }> },
-  currentUserId?: string,
-): string {
-  if (conv.kind !== "DIRECT") {
-    return conv.title ?? "(제목 없음)";
-  }
-  const peer = conv.members?.find((m) => m.userId !== currentUserId);
-  if (!peer) return "DM";
-  return peer.userId.slice(0, 8);
-}
