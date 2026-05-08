@@ -58,6 +58,39 @@ describe("prepareSendPayload", () => {
     const b = prepareSendPayload("x");
     expect(a.clientGeneratedId).not.toBe(b.clientGeneratedId);
   });
+
+  // F2-3 — replyToId / mentions 추가
+  it("opts 없으면 replyToId / mentions 모두 undefined", () => {
+    const p = prepareSendPayload("hi");
+    expect(p.replyToId).toBeUndefined();
+    expect(p.mentions).toBeUndefined();
+  });
+
+  it("opts.replyToId → payload.replyToId 포함", () => {
+    const id = "11111111-1111-7111-8111-111111111111";
+    const p = prepareSendPayload("hi", { replyToId: id });
+    expect(p.replyToId).toBe(id);
+  });
+
+  it("opts.replyToId=null → payload.replyToId undefined (정규화)", () => {
+    const p = prepareSendPayload("hi", { replyToId: null });
+    expect(p.replyToId).toBeUndefined();
+  });
+
+  it("opts.mentions=[] → payload.mentions undefined (빈 배열 생략)", () => {
+    const p = prepareSendPayload("hi", { mentions: [] });
+    expect(p.mentions).toBeUndefined();
+  });
+
+  it("opts.mentions=[u1,u2] → payload.mentions=[u1,u2]", () => {
+    const p = prepareSendPayload("hi", { mentions: ["u1", "u2"] });
+    expect(p.mentions).toEqual(["u1", "u2"]);
+  });
+
+  it("mentions 중복 dedup", () => {
+    const p = prepareSendPayload("hi", { mentions: ["u1", "u1", "u2"] });
+    expect(p.mentions).toEqual(["u1", "u2"]);
+  });
 });
 
 describe("shouldSubmitOnEnter", () => {

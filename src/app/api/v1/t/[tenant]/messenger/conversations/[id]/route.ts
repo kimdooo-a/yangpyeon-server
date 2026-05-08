@@ -41,6 +41,8 @@ export const GET = withTenant(async (_request, user, tenant, context) => {
             joinedAt: true,
             pinnedAt: true,
             mutedUntil: true,
+            // F2-3 — 멘션 popover 후보 표시용 (email). 회수/탈퇴 등 추가 필드는 F2-5 에서 확장.
+            user: { select: { email: true, name: true } },
           },
         },
       },

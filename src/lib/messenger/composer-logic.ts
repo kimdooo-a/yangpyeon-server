@@ -3,7 +3,7 @@
  *
  * UI (`MessageComposer.tsx`) 와 분리된 검증/페이로드 빌드.
  * Backend zod schema (`sendMessageSchema`) 와 정합 — body 1~5000자, kind=TEXT.
- * F2-1 범위: TEXT 만. IMAGE/FILE/멘션/답장 은 F2-3+.
+ * F2-1 범위: TEXT 만. F2-3 에서 replyToId / mentions 옵션 추가.
  */
 import { uuidv7 } from "./uuidv7";
 
@@ -20,14 +20,34 @@ export interface SendPayload {
   kind: "TEXT";
   body: string;
   clientGeneratedId: string;
+  replyToId?: string;
+  mentions?: string[];
 }
 
-export function prepareSendPayload(raw: string): SendPayload {
-  return {
+export interface PrepareOptions {
+  replyToId?: string | null;
+  mentions?: string[];
+}
+
+export function prepareSendPayload(
+  raw: string,
+  opts?: PrepareOptions,
+): SendPayload {
+  const payload: SendPayload = {
     kind: "TEXT",
     body: raw.trim(),
     clientGeneratedId: uuidv7(),
   };
+  if (opts?.replyToId) {
+    payload.replyToId = opts.replyToId;
+  }
+  if (opts?.mentions && opts.mentions.length > 0) {
+    const deduped = Array.from(new Set(opts.mentions));
+    if (deduped.length > 0) {
+      payload.mentions = deduped;
+    }
+  }
+  return payload;
 }
 
 export interface KeyEventLike {

@@ -10,17 +10,31 @@
  * F2-2 — 낙관적 송신: useMessages 를 page 레벨로 lift, MessageList 와 cache 공유.
  *        sendOptimistic 이 prepend → POST → 201 swap / 4xx-5xx mark failed.
  *        SSE wiring + 재시도 트리거 UI = F2-4+.
+ * F2-3 — 답장 인용 + 멘션 popover. conv detail (멤버 목록) 을 useEffect fetch (SWR 도입은 F2-4 INFRA-1 동반).
+ *        replyTo state 는 page 가 보유, MessageComposer/MessageList 양쪽에 prop 전달.
  */
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, MoreVertical, Info } from "lucide-react";
 import { toast } from "sonner";
 import { ConversationList } from "@/components/messenger/ConversationList";
 import { MessageList } from "@/components/messenger/MessageList";
-import { MessageComposer } from "@/components/messenger/MessageComposer";
+import {
+  MessageComposer,
+  type ReplyTarget,
+} from "@/components/messenger/MessageComposer";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useMessages } from "@/hooks/messenger/useMessages";
 import type { SendPayload } from "@/lib/messenger/composer-logic";
+import type { MentionCandidate } from "@/lib/messenger/mention-search";
+
+const TENANT_SLUG = "default";
+
+interface ConversationMemberRow {
+  userId: string;
+  role: string;
+  user?: { email: string; name?: string | null } | null;
+}
 
 export default function MessengerConversationPage() {
   const params = useParams<{ id: string }>();
@@ -28,6 +42,59 @@ export default function MessengerConversationPage() {
   const { user } = useCurrentUser();
   const conversationId = params.id;
   const { messages, loading, error, sendOptimistic } = useMessages(conversationId);
+
+  const [members, setMembers] = useState<ConversationMemberRow[]>([]);
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+
+  // F2-3 — conv detail fetch (멤버 목록, email/name include). SWR 미도입 상태라 useEffect 직접.
+  // INFRA-1 도입 후 SWR mutate 로 자연 교체 (F2-4 동반).
+  useEffect(() => {
+    if (!conversationId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/v1/t/${TENANT_SLUG}/messenger/conversations/${conversationId}`,
+        );
+        const json = await res.json();
+        if (!alive) return;
+        if (json?.success && Array.isArray(json.data?.conversation?.members)) {
+          setMembers(json.data.conversation.members as ConversationMemberRow[]);
+        } else {
+          // 멤버 fetch 실패는 멘션 popover 비활성화로만 표시 (composer 의 @ 버튼 disabled).
+          // 메시지 송수신 자체에는 영향 없음.
+          setMembers([]);
+        }
+      } catch {
+        if (alive) setMembers([]);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [conversationId]);
+
+  const mentionCandidates = useMemo<MentionCandidate[]>(
+    () =>
+      members
+        .filter((m) => m.user?.email)
+        .map((m) => ({
+          userId: m.userId,
+          email: m.user!.email,
+          role: m.role,
+        })),
+    [members],
+  );
+
+  const senderMap = useMemo(() => {
+    const map: Record<string, { email: string; name?: string | null }> = {};
+    for (const m of members) {
+      if (m.user?.email) {
+        map[m.userId] = { email: m.user.email, name: m.user.name ?? null };
+      }
+    }
+    return map;
+  }, [members]);
 
   const handleSelect = (id: string) => {
     router.push(`/messenger/${id}`);
@@ -41,8 +108,6 @@ export default function MessengerConversationPage() {
       }
       const result = await sendOptimistic(payload, user.sub);
       if (!result.ok) {
-        // pending 메시지는 cache 에 _optimistic.status='failed' 로 남아 빨간 점 노출됨.
-        // toast 는 보조 알림 — 사용자가 다른 대화 보고 있을 때도 인지 가능.
         toast.error(result.error ?? "송신 실패");
       }
     },
@@ -51,7 +116,6 @@ export default function MessengerConversationPage() {
 
   return (
     <div className="flex h-[calc(100vh-0px)]">
-      {/* 좌측 — 대화 목록 (데스크톱 only, 모바일은 /messenger 로 push) */}
       <aside className="hidden lg:flex w-80 border-r border-border bg-surface-200 flex-col">
         <div className="h-14 flex items-center px-4 border-b border-border">
           <h1 className="text-lg font-semibold">대화</h1>
@@ -65,9 +129,7 @@ export default function MessengerConversationPage() {
         </div>
       </aside>
 
-      {/* 우측 — 채팅창 */}
       <section className="flex-1 flex flex-col bg-surface-100">
-        {/* 채팅창 헤더 */}
         <header className="h-14 flex items-center justify-between px-4 border-b border-border bg-surface-200">
           <div className="flex items-center gap-3">
             <button
@@ -111,13 +173,14 @@ export default function MessengerConversationPage() {
           </div>
         </header>
 
-        {/* 메시지 영역 */}
         {user ? (
           <MessageList
             messages={messages}
             loading={loading}
             error={error}
             currentUserId={user.sub}
+            senderMap={senderMap}
+            onReplyMessage={setReplyTo}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
@@ -125,10 +188,16 @@ export default function MessengerConversationPage() {
           </div>
         )}
 
-        {/* Composer (F2-1 + F2-2 — 낙관적 송신 활성, 첨부/이모지/멘션/답장 = F2-3+) */}
-        <MessageComposer onSend={handleSend} disabled={!user} />
+        <MessageComposer
+          onSend={handleSend}
+          disabled={!user}
+          members={mentionCandidates}
+          currentUserId={user?.sub}
+          replyTo={replyTo}
+          onClearReply={() => setReplyTo(null)}
+        />
         <p className="text-[10px] text-gray-400 px-3 pb-1.5">
-          ⓘ F2-2 — 낙관적 송신 활성 (전송 중 = 흐림, 실패 시 ⚠ 실패 표시). 첨부/멘션/답장 = F2-3+
+          ⓘ F2-3 — 답장 + 멘션 활성. 첨부/이모지/SSE 실시간 = F2-4+
         </p>
       </section>
     </div>

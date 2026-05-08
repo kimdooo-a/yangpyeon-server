@@ -34,6 +34,10 @@ interface SendOptimisticPayload {
   kind: "TEXT";
   body: string;
   clientGeneratedId: string;
+  /** F2-3 — 답장 인용 대상 메시지 ID. */
+  replyToId?: string;
+  /** F2-3 — 멘션 받는 사용자 ID 배열 (자기 자신 제외는 server-side filter). */
+  mentions?: string[];
 }
 
 interface SendOptimisticResult {

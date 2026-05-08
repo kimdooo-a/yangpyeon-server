@@ -58,6 +58,8 @@ export interface OptimisticBuildInput {
     kind: "TEXT";
     body: string;
     clientGeneratedId: string;
+    /** F2-3 — 답장 인용 대상 (optimistic 메시지에도 quote preview 즉시 표시). */
+    replyToId?: string;
   };
   senderId: string;
   now?: Date;
@@ -76,7 +78,7 @@ export function buildOptimisticMessage(
     kind: input.payload.kind,
     body: input.payload.body,
     senderId: input.senderId,
-    replyToId: null,
+    replyToId: input.payload.replyToId ?? null,
     clientGeneratedId: input.payload.clientGeneratedId,
     editedAt: null,
     editCount: 0,
