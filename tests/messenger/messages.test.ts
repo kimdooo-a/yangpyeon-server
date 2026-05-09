@@ -412,6 +412,92 @@ describe("messenger/messages (env-gated)", () => {
   );
 
   it.skipIf(!fx.hasDb)(
+    "sendMessage: 첨부 IMAGE 2개 정상 → MessageAttachment row INSERT + listMessages 응답 attachments 정합 + tenant_b context 는 0 row (RLS)",
+    async () => {
+      const { runWithTenant } = await fx.modules();
+      const alice = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("att-pos-a"),
+      });
+      const bob = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("att-pos-b"),
+      });
+      const conv = await createConversation({
+        tenantId: TENANTS.a,
+        kind: "DIRECT",
+        creatorId: alice.id,
+        memberIds: [alice.id, bob.id],
+      });
+      // alice 가 두 파일 모두 소유 — 5장 묶음의 축소판 (첫 2장).
+      const { fileId: fileId1 } = await seedFile({
+        tenantId: TENANTS.a,
+        ownerId: alice.id,
+      });
+      const { fileId: fileId2 } = await seedFile({
+        tenantId: TENANTS.a,
+        ownerId: alice.id,
+      });
+
+      await runWithTenant({ tenantId: TENANTS.a }, async () => {
+        const r = await messages.sendMessage({
+          conversationId: conv.id,
+          senderId: alice.id,
+          kind: "IMAGE",
+          body: null,
+          clientGeneratedId: randomUUID(),
+          attachments: [
+            { fileId: fileId1, kind: "IMAGE", displayOrder: 0 },
+            { fileId: fileId2, kind: "IMAGE", displayOrder: 1 },
+          ],
+        });
+        expect(r.created).toBe(true);
+        expect(r.message.kind).toBe("IMAGE");
+        expect(r.message.attachments).toHaveLength(2);
+
+        // displayOrder 명시 정렬 — Prisma include 의 default order 가정 안 함.
+        const sentSorted = [...r.message.attachments].sort(
+          (a, b) => a.displayOrder - b.displayOrder,
+        );
+        expect(sentSorted[0]).toMatchObject({
+          fileId: fileId1,
+          kind: "IMAGE",
+          displayOrder: 0,
+        });
+        expect(sentSorted[1]).toMatchObject({
+          fileId: fileId2,
+          kind: "IMAGE",
+          displayOrder: 1,
+        });
+
+        // listMessages 응답에도 attachments 정확히 반영.
+        const list = await messages.listMessages({
+          conversationId: conv.id,
+          limit: 30,
+        });
+        expect(list.items).toHaveLength(1);
+        expect(list.items[0].id).toBe(r.message.id);
+        expect(list.items[0].attachments).toHaveLength(2);
+        const listSorted = [...list.items[0].attachments].sort(
+          (a, b) => a.displayOrder - b.displayOrder,
+        );
+        expect(listSorted[0].fileId).toBe(fileId1);
+        expect(listSorted[1].fileId).toBe(fileId2);
+      });
+
+      // tenant_b context — RLS 가 conv_a 메시지를 0 row 로 차단.
+      // S82 4 latent bug 패턴 재발 차단: Prisma extension RLS escape 회귀 시 본 expect 가 fail.
+      await runWithTenant({ tenantId: TENANTS.b }, async () => {
+        const list = await messages.listMessages({
+          conversationId: conv.id,
+          limit: 30,
+        });
+        expect(list.items).toHaveLength(0);
+      });
+    },
+  );
+
+  it.skipIf(!fx.hasDb)(
     "sendMessage: 차단된 사용자 mention 은 mention row INSERT skip",
     async () => {
       const { runWithTenant, prismaWithTenant } = await fx.modules();
