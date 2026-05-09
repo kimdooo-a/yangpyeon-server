@@ -1,7 +1,94 @@
-# 다음 세션 프롬프트 (세션 94)
+# 다음 세션 프롬프트 (세션 95)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 94 압축 chunk 종료 — M4 F 트랙 완주 + M5 검색 + M6 운영자/차단/알림, 7 commit, TDD +108, vitest 619→727 회귀 0)
+
+세션 94 = 다른 터미널 65cf152 (S93 /cs F2-2 단독 chunk) 직후 본 세션 진입. 사용자 "모두 순차적으로 진행" + "2-4 작업 모두 순차적 진행" 두 분기 자율 채택 → 7 commit 압축 신기록 (S81 5x → 7x). M4 Phase 2 F 트랙 5/5 완주 + M5 검색 UI + M6 운영자/차단/알림 UI + Sweep GCM 메모리 승격.
+
+- **S94 commit 시퀀스** (모두 spec/aggregator-fixes):
+  - `8903e1d` F2-3 답장+멘션 (13 files +985/-118, TDD 37)
+  - `088f623` F2-4 + INFRA-1 (8 files +1347/-8, TDD 20, jsdom + @testing-library/react/dom/jest-dom 4 devDep)
+  - `5a29980` F2-5 DIRECT peer 이름 (6 files +231/-31, TDD 10) — **F 트랙 5/5 완주**
+  - `112c8be` M5 검색 UI (5 files +414/-11, TDD 16, GIN trgm wiring)
+  - `2f9125a` M6 운영자 신고 패널 (4 files +493, TDD 9, withTenantRole 가드)
+  - `5f5253c` M6 차단+알림 설정 (5 files, TDD 16, HHMM 야간 wrap)
+
+- **PR 게이트 5항목 모든 chunk 자동 통과**: 신규 모델 0 / 신규 라우트 0 (모든 chunk 가 기존 라우트 활용 또는 응답 shape additive) / tenantPrismaFor 그대로 / RLS 라이브 N/A / timezone-sensitive 비교 0.
+
+- **logic-only TDD 분리 패턴 5 chunk 일관 적용**: backend zero-or-additive + frontend pure logic 분리 + UI 통합 패턴이 모든 chunk 적용 가능. 압축 실행 영역 분류 변경 권고 (wave-tracker §6 의 "M4 UI = 압축 불가" 와 정반대 — F2 이후 messenger UI 영역은 압축 가능).
+
+- **INFRA-1 SWR 보류**: jsdom + @testing-library 만 도입 (필수). useMessages 의 useState/useEffect → SWR mutate 마이그레이션은 별도 chunk (회귀 위험 최소화). F2-4 use-sse wiring 은 SWR 없이도 setMessages prepend 패턴으로 정상 동작.
+
+- **EventSource MockEventSource 패턴 정착**: jsdom 25 가 EventSource native 미구현 → `vi.stubGlobal("EventSource", MockClass)` + `dispatch(name, data)` + `listeners Record` add/remove. 향후 SSE wiring 테스트의 표준 패턴.
+
+- **거버넌스 단언 sunset 임박**: M5 (검색 ✅, 첨부 ❌) + M6 (운영자 ✅, 차단 ✅, 알림 ✅, 보안 리뷰 ❌). M5 첨부 + kdysharpedge 보안 리뷰 완료 시 sunset.
+
+- **Sweep — GCM 룰 메모리 승격** (S87/S91 이월 P3 정착): `memory/reference_gcm_credential_reject.md` 신규 + MEMORY.md 색인. 한국어 Windows + Bash cmdkey 인코딩 함정 + Git 직접 명령 cross-platform 표준 우회 + GCM auto-fallback 메커니즘.
+
+- **알려진 이슈**: e2e tsc 사전 존재 2건 (`phase-14c-alpha-ui.spec.ts:19/20`, S85 secret recovery 후속, 본 세션 무관) / 신규 3 페이지 (admin/reports + blocked-users + notification-preferences) 사이드바 nav 미통합 (직접 URL 진입만, 별도 chunk) / MessageBubble reply quote 부모 lookup fail-soft "이전 메시지" fallback (backend listMessages replyTo include 정착 시 자연 해소) / F2-4 SSE wiring 라이브 검증 미수행 (운영자 영역).
+
+- **터치 안 함**: M5 첨부 (SeaweedFS multipart 통합, 5-6일 단독 chunk 권고, ADR-033 후속) / kdysharpedge 보안 리뷰 (`/kdysharpedge` 스킬 호출 정석) / 다른 터미널 65cf152 영역 (S93 /cs docs 보존) / S88-USER-VERIFY 사용자 / S88-OPS-LIVE 운영자 / DB password 회전 (운영자) / S87 carry-over (S86-SEC-1, S87-RSS-ACTIVATE, S87-TZ-MONITOR).
+
+---
+
+## ⭐ 세션 95 첫 작업 우선순위 (세션 94 압축 chunk 종료 시점, 2026-05-09)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **M5-ATTACH** | **M5 첨부 (SeaweedFS multipart 통합)** | **P0 messenger** | 5-6 작업일 | ADR-033 후속 — frontend → SeaweedFS S3 API 직접 vs server proxy 결정 prerequisite. `<MessageAttachment>` 컴포넌트 + 30일 cron deref + 미리보기 + multipart upload UI. M4 Phase 2 진척 5/14 → 6/14. |
+| **kdysharpedge** | **보안 리뷰 (`/kdysharpedge` 스킬 호출)** | **P1 messenger** | 별도 세션 | messenger 도메인 + admin 패널 영역 위험 API 패턴 탐지. 본 세션 신규 3 페이지 (admin/reports + blocked-users + notification-preferences) + 6 hook 영역 권고. |
+| **NAV-INTEGRATE** | **사이드바 "커뮤니케이션" 그룹 확장** | P2 sweep | ~30분 | sidebar.tsx 의 admin/reports + blocked-users + notification-preferences 메뉴 통합. 권한 매트릭스 (admin/reports = ADMIN_ONLY, 나머지 = MEMBER+). |
+| **GOV-SUNSET** | **거버넌스 단언 sunset 결정** | P3 | 5분 | M5 첨부 + 보안 리뷰 완료 시 next-dev-prompt 상단 단언 제거. 본 세션 미해당. |
+| **DEBOUNCE-SEARCH** | **M5 검색 debounce 300ms** | P3 sweep | ~30분 | 사용자 입력 중 자동 fetch (rate-limit 30/min/user 와 정합 유지). |
+| **NEW-BLOCK-UI** | **신규 차단 진입 UI** (대화 화면 hover) | P2 messenger | ~1 작업일 | MessageBubble hover → 차단 메뉴 (자기 자신 X, isOwn=false 만). 차단 후 양방향 메시지 차단 자동 적용. |
+| **SWR-MIGRATE** | **useMessages/useConversations SWR 마이그레이션** | P2 인프라 | ~3h | useState/useEffect → SWR mutate 패턴. 캐시 공유 자연 진화 + invalidate 패턴 정착. |
+| **STYLE-2** | **e2e 사전 존재 tsc 2 errors fix** | P3 sweep | 5분 | `phase-14c-alpha-ui.spec.ts:19/20`, S85 secret recovery 후속. 별도 sweep PR. |
+| **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도** | **P0 사용자** | 1분 | S88+S89+S90 8 위치 silent catch 표면화 + S91 origin push 후 final 검증. |
+| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** | **P1 운영자** | ~30분 | Webhooks/SQL Editor/Cron 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86~S94 미수행) Settings 확인. public 이면 비밀번호 회전 권고 강화. |
+| **S87-CK-MEMORY** | **S87-CK-WSL 2 CK → memory/feedback_*.md 룰 승격** | P2 | ~30분 | `feedback_wsl2_single_foreground_call.md` + `feedback_tsx_no_dotenv_autoload.md`. MEMORY.md 색인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=true** (+ 4 feed 확장) | P2 운영자 | 30분 | DB url 갱신 완료. 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
+| ~~F2-1~~ ~~F2-2~~ ~~F2-3~~ ~~F2-4+INFRA-1~~ ~~F2-5~~ | ~~M4 Phase 2 F 트랙 5 chunk~~ | — | — | ✅ **세션 92~94 완료** |
+| ~~M5 검색 UI~~ ~~M6 운영자~~ ~~M6 차단~~ ~~M6 알림~~ | ~~M5/M6 4 chunk~~ | — | — | ✅ **세션 94 완료** |
+| ~~Sweep GCM 룰 승격~~ | ~~S87/S91 이월 P3~~ | — | — | ✅ **세션 94 완료** |
+
+### S95 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **M5-ATTACH 진입** (M4 Phase 2 진척 5/14 → 6/14) — ADR-033 후속 결정 필요. 권고: SP-024 또는 신규 spike 로 frontend S3 API 직접 vs server proxy 검토. server proxy = `/messenger/uploads` 라우트 신설 (PR 게이트 #2 발동, withTenant + 라이브 RLS 테스트 필수).
+4. 또는 **kdysharpedge 진입** — `/kdysharpedge` 스킬 호출, messenger 도메인 + 본 세션 신규 3 페이지 + 6 hook 영역.
+5. P0 운영자 carry-over: S88-USER-VERIFY + S88-OPS-LIVE + S86-SEC-1.
+
+### S96 wave 평가 권장 시점
+
+`kdywavecompletion --compare session-92` — M5 첨부 완료 후 Track C M4+M5+M6 진척 측정. 거버넌스 단언 효과 정량화 + sunset 결정 자료.
+
+---
+
+## 🚨 거버넌스 단언 — M4 Phase 2 진입 우선 (G-NEW-3/G-NEW-6 재발 방지, S94 sunset 임박)
+
+**Why**: S85 wave eval 권고 commit 시퀀스 14건 중 S91~S94 = **5/14 commit 진척** (36% 회수). M4 Phase 2 F 트랙 5/5 완주 + M5 검색 + M6 운영자/차단/알림 5/14 + 본 세션 7 commit 압축. M5 첨부 + 보안 리뷰만 잔여.
+
+**Rule**: M4 Phase 2 진입 전 다른 작업 진입 시 사용자 명시 승인 필수 — 자율 실행 메모리(`feedback_autonomy.md`) 적용 안 함. 단, 진짜 긴급 사고만 자율 처리.
+
+**Exceptions** (자율 처리 허용):
+- production down / PG fatal / GitGuardian 알람 / 사용자 직접 보고
+- M4 Phase 2 / M5 / M6 진행 중 자연 발생한 dependency
+- 5분 이내 cosmetic sweep 으로 본 chunk 와 같은 commit 으로 흡수 가능
+
+**Sunset 조건**: M5 첨부 + kdysharpedge 보안 리뷰 완료 시 본 단언 해제 — wave-tracker 본진 가치 95%+ 도달 후 sweep cycle 정상화.
+
+**자율 적용 사례 누적**:
+- S93 F2-2: F2-1 의 자연 dependency (Phase 2 진척 1/14 → 2/14).
+- S94: 사용자 "순차 진행" 명시 결정 후 7 chunk 압축 (5/14 → wave eval 권고 36% 회수).
+
+**연관 자료**: [S91 wave eval delta](./260508-session91-wave-completion-eval-delta.md) §2.3 G-NEW-3 / §6 우선순위 결정 / §8 거버넌스 조치, [S94 인계서](./260509-session94-f-track-m5-m6-mass-chunk.md).
 
 ---
 
