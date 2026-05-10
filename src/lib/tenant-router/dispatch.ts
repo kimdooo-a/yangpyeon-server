@@ -1,14 +1,18 @@
 /**
- * tenant-router/dispatch — catch-all 라우터의 임시 핸들러 디스패처.
+ * tenant-router/dispatch — catch-all 라우터의 핸들러 디스패처.
  *
- * Phase 1.2 (T1.2) ADR-027 §3. catch-all 은 마이그레이션 도중의 임시 디스패처이며,
- * Phase 2+ 부터는 명시적 라우트(`src/app/api/v1/t/[tenant]/contents/route.ts` 등)가
- * Next.js 의 구체 라우트 우선 매칭에 의해 자동 흡수한다.
+ * Phase 1.2 (T1.2) ADR-027 §3 + PLUGIN-MIG-3 (S99) 확장.
  *
- * 본 단계 (Phase 0~1) 의 HANDLER_TABLE 은 빈 객체로 시작한다. 신규 리소스는
- * 가능한 한 명시 라우트로 추가하고, 정말 catch-all 만으로 처리해야 하는 경우에만
- * 본 테이블에 등록한다. ADR-027 §2.2 의 단계별 사용 가이드 참조.
+ * 우선순위:
+ *   1. Tenant manifest.routes — `@yangpyeon/core` registry 에서 tenant 별 plugin
+ *      라우트를 lookup. ADR-024 옵션 D 의 정상 경로.
+ *   2. HANDLER_TABLE — 플랫폼-레벨 catch-all 전용 (현 시점 비어 있음).
+ *
+ * Path 매칭:
+ *   - manifest 루트는 정적 segment + `:param` 만 지원 (간이 segment 매칭).
+ *   - HANDLER_TABLE 은 첫 segment 를 resource key 로 사용 (legacy).
  */
+import { getTenantManifest, type HttpMethod } from "@yangpyeon/core";
 import { errorResponse } from "@/lib/api-response";
 import type { AccessTokenPayload } from "@/lib/jwt-v1";
 import type { ResolvedTenant } from "./types";
@@ -24,26 +28,77 @@ export interface DispatchInput {
 type Handler = (ctx: DispatchInput) => Promise<Response>;
 
 /**
- * resource → method → handler 매핑 테이블.
- *
- * Phase 0~1 에서는 비어 있으며, 모든 path 는 ROUTE_NOT_FOUND (404) 로 응답한다.
- * 신규 핸들러 추가 시 lazy import 패턴을 권장한다 (ADR-027 §3 예시):
- *
- *   contents: {
- *     GET: (ctx) => import("./handlers/contents-list").then(m => m.handle(ctx)),
- *   }
+ * Phase 0~1 의 명시적 catch-all-only 핸들러 테이블 (PLUGIN-MIG-3 후에도 보존).
+ * 모든 plugin 도메인 라우트는 manifest.routes 로 등록 — 본 테이블은
+ * 플랫폼-레벨 catch-all 전용이며 현 시점 비어 있다.
  */
-const HANDLER_TABLE: Record<string, Record<string, Handler>> = {
-  // Phase 2+ 등록 — 현 시점 의도적 빈 테이블.
-};
+const HANDLER_TABLE: Record<string, Record<string, Handler>> = {};
 
 /**
- * subPath 의 첫 segment 를 resource 로 보고 HANDLER_TABLE 에서 lookup.
- * 미정의 resource → 404, 미정의 method → 405.
+ * Path 패턴 매칭 — 정적 segment + `:name` 동적 segment.
+ * 매칭 시 params 맵 반환, 미매칭 시 null.
+ *
+ * 예) pattern="items/:slug", subPath="items/foo" → { slug: "foo" }
+ *     pattern="contents",    subPath="contents"  → {}
+ *     pattern="contents",    subPath="other"     → null
+ *     pattern="items/:slug", subPath="items"     → null (segment 수 불일치)
+ */
+export function matchRoute(
+  pattern: string,
+  subPath: string,
+): Record<string, string> | null {
+  const patternSegs = pattern.split("/").filter(Boolean);
+  const pathSegs = subPath.split("/").filter(Boolean);
+  if (patternSegs.length !== pathSegs.length) return null;
+
+  const params: Record<string, string> = {};
+  for (let i = 0; i < patternSegs.length; i++) {
+    const p = patternSegs[i];
+    const v = pathSegs[i];
+    if (p.startsWith(":")) {
+      params[p.slice(1)] = decodeURIComponent(v);
+    } else if (p !== v) {
+      return null;
+    }
+  }
+  return params;
+}
+
+/**
+ * dispatch 진입점. catch-all route handler 가 호출.
+ *
+ * Manifest 의 routes 가 우선이며, 없으면 HANDLER_TABLE, 그래도 없으면 404.
+ * Method 미지원은 405 (manifest path 매칭 후에만 의미를 가짐).
  */
 export async function dispatchTenantRoute(
   input: DispatchInput,
 ): Promise<Response> {
+  // 1. Manifest plugin route lookup
+  const manifest = getTenantManifest(input.tenant.id);
+  if (manifest?.enabled && manifest.routes) {
+    for (const reg of manifest.routes) {
+      const params = matchRoute(reg.path, input.subPath);
+      if (params === null) continue;
+
+      const handler = reg.methods[input.method as HttpMethod];
+      if (!handler) {
+        return errorResponse(
+          "METHOD_NOT_ALLOWED",
+          `${input.method} 미지원`,
+          405,
+        );
+      }
+      return handler({
+        request: input.request,
+        tenant: input.tenant,
+        user: input.user,
+        params,
+        subPath: input.subPath,
+      });
+    }
+  }
+
+  // 2. Legacy HANDLER_TABLE fallback (플랫폼-레벨 catch-all 전용)
   const segments = input.subPath.split("/");
   const resource = segments[0] ?? "";
   const table = HANDLER_TABLE[resource];

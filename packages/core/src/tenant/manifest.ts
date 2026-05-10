@@ -30,17 +30,69 @@ export interface TenantCronResult {
   errorMessage?: string;
 }
 
-/** Route 등록 — apps/web 빌드 시 codegen 으로 Next.js route 파일로 expand. */
+/** HTTP 메서드 (TenantRouteRegistration.methods 의 키). */
+export type HttpMethod =
+  | "GET"
+  | "POST"
+  | "PATCH"
+  | "PUT"
+  | "DELETE"
+  | "OPTIONS";
+
+/**
+ * Plugin route handler 호출 컨텍스트.
+ *
+ * app-side dispatcher (`src/lib/tenant-router/dispatch.ts`) 가 withTenant 가드
+ * 통과 후 본 객체를 구성하여 handler 에 전달한다.
+ *
+ * `tenant`/`user` 의 실제 형은 app-side `ResolvedTenant` / `AccessTokenPayload`
+ * 이지만, core 가 app-side 에 역의존하지 않도록 구조적 호환 사본만 노출한다.
+ * Plugin 은 본 인터페이스의 필드만 사용 가능 — app-side 추가 필드 의존 시
+ * ADR-024 옵션 D 의 격리가 깨진다.
+ */
+export interface TenantRouteContext {
+  request: Request;
+  tenant: {
+    id: string;
+    slug: string;
+    displayName: string;
+    active: boolean;
+    status: string;
+  };
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+    type: string;
+  };
+  /** `:slug` 등 path 패턴에서 추출한 dynamic param. */
+  params: Record<string, string>;
+  /** /api/v1/t/<tenant>/ 이후 전체 subPath (디버깅/감사). */
+  subPath: string;
+}
+
+/** Plugin route handler 시그니처. */
+export type TenantRouteHandler = (
+  ctx: TenantRouteContext,
+) => Promise<Response>;
+
+/**
+ * Route 등록 — manifest.routes 배열 항목.
+ *
+ * PLUGIN-MIG-3 (S99): 기존 codegen-지향 thunk 시그니처에서 dynamic dispatch
+ * 시그니처로 전환. 기준 prefix 는 `/api/v1/t/<tenant>/` 이며, `path` 는 그
+ * 이후의 상대 패턴.
+ *
+ * Path 패턴 문법 (간이):
+ *   - 정적 segment: "contents", "today-top"
+ *   - dynamic param: "items/:slug" → params.slug 로 추출
+ *   - 와일드카드/optional 미지원 (필요 시 path-to-regexp 도입 검토)
+ */
 export interface TenantRouteRegistration {
-  /** Next.js App Router 경로 (예: "/api/v1/almanac/contents"). */
+  /** /api/v1/t/<tenant>/ 기준 상대 경로 패턴. */
   path: string;
-  /** dynamic import — 빌드 시점에 핸들러 모듈 lazy load. */
-  handler: () => Promise<{
-    GET?: unknown;
-    POST?: unknown;
-    PATCH?: unknown;
-    DELETE?: unknown;
-  }>;
+  /** 메서드별 핸들러. 없는 메서드는 dispatcher 가 405 반환. */
+  methods: Partial<Record<HttpMethod, TenantRouteHandler>>;
 }
 
 /** Admin UI 페이지 등록 — apps/web/app/admin/(<id>)/* 로 codegen. */

@@ -1,39 +1,23 @@
 /**
- * GET /api/v1/t/<tenant>/today-top
+ * Almanac plugin route — GET /api/v1/t/<tenant>/today-top
  *
- * 오늘의 트랙별 TOP N (기본 N=10).
+ * PLUGIN-MIG-3 (S99 Chunk B). 본체 출처: src/app/api/v1/t/[tenant]/today-top/route.ts.
  * 인수인계서 `docs/assets/260427-yangpyeon-phase2-aggregator-handover.md` §3.5 contract.
  *
- * 가드:
- *   - withTenant — Bearer pub_/srv_ 키 또는 cookie 멤버십 검증.
- *   - K3 cross-validation: dbTenant.slug === pathTenant.slug.
- *
- * RLS:
- *   - prismaWithTenant 가 ContentItem / ContentItemMetric 모두에 SET LOCAL app.tenant_id 적용.
- *
- * 캐시:
- *   - public, s-maxage=600, stale-while-revalidate=1800 (10분).
+ * 캐시: public, s-maxage=600, stale-while-revalidate=1800 (10분).
  *
  * 알고리즘 (트랙별 score_today 내림차순):
  *   score_today = 0.4 * metric.views + 0.6 * item.score
  *   - 단, item.publishedAt 이 24시간 이내이면 1.5x boost
  *
- * 쿼리:
- *   date?: YYYY-MM-DD (default = today, UTC)
- *
- * 응답:
- *   { success:true, data:{ date, byTrack:{ hustle:[...], work:[...], ... } } }
- *
  * 스키마 정합:
  *   - ContentItemMetric.itemId (spec 의 contentItemId 가 아님 — schema.prisma:783).
  */
-import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { withTenant } from "@/lib/api-guard-tenant";
+import type { TenantRouteHandler } from "@yangpyeon/core";
 import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { successResponse, errorResponse } from "@/lib/api-response";
-
-export const runtime = "nodejs";
+import { applyCors, preflightResponse } from "../lib/cors";
 
 const TRACKS = [
   "hustle",
@@ -54,23 +38,6 @@ const querySchema = z.object({
     .optional(),
 });
 
-function buildCorsHeaders(request: NextRequest): Record<string, string> {
-  const origin = request.headers.get("origin") || "";
-  const allowed = (process.env.ALMANAC_ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (origin && allowed.includes(origin)) {
-    return {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "authorization, x-api-key, content-type",
-      Vary: "Origin",
-    };
-  }
-  return {};
-}
-
 function getDayRange(dateStr: string): { start: Date; end: Date } {
   const start = new Date(`${dateStr}T00:00:00.000Z`);
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
@@ -81,7 +48,7 @@ function todayUtcYmd(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-export const GET = withTenant(async (request, _user, tenant) => {
+export const GET: TenantRouteHandler = async ({ request, tenant }) => {
   try {
     const { searchParams } = new URL(request.url);
     const parsed = querySchema.safeParse(Object.fromEntries(searchParams));
@@ -97,7 +64,6 @@ export const GET = withTenant(async (request, _user, tenant) => {
     const { start, end } = getDayRange(dateStr);
     const boostThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
     const db = tenantPrismaFor({ tenantId: tenant.id });
     const metrics = await db.contentItemMetric.findMany({
       where: { date: { gte: start, lt: end } },
@@ -179,16 +145,12 @@ export const GET = withTenant(async (request, _user, tenant) => {
         }));
     }
 
-    const corsHeaders = buildCorsHeaders(request);
     const res = successResponse({ date: dateStr, byTrack: result });
     res.headers.set(
       "Cache-Control",
       "public, s-maxage=600, stale-while-revalidate=1800",
     );
-    for (const [k, v] of Object.entries(corsHeaders)) {
-      res.headers.set(k, v);
-    }
-    return res;
+    return applyCors(request, res);
   } catch (err) {
     console.error("[GET /api/v1/t/{tenant}/today-top] error", err);
     return errorResponse(
@@ -197,11 +159,7 @@ export const GET = withTenant(async (request, _user, tenant) => {
       500,
     );
   }
-});
+};
 
-export async function OPTIONS(request: NextRequest) {
-  return new Response(null, {
-    status: 204,
-    headers: buildCorsHeaders(request),
-  });
-}
+export const OPTIONS: TenantRouteHandler = async ({ request }) =>
+  preflightResponse(request);

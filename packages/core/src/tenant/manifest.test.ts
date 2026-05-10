@@ -30,8 +30,11 @@ describe("defineTenant", () => {
       },
       routes: [
         {
-          path: "/api/v1/almanac/contents",
-          handler: async () => ({}),
+          // PLUGIN-MIG-3 (S99): tenant-relative path 패턴 + 메서드별 핸들러.
+          path: "contents",
+          methods: {
+            GET: async () => new Response("ok", { status: 200 }),
+          },
         },
       ],
       adminPages: [

@@ -54,6 +54,10 @@ vi.mock("../src/handlers/cleanup", () => ({
   }),
 }));
 
+// PLUGIN-MIG-3 Chunk B: 5 route handler 모듈은 lazy invocation 이므로 mock 불필요.
+// 단, app-side import 체인 (`@/lib/db/prisma-tenant-client` → Prisma client)
+// 의 무거운 의존성을 회피하기 위해 import-time side-effect 가 가벼운지만 확인.
+
 const { manifest } = await import("@yangpyeon/tenant-almanac");
 
 describe("tenant-almanac manifest (PLUGIN-MIG-2)", () => {
@@ -120,5 +124,37 @@ describe("tenant-almanac manifest (PLUGIN-MIG-2)", () => {
       "GEMINI_API_KEY",
       "ALMANAC_ALLOWED_ORIGINS",
     ]);
+  });
+
+  // ─── PLUGIN-MIG-3 Chunk B: 5 route 등록 검증 ───
+  it("5 라우트 등록 (categories/sources/today-top/items/:slug/contents)", () => {
+    const routes = manifest.routes ?? [];
+    const paths = routes.map((r) => r.path).sort();
+    expect(paths).toEqual([
+      "categories",
+      "contents",
+      "items/:slug",
+      "sources",
+      "today-top",
+    ]);
+  });
+
+  it("각 라우트는 GET + OPTIONS 메서드 핸들러 보유", () => {
+    const routes = manifest.routes ?? [];
+    expect(routes.length).toBe(5);
+    for (const reg of routes) {
+      expect(typeof reg.methods.GET).toBe("function");
+      expect(typeof reg.methods.OPTIONS).toBe("function");
+    }
+  });
+
+  it("라우트 메서드 핸들러는 기타 변경 메서드 미지원 (POST/PATCH/DELETE)", () => {
+    const routes = manifest.routes ?? [];
+    for (const reg of routes) {
+      expect(reg.methods.POST).toBeUndefined();
+      expect(reg.methods.PATCH).toBeUndefined();
+      expect(reg.methods.DELETE).toBeUndefined();
+      expect(reg.methods.PUT).toBeUndefined();
+    }
   });
 });

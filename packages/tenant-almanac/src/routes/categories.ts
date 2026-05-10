@@ -1,30 +1,21 @@
 /**
- * GET /api/v1/t/<tenant>/categories
+ * Almanac plugin route — GET /api/v1/t/<tenant>/categories
  *
- * 트랙별 카테고리 + 활성 콘텐츠 카운트.
+ * PLUGIN-MIG-3 (S99 Chunk B). 본체 출처: src/app/api/v1/t/[tenant]/categories/route.ts.
  * 인수인계서 `docs/assets/260427-yangpyeon-phase2-aggregator-handover.md` §3.3 contract.
  *
- * 가드:
- *   - withTenant — Bearer pub_/srv_ 키 또는 cookie 멤버십 검증.
- *   - K3 cross-validation: dbTenant.slug === pathTenant.slug (api-guard-tenant.ts).
+ * 가드/RLS:
+ *   - withTenant 가드 + K3 cross-validation 은 catch-all (`/api/v1/t/[tenant]/[...path]`) 에서 처리.
+ *   - tenantPrismaFor({ tenantId }) 가 SET LOCAL app.tenant_id 적용 (memory rule
+ *     project_workspace_singleton_globalthis — ALS propagation 깨짐 회피 closure 캡처).
  *
- * RLS:
- *   - prismaWithTenant 가 매 query 마다 SET LOCAL app.tenant_id 적용.
- *   - 따라서 명시적 tenantId where 절 없이도 자기 tenant row 만 노출.
- *
- * 캐시:
- *   - public, s-maxage=300, stale-while-revalidate=900 (Almanac /explore ISR 5분과 정합).
- *
- * 응답:
- *   { success:true, data:{ byTrack:{ hustle:[...], work:[...], build:[...], invest:[...], learn:[...], community:[...] } } }
+ * 캐시: public, s-maxage=300, stale-while-revalidate=900.
  */
-import type { NextRequest } from "next/server";
 import { z } from "zod";
-import { withTenant } from "@/lib/api-guard-tenant";
+import type { TenantRouteHandler } from "@yangpyeon/core";
 import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { successResponse, errorResponse } from "@/lib/api-response";
-
-export const runtime = "nodejs";
+import { applyCors, preflightResponse } from "../lib/cors";
 
 const TRACKS = [
   "hustle",
@@ -40,24 +31,7 @@ const querySchema = z.object({
   track: z.enum(TRACKS).optional(),
 });
 
-function buildCorsHeaders(request: NextRequest): Record<string, string> {
-  const origin = request.headers.get("origin") || "";
-  const allowed = (process.env.ALMANAC_ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (origin && allowed.includes(origin)) {
-    return {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "authorization, x-api-key, content-type",
-      Vary: "Origin",
-    };
-  }
-  return {};
-}
-
-export const GET = withTenant(async (request, _user, tenant) => {
+export const GET: TenantRouteHandler = async ({ request, tenant }) => {
   try {
     const { searchParams } = new URL(request.url);
     const parsed = querySchema.safeParse(Object.fromEntries(searchParams));
@@ -72,7 +46,6 @@ export const GET = withTenant(async (request, _user, tenant) => {
 
     const where = track ? { track } : {};
 
-    // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
     const db = tenantPrismaFor({ tenantId: tenant.id });
     const categories = await db.contentCategory.findMany({
       where,
@@ -121,16 +94,12 @@ export const GET = withTenant(async (request, _user, tenant) => {
       });
     }
 
-    const corsHeaders = buildCorsHeaders(request);
     const res = successResponse({ byTrack });
     res.headers.set(
       "Cache-Control",
       "public, s-maxage=300, stale-while-revalidate=900",
     );
-    for (const [k, v] of Object.entries(corsHeaders)) {
-      res.headers.set(k, v);
-    }
-    return res;
+    return applyCors(request, res);
   } catch (err) {
     console.error("[GET /api/v1/t/{tenant}/categories] error", err);
     return errorResponse(
@@ -139,11 +108,7 @@ export const GET = withTenant(async (request, _user, tenant) => {
       500,
     );
   }
-});
+};
 
-export async function OPTIONS(request: NextRequest) {
-  return new Response(null, {
-    status: 204,
-    headers: buildCorsHeaders(request),
-  });
-}
+export const OPTIONS: TenantRouteHandler = async ({ request }) =>
+  preflightResponse(request);

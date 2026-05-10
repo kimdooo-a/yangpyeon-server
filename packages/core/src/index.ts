@@ -43,6 +43,9 @@ export {
   type TenantCronResult,
   type TenantRouteRegistration,
   type TenantAdminPageRegistration,
+  type TenantRouteHandler,
+  type TenantRouteContext,
+  type HttpMethod,
 } from "./tenant";
 
 // Phase 1.5: Cron pure logic (lock key, circuit breaker state)

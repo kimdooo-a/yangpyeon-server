@@ -16,3 +16,11 @@ export { runApiPoller } from "./handlers/api-poller";
 export { runClassifierHandler } from "./handlers/classifier";
 export { runPromoterHandler } from "./handlers/promoter";
 export { runCleanupHandler } from "./handlers/cleanup";
+
+// PLUGIN-MIG-3 (S99 Chunk B): 5 route handler — namespace export.
+// 직접 import 가능 (단위 테스트, 향후 SDK 노출).
+export * as categoriesRoute from "./routes/categories";
+export * as sourcesRoute from "./routes/sources";
+export * as itemsBySlugRoute from "./routes/items-by-slug";
+export * as todayTopRoute from "./routes/today-top";
+export * as contentsRoute from "./routes/contents";

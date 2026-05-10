@@ -1,34 +1,17 @@
 /**
- * GET /api/v1/t/<tenant>/sources
+ * Almanac plugin route — GET /api/v1/t/<tenant>/sources
  *
- * 활성 콘텐츠 소스 메타.
+ * PLUGIN-MIG-3 (S99 Chunk B). 본체 출처: src/app/api/v1/t/[tenant]/sources/route.ts.
  * 인수인계서 `docs/assets/260427-yangpyeon-phase2-aggregator-handover.md` §3.4 contract.
  *
- * 가드:
- *   - withTenant — Bearer pub_/srv_ 키 또는 cookie 멤버십 검증.
- *   - K3 cross-validation: dbTenant.slug === pathTenant.slug.
- *
- * RLS:
- *   - prismaWithTenant 가 매 query 마다 SET LOCAL app.tenant_id 적용.
- *
- * 캐시:
- *   - public, s-maxage=3600, stale-while-revalidate=86400 (1시간).
- *
- * 쿼리:
- *   kind?: RSS | HTML | API | FIRECRAWL
- *   country?: ISO 2자리
- *
- * 응답:
- *   { success:true, data:{ sources: [{slug,name,kind,country,defaultTrack,lastSuccessAt}] } }
+ * 캐시: public, s-maxage=3600, stale-while-revalidate=86400.
  */
-import type { NextRequest } from "next/server";
 import { z } from "zod";
+import type { TenantRouteHandler } from "@yangpyeon/core";
 import { Prisma } from "@/generated/prisma/client";
-import { withTenant } from "@/lib/api-guard-tenant";
 import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
 import { successResponse, errorResponse } from "@/lib/api-response";
-
-export const runtime = "nodejs";
+import { applyCors, preflightResponse } from "../lib/cors";
 
 const querySchema = z.object({
   kind: z.enum(["RSS", "HTML", "API", "FIRECRAWL"]).optional(),
@@ -38,24 +21,7 @@ const querySchema = z.object({
     .optional(),
 });
 
-function buildCorsHeaders(request: NextRequest): Record<string, string> {
-  const origin = request.headers.get("origin") || "";
-  const allowed = (process.env.ALMANAC_ALLOWED_ORIGINS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (origin && allowed.includes(origin)) {
-    return {
-      "Access-Control-Allow-Origin": origin,
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Headers": "authorization, x-api-key, content-type",
-      Vary: "Origin",
-    };
-  }
-  return {};
-}
-
-export const GET = withTenant(async (request, _user, tenant) => {
+export const GET: TenantRouteHandler = async ({ request, tenant }) => {
   try {
     const { searchParams } = new URL(request.url);
     const parsed = querySchema.safeParse(Object.fromEntries(searchParams));
@@ -74,7 +40,6 @@ export const GET = withTenant(async (request, _user, tenant) => {
       ...(country && { country: country.toUpperCase() }),
     };
 
-    // 2026-05-01: ALS propagation 깨짐 회피 — tenantPrismaFor 직접 closure 캡처 사용.
     const db = tenantPrismaFor({ tenantId: tenant.id });
     const sources = await db.contentSource.findMany({
       where,
@@ -89,16 +54,12 @@ export const GET = withTenant(async (request, _user, tenant) => {
       },
     });
 
-    const corsHeaders = buildCorsHeaders(request);
     const res = successResponse({ sources });
     res.headers.set(
       "Cache-Control",
       "public, s-maxage=3600, stale-while-revalidate=86400",
     );
-    for (const [k, v] of Object.entries(corsHeaders)) {
-      res.headers.set(k, v);
-    }
-    return res;
+    return applyCors(request, res);
   } catch (err) {
     console.error("[GET /api/v1/t/{tenant}/sources] error", err);
     return errorResponse(
@@ -107,11 +68,7 @@ export const GET = withTenant(async (request, _user, tenant) => {
       500,
     );
   }
-});
+};
 
-export async function OPTIONS(request: NextRequest) {
-  return new Response(null, {
-    status: 204,
-    headers: buildCorsHeaders(request),
-  });
-}
+export const OPTIONS: TenantRouteHandler = async ({ request }) =>
+  preflightResponse(request);

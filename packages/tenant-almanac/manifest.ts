@@ -22,6 +22,11 @@ import { runApiPoller } from "./src/handlers/api-poller";
 import { runClassifierHandler } from "./src/handlers/classifier";
 import { runPromoterHandler } from "./src/handlers/promoter";
 import { runCleanupHandler } from "./src/handlers/cleanup";
+import * as categoriesRoute from "./src/routes/categories";
+import * as sourcesRoute from "./src/routes/sources";
+import * as itemsBySlugRoute from "./src/routes/items-by-slug";
+import * as todayTopRoute from "./src/routes/today-top";
+import * as contentsRoute from "./src/routes/contents";
 import type { TenantContext } from "@/lib/db/prisma-tenant-client";
 
 /**
@@ -73,10 +78,37 @@ export default defineTenant({
   },
 
   /**
-   * PLUGIN-MIG-3 에서 본격 추가 — 현재는 src/app/api/v1/t/[tenant]/{...}/route.ts 가
-   * 직접 처리. manifest.routes 는 [tenant]/[...path] catch-all dispatcher 가 사용 예정.
+   * PLUGIN-MIG-3 (S99 Chunk B): 5 라우트 본체 이전 완료.
+   * `src/app/api/v1/t/[tenant]/{...}/route.ts` 5개는 Chunk C 에서 삭제.
+   * Next.js 정적 우선 매칭 규칙에 의해, 명시 route.ts 가 살아있는 동안에는
+   * 운영 트래픽이 본 manifest 를 사용하지 않음 (catch-all 미흡수). Chunk C 시점에
+   * 본 routes 가 catch-all dispatcher 의 유일한 경로가 됨.
    */
-  routes: [],
+  routes: [
+    {
+      path: "categories",
+      methods: { GET: categoriesRoute.GET, OPTIONS: categoriesRoute.OPTIONS },
+    },
+    {
+      path: "sources",
+      methods: { GET: sourcesRoute.GET, OPTIONS: sourcesRoute.OPTIONS },
+    },
+    {
+      path: "today-top",
+      methods: { GET: todayTopRoute.GET, OPTIONS: todayTopRoute.OPTIONS },
+    },
+    {
+      path: "items/:slug",
+      methods: {
+        GET: itemsBySlugRoute.GET,
+        OPTIONS: itemsBySlugRoute.OPTIONS,
+      },
+    },
+    {
+      path: "contents",
+      methods: { GET: contentsRoute.GET, OPTIONS: contentsRoute.OPTIONS },
+    },
+  ],
 
   /**
    * 현재 admin UI (현 코드베이스) — src/app/(protected)/admin/aggregator/* 에 존재.
