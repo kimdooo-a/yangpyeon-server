@@ -5,32 +5,33 @@
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 99 PLUGIN-MIG-3 정찰 + chunk A/B/C 설계 종료, 코드 변경 0)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 99 후속 PLUGIN-MIG-3 A+B+C 단일 commit cutover 완료, commit `33e6721`)
 
-세션 99 = S98 후속 commit `f7a0253` (PLUGIN-MIG-2 + 5) 직후 새 세션 진입. 사용자 "새로운 새션 시작" + S98 후속 마감 보고 paste → next-dev-prompt P0 PLUGIN-MIG-3 자율 진입 → 정찰 + 설계만 완료한 시점에 사용자 `/cs` 호출. **본격 구현은 S100 진입.** 정찰 + 설계 가치를 인수인계서에 보존하여 S100 재진입 비용 회피.
+세션 99 후속 = S99 정찰 /cs (`411d0f7`) 직후 같은 터미널이 자율 진입 (`feedback_autonomy.md`) → chunk A/B/C 설계를 단일 commit `33e6721` 으로 정착. **Almanac 5 routes 가 manifest dispatch 의 단일 진입점 (`/api/v1/t/[tenant]/[...path]`) 으로 전환 완료.**
 
-- **5 routes + 2 dispatcher 정밀 정찰**: categories 149 / sources 117 / today-top 207 / items[slug] 135 / contents 253 = 928줄 + 308 alias 44줄 + catch-all 67줄. 공통 패턴 = withTenant + buildCorsHeaders (5×17줄 cors 중복) + tenantPrismaFor + successResponse/errorResponse + OPTIONS handler. 개별 차이 = today-top score 1.5x boost / items tenantId_slug composite + viewCount fire-and-forget / contents 7 query + base64 cursor + ALMANAC_CONTENTS_LIST audit.
-- **TenantRouteRegistration 한계 발견**: PLUGIN-MIG-1 (S98) 에서 path + dynamic-import handler 인터페이스 정의됐으나 route registry/dispatch lookup **미구현** (S99 PLUGIN-MIG-5 dispatcher.ts 는 cron handler 만). PLUGIN-MIG-3 추가 작업 = TenantRouteHandler 타입 신설 + path 의미 재정의 (절대 → subPath pattern "contents"/"items/:slug") + handler strict typing + dispatch.ts manifest lookup + `:slug` 동적 param 추출.
-- **chunk A/B/C 분할 설계** (회귀 위험 분리): A = 인프라 (~150 신규 LOC, 0 회귀 — 5 explicit 가 흡수 중이라 catch-all 변경 영향 없음) / B = 5 handler 본체 packages/tenant-almanac/src/routes/ 이전 + cors helper 공통화 + manifest.routes 등록 (~700 LOC 이전, 0 회귀 — 5 explicit 보존이라 hot path 무관) / C = 5 explicit route.ts 삭제 + 라이브 cutover (-928 LOC, vitest + 수동 curl smoke 게이트).
-- **308 alias 보존 결정**: 44줄 redirect 결합 0, Almanac frontend 직접 호출 검증 후 별도 sub-chunk (v1.1 cutover) 로 제거.
-- **withTenant 단일 위치 전환**: catch-all 측 단일 적용 → plugin handler signature `(req, user, tenant, params) => Promise<Response>` 단순화. K3 cross-validation 도 catch-all 한 곳 강제 (ADR-022 7원칙 #3 router 레이어 현실화).
-- **packages → app 역방향 import 정책**: PLUGIN-MIG-2 manifest.ts 가 이미 @/lib/aggregator/types import — 허용 상태. 진정한 격리는 PLUGIN-MIG-4+ (5 Content* 모델 + audit-log + api-response 의 packages 화 동반).
-- **TaskCreate 7 등록**: chunk A/B/C 단계별 task 7 (#1 정찰만 완료, #2-#7 /cs 시점 deleted — S100 본 인수인계서 읽고 재등록 가능).
-- **본 세션 변경 0**: 정찰 + 설계 + handover 보존만, 코드/테스트/빌드 모두 미실행. baseline = HEAD `f7a0253` + vitest 821 PASS 그대로.
-- **알려진 이슈**: 없음 (코드 변경 0, 회귀 위험 0).
-- **터치 안 함**: PLUGIN-MIG-3 본격 구현 (chunk A → B → C, ~1-2일, S100 진입) / PLUGIN-MIG-4 (Prisma fragment + RLS, PR 게이트 #4 live test 필수) / 308 alias 제거 (v1.1) / FILE-UPLOAD-MIG / 사용자 + 운영자 carry-over.
+- **Chunk A — 인프라** (5 파일): `packages/core/src/tenant/manifest.ts` 에 `HttpMethod` / `TenantRouteContext` (구조적 사본 — core 가 app-side `ResolvedTenant`/`AccessTokenPayload` 에 역의존하지 않으면서 plugin handler 가 `tenant.id` 등 그대로 사용, ADR-024 옵션 D hybrid 격리가 타입 시스템에서 강제) / `TenantRouteHandler` 신규 + `TenantRouteRegistration` 시그니처 교체 (codegen thunk → eager `methods`). `src/lib/tenant-router/dispatch.ts` 에 `matchRoute` helper (정적 segment + `:param`, 40 LOC, path-to-regexp 미도입 — 5 routes = 정적 + 1 `:slug` 충분) + manifest 우선 lookup. **17 신규 unit test** (matchRoute 7 + dispatchTenantRoute 10).
+- **Chunk B — 본체 이전** (9 신규 + 3 수정): lift-and-shift 1:1 복사 (signature 만 교체), `packages/tenant-almanac/src/lib/cors.ts` 1회 정의 (`buildCorsHeaders` + `applyCors` + `preflightResponse`, 5×17 LOC 중복 압축), 5 routes (`categories`/`sources`/`today-top`/`items-by-slug`/`contents`) 각 `{ GET, OPTIONS }` 등록, manifest.routes path 패턴 = relative subPath ("contents", "items/:slug"), namespace export 로 manifest 등록 깔끔화. **12 신규 testcase** (cors 9 + manifest routes 3).
+- **Chunk C — cutover** (1 수정 + 5 삭제): 5 explicit route.ts 삭제 + 빈 디렉토리 5 정리. catch-all `[tenant]/[...path]/route.ts` 에 `import "@/lib/tenant-bootstrap"` side-effect import (manifest registry 채움) + OPTIONS 핸들러 추가 (preflight 인증 우회 — withTenant 미경유, slug 만 검증 후 manifest 의 OPTIONS 핸들러 위임, ANONYMOUS_PREFLIGHT_USER 합성). dev :3100 첫 smoke = OPTIONS 5 routes 모두 500 (Windows host → WSL postgres 미접근, resolveTenantFromSlug Prisma throw). **견고화** = OPTIONS try/catch swallow → 204 graceful 폴백 (운영자 CORS 디버깅 가시성 향상 — preflight 500 으로 실패 시 모호한 CORS 에러 회피).
+- **라이브 dev smoke 통과**: OPTIONS 5 routes + 미등록 tenant 모두 204, GET 5 routes 모두 401 (catch-all → withTenant gate 도달), messenger explicit `/conversations` 401 (영향 0).
+- **PR 게이트 5항목 자동 통과**: 신규 모델 0 / 신규 라우트 0 (URL 동일, dispatcher 만 교체) + withTenant 가드 보존 / Prisma `tenantPrismaFor({ tenantId })` closure 5/5 보존 (memory `project_workspace_singleton_globalthis`) / 라이브 dev :3100 smoke 통과 / timezone 비교 영향 0.
+- **Git rename 감지 50~78%** (items-by-slug 53% / sources 50% / categories 57% / today-top 71% / contents 78%) — 시그니처 교체 + cors 추출이 50% 이상 유사도 떨어뜨렸지만 여전히 rename, blame 보존.
+- **검증**: vitest 846 PASS (이전 +25 신규 회귀 0) / tsc 0 / commit `33e6721` 17 files +782/-305 / push `411d0f7..33e6721` 성공.
+- **메타 가치**: ADR-022 7원칙 #3 "한 컨슈머 실패는 다른 컨슈머에 닿지 않는다" router 레이어 현실화 (catch-all 단일 진입점 + K3 cross-validation 한 곳 강제) + 7원칙 #4 "컨슈머 추가 코드 수정 0줄" router 레이어 현실화 (manifest.routes 등록만으로 신규 컨슈머 라우트).
+- **알려진 이슈**: 운영 적용 `/ypserver` 미수행 (S100 first action 권장).
+- **터치 안 함**: PLUGIN-MIG-4 (Prisma fragment + RLS, PR 게이트 #4 live test 필수) / 308 alias 제거 (Almanac v1.1) / support libs 분리 (PLUGIN-MIG-4 시 동시 이동) / FILE-UPLOAD-MIG / 사용자 + 운영자 carry-over.
 
 ---
 
-## ⭐ 세션 100 첫 작업 우선순위 (세션 99 PLUGIN-MIG-3 정찰 종료 시점, 2026-05-10)
+## ⭐ 세션 100 첫 작업 우선순위 (세션 99 후속 PLUGIN-MIG-3 cutover 종료 시점, 2026-05-10)
 
 | # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
 |---|------|------|------|----------|
-| **PLUGIN-MIG-3-A** | **인프라 — TenantRouteHandler 타입 + dispatcher route registry + dispatch.ts manifest lookup** | **P0** | ~30분 | S99 정찰에서 설계 완료 (`260510-session99-plugin-mig-3-recon.md` §"다음 작업 제안"). 0 회귀 (5 explicit 가 catch-all 흡수 중). |
-| **PLUGIN-MIG-3-B** | **5 handler 본체 packages/tenant-almanac/src/routes/ 이전 + cors helper 공통화 + manifest.routes 등록** | **P0** | ~1시간 | A 완료 후 진입. 0 회귀 (5 explicit 보존이라 hot path 무관). |
-| **PLUGIN-MIG-3-C** | **5 explicit route.ts 삭제 + vitest + curl smoke + commit** | **P0** | ~30분 | B 완료 후 진입. 라이브 cutover 위험 — vitest 821 → 같거나 + 신규 / tsc 0 / 5 routes × GET smoke. |
-| **PLUGIN-MIG-4** | **Prisma fragment 활성 + tenantId backfill + RLS** | P0~P1 | ~1-2일 | PLUGIN-MIG-3 완료 후 묶음 권장. **PR 게이트 #4 live non-BYPASSRLS 테스트 필수** — `bash scripts/run-integration-tests.sh tests/almanac/`. |
-| **308 alias 제거** | `/api/v1/almanac/[...path]/route.ts` 44줄 삭제 | P3 | ~5분 | Almanac v1.1 cutover 시점. 본 chunk 보류. |
+| **/ypserver** | **운영 적용 — PLUGIN-MIG-3 cutover 를 production 에 배포** | **P0 first** | ~5분 | dev :3100 smoke 가 dispatcher 메커니즘 검증, production WSL postgres + 실제 트래픽 검증은 별도. PM2 임의 종료 금지 메모리 준수 — `/ypserver` 스킬이 standalone 빌드 + rsync + `pm2 restart ypserver` 표준. |
+| **PLUGIN-MIG-4-models** | **5 Content* 모델 fragment 추출 + tenantId backfill** | **P0** | ~6시간 | `prisma/schema.prisma` → `packages/tenant-almanac/prisma/fragment.prisma` (ContentCategory + ContentSource + ContentIngestedItem + ContentItem + ContentItemMetric). 글로벌 schema 빌드 시 fragment append workflow 보강. tenantId='almanac' backfill 마이그레이션. unique constraint 검토 (`tenantId_slug` composite). |
+| **PLUGIN-MIG-4-rls** | **RLS 정책 5 모델 + GRANT 검증** | **P0** | ~4시간 | `CREATE POLICY ... USING (tenant_id = current_setting('app.tenant_id'))` 5건 + app_admin/app_test_runtime/app_user BYPASSRLS 검증 (S88 사례 — RLS 우회 ≠ ACL 우회 메모리 `feedback_grant_check_for_bypassrls_roles` 정합). |
+| **PLUGIN-MIG-4-test** | **라이브 non-BYPASSRLS test (PR 게이트 #4 필수)** | **P0** | ~4시간 | `tests/almanac/` 신설 + `bash scripts/run-integration-tests.sh tests/almanac/` 통과 (PowerShell 권장 = WSL→Win cross-OS env 손실 회피, S82 4 latent bug 패턴 재발 차단). cross-tenant 격리 + composite unique 검증 시나리오 필수. |
+| **PLUGIN-MIG-4-libs** | **support libs (dedupe/fetchers/llm/promote/cleanup/types) 동시 이동** | P0 | ~2시간 | 모델 import path 1번 정리. cron handler 6 + 5 routes 의 import path 갱신. |
+| **308 alias 제거** | `/api/v1/almanac/[...path]/route.ts` 44줄 삭제 | P3 | ~5분 | Almanac v1.1 frontend cutover 시점. 본 chunk 보류. |
 | **S88-USER-VERIFY** | **사용자 휴대폰 stylelucky4u.com/notes 재검증** | **P0 사용자** | 1분 | 누적 carry-over. |
 | **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 사용자** | 30초 | (S86~S99 미수행) Settings 확인. |
 | **S87-RSS-ACTIVATE** | **anthropic-news active=true** | P2 운영자 | 30분 | 운영자 결정. |
@@ -40,41 +41,47 @@
 | **STYLE-3** | sticky-note-card.tsx:114 endDrag stale closure | P3 sweep | ~15분 | 별도 PR. |
 | **DEBOUNCE-1** | M5 검색 300ms debounce | P3 sweep | ~30분 | UX 개선. |
 | **NEW-BLOCK-UI** | 대화 화면 hover → 차단 진입 메뉴 | P3 sweep | ~30분 | UX 보완. |
+| ~~PLUGIN-MIG-3 본격 (A+B+C)~~ | ~~Almanac 5 routes manifest dispatch 전환~~ | — | — | ✅ **세션 99 후속 완료** (commit `33e6721`, handover `260510-session99-postscript-plugin-mig-3-abc.md`) |
 | ~~PLUGIN-MIG-3 정찰~~ | ~~5 routes + dispatcher 정찰 + chunk A/B/C 설계~~ | — | — | ✅ **세션 99 완료** (handover `260510-session99-plugin-mig-3-recon.md`) |
 
 ### S100 진입 시 첫 행동
 
-1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`)
+1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`) — HEAD 가 `33e6721` (S99 후속) 이상인지 확인. 다른 터미널 commit 흡수.
 2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
-3. **S99 인수인계서 read** — `docs/handover/260510-session99-plugin-mig-3-recon.md` §"다음 작업 제안 (S100)" 의 chunk A/B/C 본격 구현 가이드 그대로 사용 (정찰 비용 회피)
-4. **자율 진입 메모리 적용** (분기 질문 X) — 권장 순서 = chunk A (~30분) → B (~1시간) → C (~30분) 단계별 commit, 각 단계 vitest 회귀 0 검증 후 진행
-5. 또는 사용자 carry-over 처리 우선 (S88-USER-VERIFY 1분 + S86-SEC-1 30초 = 1.5분 비용으로 P0 carry-over 2건 해소)
+3. **S99 후속 인수인계서 read** — `docs/handover/260510-session99-postscript-plugin-mig-3-abc.md` §"다음 작업 제안" 의 PLUGIN-MIG-4 가이드 그대로 사용
+4. **/ypserver 운영 적용 first** (~5분) — PLUGIN-MIG-3 cutover 가 production 에 반영되도록 standalone 빌드 + PM2 restart. dev :3100 smoke 로 dispatcher 메커니즘 검증 완료, production 라이브 검증은 별도. **권장 first action**.
+5. **PLUGIN-MIG-4 자율 진입** (분기 질문 X) — 권장 순서 = models (~6h) → libs 동시 이동 (~2h) → RLS 정책 (~4h) → 라이브 non-BYPASSRLS test (~4h) ≈ 1-2일.
+6. 또는 사용자 carry-over 처리 우선 (S88-USER-VERIFY 1분 + S86-SEC-1 30초 = 1.5분 비용으로 P0 carry-over 2건 해소)
 
-### chunk A/B/C 본격 구현 가이드 (S99 정찰 결과)
+### PLUGIN-MIG-4 본격 구현 가이드 (S99 후속 cutover 후 후속 단계)
 
-**Chunk A — 인프라 (~30분, 0 회귀):**
-1. `packages/core/src/tenant/manifest.ts` — `TenantRouteHandler` 타입 신설 (`(req, user, tenant, params) => Promise<Response>`), `TenantRouteRegistration.path` 의미 재정의 (subPath pattern, 예 "contents"/"items/:slug"), `TenantRouteRegistration.handler` strict typing
-2. `packages/core/src/tenant/dispatcher.ts` — route registry 함수 추가 (manifest.routes 활용 또는 별도 `registerTenantRoutes`)
-3. `src/lib/tenant-router/dispatch.ts` — `HANDLER_TABLE` 제거, `getTenantManifest(tenant.id).routes` lookup → method+pattern 매칭 → dynamic import → handler 호출. `:slug` 동적 param 추출
-4. `src/lib/tenant-router/dispatch.test.ts` — 신규 케이스 (registered tenant + 매칭 / unmatched resource 404 / unmatched method 405 / `:slug` param 추출)
+**Step 1 — 5 모델 fragment 추출 (~6h, P0):**
+1. `prisma/schema.prisma` 에서 5 Content* 모델 (ContentCategory + ContentSource + ContentIngestedItem + ContentItem + ContentItemMetric) 절단 → `packages/tenant-almanac/prisma/fragment.prisma` 로 이동.
+2. `prisma generate` workflow 보강 — fragment 가 글로벌 schema 끝에 append 되도록 (npm script 또는 build hook).
+3. tenantId 컬럼이 5 모델 모두에 첫 컬럼인지 검증 (이미 적용된 모델 있을 가능성 — schema audit). 누락 시 ADD COLUMN + tenantId='almanac' backfill 마이그레이션 작성 → `npx prisma migrate deploy` 즉시 적용 (메모리 `feedback_migration_apply_directly`).
+4. composite unique 검토 — `tenantId_slug` 등 (items[slug] route 가 이미 사용 중).
 
-**Chunk B — 본체 이전 (~1시간, 0 회귀):**
-1. `packages/tenant-almanac/src/lib/cors.ts` — `buildCorsHeaders` + OPTIONS factory 공통화 (5 routes 중복 ~85줄 흡수)
-2. `packages/tenant-almanac/src/routes/categories.ts` (149 → ~80줄)
-3. `packages/tenant-almanac/src/routes/sources.ts` (117 → ~70줄)
-4. `packages/tenant-almanac/src/routes/today-top.ts` (207 → ~150줄)
-5. `packages/tenant-almanac/src/routes/items.ts` (135 → ~90줄, params.slug 추출 시그니처)
-6. `packages/tenant-almanac/src/routes/contents.ts` (253 → ~190줄, audit-log 의존 보존)
-7. `packages/tenant-almanac/manifest.ts` — `routes: []` → 5 entry 등록 (path: "categories" / "sources" / "today-top" / "items/:slug" / "contents")
+**Step 2 — support libs 동시 이동 (~2h, P0):**
+1. `src/lib/aggregator/{dedupe,fetchers,llm,promote,cleanup,types}.ts` → `packages/tenant-almanac/src/lib/`. 모델 import path 1번 정리.
+2. cron handler 6 (rss-fetcher / html-scraper / api-poller / classifier / promoter / cleanup) + 5 routes import path 갱신.
+3. `src/lib/aggregator/runner.ts` 97줄 thin dispatcher 의 `@/lib/aggregator/types` import 도 `@yangpyeon/tenant-almanac/lib/types` 또는 동등 경로로 갱신.
 
-**Chunk C — cutover (~30분, 라이브 검증 필요):**
-1. 5 explicit route.ts 삭제: `src/app/api/v1/t/[tenant]/{categories,sources,today-top,items/[slug],contents}/route.ts`
-2. `npx vitest run` — 821 → 같거나 + 신규 (회귀 0 확인)
-3. `npx tsc --noEmit` — 0 errors 확인
-4. 라이브 smoke (선택): WSL 빌드 + curl 5 routes × GET (ALMANAC_ALLOWED_ORIGINS 헤더 검증)
-5. commit `feat(plugin-mig-3): Almanac 5 라우트 본체 이전 + dispatch registry`
-6. PR 게이트 5 항목 본문 명시 (신규 모델 0 / withTenant 가드 catch-all 단일 적용 / Prisma tenantPrismaFor 패턴 보존 / RLS 변경 0 / timezone 0)
-7. `git push origin spec/aggregator-fixes`
+**Step 3 — RLS 정책 5 모델 + GRANT 검증 (~4h, P0):**
+1. `CREATE POLICY tenant_isolation ON "ContentCategory" USING (tenant_id = current_setting('app.tenant_id'))` 5건 마이그레이션.
+2. app_admin (BYPASSRLS=t) GRANT 검증 — 신규 5 모델에 SELECT/INSERT/UPDATE/DELETE GRANT 추가 (S88 사례 = `app_admin` GRANT 누락 4개월 prod hidden, 메모리 `feedback_grant_check_for_bypassrls_roles` 정합).
+3. ALTER DEFAULT PRIVILEGES 가 신규 모델에도 자동 적용되는지 검증 (S88 마이그레이션 등록분).
+4. `npx prisma migrate deploy` 즉시 적용.
+
+**Step 4 — 라이브 non-BYPASSRLS test (~4h, P0, PR 게이트 #4 필수):**
+1. `tests/almanac/` 신설 — cross-tenant 격리 + composite unique + RLS 격리 시나리오.
+2. WSL 빌드 미러 cp + `bash scripts/run-integration-tests.sh tests/almanac/` 또는 PowerShell `$env:RLS_TEST_DATABASE_URL=...` 후 `npx vitest run tests/almanac/` (메모리 `feedback_wsl2_single_foreground_call` 정합 + S95 정착 절차).
+3. cross-tenant probe = 다른 tenant id 로 조회 시 0 rows 또는 403 검증 (S82 4 latent bug 패턴 재발 차단).
+4. **app_admin 으로 SET ROLE 테스트 1회 통과** (S88 게이트).
+
+**Step 5 — commit + PR 게이트 본문 명시:**
+- commit message = `feat(plugin-mig-4): Almanac 5 모델 fragment + tenantId backfill + RLS + 라이브 통과`
+- PR 게이트 5항목 = 신규 모델 5 (tenantId 첫 컬럼 + composite unique + RLS 5건) / 신규 라우트 0 (PLUGIN-MIG-3 에서 처리) / Prisma closure 보존 / **RLS 라이브 non-BYPASSRLS test PASS** / TZ 0.
+- `git push origin spec/aggregator-fixes` + `/ypserver` 운영 적용.
 
 ### S100+ wave 평가 권장 시점
 
