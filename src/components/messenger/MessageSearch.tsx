@@ -128,7 +128,14 @@ export function MessageSearch({ convId }: MessageSearchProps) {
                           {seg.text}
                         </span>
                       ))
-                    : "(본문 없음)"}
+                    : row.attachments && row.attachments.length > 0
+                      ? null
+                      : "(본문 없음)"}
+                  {row.attachments && row.attachments.length > 0 && (
+                    <span className="ml-1 text-[11px] text-gray-500">
+                      📎 첨부 {row.attachments.length}건
+                    </span>
+                  )}
                 </div>
               </button>
             </li>

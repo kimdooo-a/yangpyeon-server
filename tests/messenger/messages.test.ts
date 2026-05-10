@@ -498,6 +498,153 @@ describe("messenger/messages (env-gated)", () => {
   );
 
   it.skipIf(!fx.hasDb)(
+    "M5-ATTACH-5: searchMessages 응답에 attachments 포함 (캡션 검색어 매치 시)",
+    async () => {
+      const { runWithTenant } = await fx.modules();
+      const alice = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("att-search-a"),
+      });
+      const bob = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("att-search-b"),
+      });
+      const conv = await createConversation({
+        tenantId: TENANTS.a,
+        kind: "DIRECT",
+        creatorId: alice.id,
+        memberIds: [alice.id, bob.id],
+      });
+      const { fileId } = await seedFile({
+        tenantId: TENANTS.a,
+        ownerId: alice.id,
+      });
+
+      await runWithTenant({ tenantId: TENANTS.a }, async () => {
+        const r = await messages.sendMessage({
+          conversationId: conv.id,
+          senderId: alice.id,
+          kind: "IMAGE",
+          body: "오늘의 사진_attachsearch_marker",
+          clientGeneratedId: randomUUID(),
+          attachments: [{ fileId, kind: "IMAGE", displayOrder: 0 }],
+        });
+        expect(r.created).toBe(true);
+
+        const search = await messages.searchMessages({
+          searcherId: alice.id,
+          q: "attachsearch_marker",
+          limit: 30,
+        });
+        expect(search.items).toHaveLength(1);
+        expect(search.items[0].id).toBe(r.message.id);
+        expect(search.items[0].attachments).toHaveLength(1);
+        expect(search.items[0].attachments[0].fileId).toBe(fileId);
+        expect(search.items[0].attachments[0].kind).toBe("IMAGE");
+      });
+    },
+  );
+
+  it.skipIf(!fx.hasDb)(
+    "M5-ATTACH-5: 30일 cron deref 시나리오 — recall 후 cutoff 경과 시 attachments DELETE, 미경과 시 보존",
+    async () => {
+      const { runWithTenant } = await fx.modules();
+      const { runMessengerAttachmentCleanup } = await import(
+        "@/lib/messenger/attachment-cleanup"
+      );
+      const alice = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("att-deref-a"),
+      });
+      const bob = await createUser({
+        tenantId: TENANTS.a,
+        email: uniqueEmail("att-deref-b"),
+      });
+      const conv = await createConversation({
+        tenantId: TENANTS.a,
+        kind: "DIRECT",
+        creatorId: alice.id,
+        memberIds: [alice.id, bob.id],
+      });
+      const { fileId: fileOld } = await seedFile({
+        tenantId: TENANTS.a,
+        ownerId: alice.id,
+      });
+      const { fileId: fileFresh } = await seedFile({
+        tenantId: TENANTS.a,
+        ownerId: alice.id,
+      });
+
+      // 1) 메시지 2개 송신 (각 첨부 1개) — 기본은 deletedAt=NULL.
+      const sentOld = await runWithTenant(
+        { tenantId: TENANTS.a },
+        async () => {
+          return messages.sendMessage({
+            conversationId: conv.id,
+            senderId: alice.id,
+            kind: "IMAGE",
+            body: null,
+            clientGeneratedId: randomUUID(),
+            attachments: [{ fileId: fileOld, kind: "IMAGE", displayOrder: 0 }],
+          });
+        },
+      );
+      const sentFresh = await runWithTenant(
+        { tenantId: TENANTS.a },
+        async () => {
+          return messages.sendMessage({
+            conversationId: conv.id,
+            senderId: alice.id,
+            kind: "IMAGE",
+            body: null,
+            clientGeneratedId: randomUUID(),
+            attachments: [
+              { fileId: fileFresh, kind: "IMAGE", displayOrder: 0 },
+            ],
+          });
+        },
+      );
+
+      // 2) admin pool 로 deletedAt 직접 조작 — sentOld 는 31일 전, sentFresh 는 5일 전.
+      const pool = await getAdminPool();
+      const oldCutoff = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+      const freshCutoff = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+      await pool.query(
+        `UPDATE messages SET deleted_at = $1, deleted_by = 'self', body = NULL WHERE id = $2`,
+        [oldCutoff, sentOld.message.id],
+      );
+      await pool.query(
+        `UPDATE messages SET deleted_at = $1, deleted_by = 'self', body = NULL WHERE id = $2`,
+        [freshCutoff, sentFresh.message.id],
+      );
+
+      // 3) cron deref 실행 (default retentionDays=30).
+      const result = await runMessengerAttachmentCleanup({
+        tenantId: TENANTS.a,
+      });
+      expect(result.dereferenced).toBeGreaterThanOrEqual(1);
+
+      // 4) sentOld 는 attachments 0건, sentFresh 는 1건 보존.
+      const remainingOld = await pool.query(
+        `SELECT id FROM message_attachments WHERE message_id = $1`,
+        [sentOld.message.id],
+      );
+      const remainingFresh = await pool.query(
+        `SELECT id FROM message_attachments WHERE message_id = $1`,
+        [sentFresh.message.id],
+      );
+      expect(remainingOld.rows).toHaveLength(0);
+      expect(remainingFresh.rows).toHaveLength(1);
+
+      // 5) tenant_b context 의 동일 cleanup 호출 = 0 row (cross-tenant 격리).
+      const tenantBResult = await runMessengerAttachmentCleanup({
+        tenantId: TENANTS.b,
+      });
+      expect(tenantBResult.dereferenced).toBe(0);
+    },
+  );
+
+  it.skipIf(!fx.hasDb)(
     "sendMessage: 차단된 사용자 mention 은 mention row INSERT skip",
     async () => {
       const { runWithTenant, prismaWithTenant } = await fx.modules();
