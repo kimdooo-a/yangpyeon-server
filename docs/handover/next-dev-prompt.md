@@ -27,7 +27,9 @@
 
 - **검증**: tsc 신규 0 + 사전 0 / vitest unit 169/169 PASS (composer-logic + bubble-variant + 13 file 회귀) / 라이브 vitest 누적 34 PASS (attachment-cleanup 6 + messages 15 + rls 13) / origin push `ee82c8c..a9aeede..da8786b`.
 
-- **터치 안 함**: file-upload-zone.tsx → attachment-upload utility 마이그레이션 (별도 sweep) / 사용자 P0 carry-over (S88-USER-VERIFY 사용자 / S88-OPS-LIVE 운영자 / S86-SEC-1 운영자) / DB password 회전 / S87 carry-over (S87-CK-MEMORY 메모리 룰 승격, S87-RSS-ACTIVATE, S87-TZ-MONITOR) / cron 활성화 (운영자 검토 대기).
+- **터치 안 함**: file-upload-zone.tsx → attachment-upload utility 마이그레이션 (별도 sweep) / 사용자 P0 carry-over (S88-USER-VERIFY 사용자 / ~~S88-OPS-LIVE~~ ✅ PASS 후속-2 / S86-SEC-1 운영자) / DB password 회전 / S87 carry-over (S87-CK-MEMORY 메모리 룰 승격, S87-RSS-ACTIVATE, S87-TZ-MONITOR) / cron 활성화 (운영자 검토 대기).
+
+- **세션 96 후속-2 (verification-only, 코드 변경 0)**: 사용자 "내가 해야할 것은?" 분기에서 S88-OPS-LIVE 가 Claude 직접 가능 영역임을 확인 → WSL pm2 log timeline correlation 으로 라이브 검증. 마지막 ACL 에러 5/5 08:51:58 KST → 마이그레이션 적용 5/5 08:57:15 KST (5분 17초 간격) → 5일+ 0 errors. solution `2026-05-10-ops-live-verification-by-pm2-log-correlation.md` (Compound Knowledge: 라이브 호출 없이 timeline 으로 fix 인과 검증 패턴).
 
 ---
 
@@ -42,7 +44,7 @@
 | **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
 | **FILEBOX-MIGRATE** | **file-upload-zone.tsx → attachment-upload.ts utility 통합** | P3 sweep | ~30분 | 결합 0 유지하며 단일 utility 로 마이그레이션 (filebox 측 변경). 별도 commit. |
 | **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도** | **P0 사용자** | 1분 | S88+S89+S90 8 위치 silent catch 표면화 + S91 origin push 후 final 검증. |
-| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** | **P1 운영자** | ~30분 | Webhooks/SQL Editor/Cron 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터. |
+| ~~S88-OPS-LIVE~~ | ~~다른 ops 콘솔 라이브 호출~~ | — | — | ✅ **세션 96 후속-2 verification 완료** (PM2 log timeline correlation, 마지막 ACL 에러 5/5 08:51:58 KST → S88 migration `20260505000000_grant_app_admin_all_public` 적용 5/5 08:57:15 KST → 5일+ 0 errors. 4 latent bug 시그 모두 무발생, RLS/timezone/Prisma @map/Unhandled/5xx 0건. ypserver online 5일 unstable_restarts=0. baseline 호출 `/auth/me` + `/messenger/conversations` + cross-tenant probe 모두 401 정상 ≤10ms.) |
 | **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86~S96 미수행) Settings 확인. public 이면 비밀번호 회전 권고 강화. |
 | ~~M5-ATTACH-2~~ | ~~30일 첨부 dereference cron~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `6bb29c7`) |
 | ~~M5-ATTACH-3b~~ | ~~MessageComposer 첨부 UI 통합~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `7ceb075`) |
@@ -59,8 +61,9 @@
 2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
 3. **S97-WAVE-EVAL 진입 권장** — `kdywavecompletion --compare session-92` 호출. M4 Phase 2 완주 + S82 trivially-pass 차단 + 거버넌스 단언 sunset 효과 정량화. wave-tracker §0 갱신 자료 산출.
 4. 또는 P2 sweep 일괄 진입 (`S87-CK-MEMORY` ~30분 + `S87-RSS-ACTIVATE` 운영자 결정 + `CRON-ACTIVATE` 1분 + `FILEBOX-MIGRATE` ~30분).
-5. P0 운영자 carry-over: S88-USER-VERIFY + S88-OPS-LIVE + S86-SEC-1.
+5. P0/P1 carry-over 잔여: **S88-USER-VERIFY** (사용자 휴대폰) + **S86-SEC-1** (사용자 GitHub Settings). ~~S88-OPS-LIVE~~ 는 세션 96 후속-2에서 Claude 직접 검증 PASS (PM2 log timeline correlation).
 6. **거버넌스 단언 sunset 후 정책**: 자율 실행 메모리(`feedback_autonomy.md`) 일반 적용. 다음 작업 진입 시 분기 질문 없이 권장안 즉시 채택. 긴급 사고만 사용자 확인 필수.
+7. **운영자-only 라벨 재검증**: S88-OPS-LIVE 가 사실은 Claude 직접 가능 영역이었던 것처럼, 다른 "운영자 carry-over" 도 WSL/DB 직접 호출로 해소 가능 여부 재평가 권장. 정적 audit + log timeline 으로 라이브 호출 없이 검증 가능한 패턴이 있음.
 
 ### S97 wave 평가 권장 시점
 
