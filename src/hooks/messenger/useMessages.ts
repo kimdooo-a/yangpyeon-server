@@ -3,18 +3,18 @@
 /**
  * useMessages — 단일 conversation 의 메시지 stream + 낙관적 송신 + SSE 실시간 수신.
  *
- * Phase 1:
- *   - keyset cursor 첫 페이지 (limit 30) 만 로드.
- *   - 역방향 무한스크롤 = F2-5+ (Phase 1.x).
+ * INFRA-2 (S98) — useState/useEffect/fetch → SWR 마이그레이션:
+ *   - 캐시 dedup: 같은 conversation 다중 호출자가 fetch 1회 공유
+ *   - mutate(updater, { revalidate: false }) 으로 sendOptimistic / SSE 이벤트 둘 다 동일 패턴
+ *   - 시그니처 보존 (page.tsx 변경 0)
  *
- * Phase 2 (F2-2):
- *   - sendOptimistic: prepend → POST → 201 swap / 4xx-5xx mark failed.
- *   - retry: 같은 clientGeneratedId 로 재호출 시 server 멱등성 (UNIQUE 인덱스) 의존.
+ * Phase 1: keyset cursor 첫 페이지 (limit 30) 만 로드. 역방향 무한스크롤 = F2-5+.
  *
- * Phase 2 (F2-4 — INFRA-1 동반):
- *   - SSE wiring: use-sse hook 으로 events route 구독 → message.created/updated/deleted
- *     applyEventToMessages reducer 로 cache 변형. clientGeneratedId 매칭 시 optimistic swap.
- *   - SWR 도입은 별도 chunk (현재는 useState/useEffect 패턴 유지).
+ * Phase 2 (F2-2): sendOptimistic = prepend → POST → 201 swap / 4xx-5xx mark failed.
+ *   server `(tenantId, conversationId, clientGeneratedId)` UNIQUE 멱등 의존.
+ *
+ * Phase 2 (F2-4): SSE wiring — message.created/updated/deleted 만 cache 변형.
+ *   typing/receipt/member 이벤트는 trail (별도 hook 분리 예정).
  *
  * tenantSlug = 'default' 하드코드 (multi-tenant routing 도입 전).
  *
@@ -24,7 +24,8 @@
  *
  *   items 는 desc(createdAt) — 컴포넌트 레벨에서 reverse 해 표시.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import useSWR from "swr";
 import {
   buildOptimisticMessage,
   prependOptimistic,
@@ -75,56 +76,63 @@ interface UseMessagesResult {
   ) => Promise<SendOptimisticResult>;
 }
 
+/** SWR 캐시에 저장하는 단위 — items 와 함께 nextCursor / hasMore 보존. */
+interface MessagesCache {
+  items: MessageRow[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 const TENANT_SLUG = "default";
 
-export function useMessages(conversationId: string): UseMessagesResult {
-  const [messages, setMessages] = useState<MessageRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(false);
+function messagesUrl(conversationId: string): string {
+  return `/api/v1/t/${TENANT_SLUG}/messenger/conversations/${conversationId}/messages?limit=30`;
+}
 
-  useEffect(() => {
-    if (!conversationId) {
-      setMessages([]);
-      setLoading(false);
-      return;
-    }
-    let disposed = false;
-    setLoading(true);
-    setError(null);
-    fetch(
-      `/api/v1/t/${TENANT_SLUG}/messenger/conversations/${conversationId}/messages?limit=30`,
-    )
-      .then((res) => res.json())
-      .then((json) => {
-        if (disposed) return;
-        if (!json?.success) {
-          setError(json?.error?.message ?? "fetch 실패");
-          return;
-        }
-        const rows: MessageRow[] = json.data?.items ?? [];
-        setMessages(rows);
-        setHasMore(Boolean(json.data?.hasMore));
-      })
-      .catch((e) => {
-        if (disposed) return;
-        setError(e instanceof Error ? e.message : "네트워크 오류");
-      })
-      .finally(() => {
-        if (!disposed) setLoading(false);
-      });
-    return () => {
-      disposed = true;
-    };
-  }, [conversationId]);
+async function fetchMessages(url: string): Promise<MessagesCache> {
+  const res = await fetch(url);
+  const json = await res.json().catch(() => null);
+  if (!json?.success) {
+    throw new Error(json?.error?.message ?? `HTTP ${res.status}`);
+  }
+  return {
+    items: (json.data?.items ?? []) as MessageRow[],
+    nextCursor: (json.data?.nextCursor ?? null) as string | null,
+    hasMore: Boolean(json.data?.hasMore),
+  };
+}
+
+const EMPTY_CACHE: MessagesCache = { items: [], nextCursor: null, hasMore: false };
+
+/** items 만 변형하는 reducer 를 SWR mutate updater 로 변환. */
+function withItems(updater: (items: MessageRow[]) => MessageRow[]) {
+  return (current?: MessagesCache): MessagesCache => {
+    const base = current ?? EMPTY_CACHE;
+    return { ...base, items: updater(base.items) };
+  };
+}
+
+export function useMessages(conversationId: string): UseMessagesResult {
+  const swrKey = conversationId ? messagesUrl(conversationId) : null;
+  const { data, error, isLoading, mutate } = useSWR<MessagesCache, Error>(
+    swrKey,
+    fetchMessages,
+  );
 
   const sendOptimistic = useCallback(
     async (
       payload: SendOptimisticPayload,
       senderId: string,
     ): Promise<SendOptimisticResult> => {
+      if (!conversationId) {
+        return { ok: false, error: "대화 미선택" };
+      }
       const optimistic = buildOptimisticMessage({ payload, senderId });
-      setMessages((prev) => prependOptimistic(prev, optimistic));
+      // 1. 즉시 prepend (UX)
+      await mutate(
+        withItems((items) => prependOptimistic(items, optimistic)),
+        { revalidate: false },
+      );
 
       try {
         const res = await fetch(
@@ -135,40 +143,55 @@ export function useMessages(conversationId: string): UseMessagesResult {
             body: JSON.stringify(payload),
           },
         );
-        const json = await res.json();
+        const json = await res.json().catch(() => null);
         if (!res.ok || !json?.success) {
           const errMsg =
             json?.error?.message ?? `송신 실패 (HTTP ${res.status})`;
-          setMessages((prev) =>
-            markOptimisticFailed(prev, payload.clientGeneratedId, errMsg),
+          await mutate(
+            withItems((items) =>
+              markOptimisticFailed(items, payload.clientGeneratedId, errMsg),
+            ),
+            { revalidate: false },
           );
           return { ok: false, error: errMsg };
         }
         const serverMsg: MessageRow | undefined = json.data?.message;
         if (!serverMsg) {
           const errMsg = "서버 응답 누락";
-          setMessages((prev) =>
-            markOptimisticFailed(prev, payload.clientGeneratedId, errMsg),
+          await mutate(
+            withItems((items) =>
+              markOptimisticFailed(items, payload.clientGeneratedId, errMsg),
+            ),
+            { revalidate: false },
           );
           return { ok: false, error: errMsg };
         }
-        setMessages((prev) =>
-          replaceOptimisticWithServer(prev, payload.clientGeneratedId, serverMsg),
+        await mutate(
+          withItems((items) =>
+            replaceOptimisticWithServer(
+              items,
+              payload.clientGeneratedId,
+              serverMsg,
+            ),
+          ),
+          { revalidate: false },
         );
         return { ok: true };
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : "네트워크 오류";
-        setMessages((prev) =>
-          markOptimisticFailed(prev, payload.clientGeneratedId, errMsg),
+        await mutate(
+          withItems((items) =>
+            markOptimisticFailed(items, payload.clientGeneratedId, errMsg),
+          ),
+          { revalidate: false },
         );
         return { ok: false, error: errMsg };
       }
     },
-    [conversationId],
+    [conversationId, mutate],
   );
 
   // F2-4 — SSE 실시간 수신. message.created/updated/deleted 만 cache 변형.
-  // typing/receipt/member 이벤트는 추후 trail (별도 hook 분리 예정).
   const sseUrl = conversationId
     ? `/api/v1/t/${TENANT_SLUG}/messenger/conversations/${conversationId}/events`
     : null;
@@ -181,11 +204,21 @@ export function useMessages(conversationId: string): UseMessagesResult {
       ) {
         return;
       }
-      setMessages((prev) => applyEventToMessages([event], prev));
+      void mutate(
+        withItems((items) => applyEventToMessages([event], items)),
+        { revalidate: false },
+      );
     },
-    [],
+    [mutate],
   );
   const { connected: sseConnected } = useSse(sseUrl, handleSseEvent);
 
-  return { messages, loading, error, hasMore, sseConnected, sendOptimistic };
+  return {
+    messages: data?.items ?? [],
+    loading: isLoading,
+    error: error ? error.message : null,
+    hasMore: data?.hasMore ?? false,
+    sseConnected,
+    sendOptimistic,
+  };
 }
