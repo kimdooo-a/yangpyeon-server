@@ -38,7 +38,6 @@ import {
   StickyNote,
   MessageCircle,
   Bell,
-  Activity,
 } from "lucide-react";
 
 type NavItem = {
@@ -61,11 +60,14 @@ const navItems: NavItem[] = [
   { href: "/notes", label: "메모", icon: <StickyNote size={18} />, group: "콘텐츠" },
   { href: "/members", label: "회원 관리", icon: <IconMembers size={18} />, group: "콘텐츠" },
 
-  // 커뮤니케이션 — Track C Messenger Phase 1 M4 UI 진입 (S84-F1)
+  // 커뮤니케이션 — Track C Messenger Phase 1 (S84-F1 시작 → S96 NAV-INTEGRATE 정합)
+  // S96: 사이드바 항목을 실제 라우트와 정합. 기존 /messenger/settings (없음), /admin/messenger/* (없음)
+  // 제거. 실제 경로: /messenger/notification-preferences (S94), /messenger/blocked-users (S94),
+  // /messenger/admin/reports (S94 운영자 패널).
   { href: "/messenger", label: "대화", icon: <MessageCircle size={18} />, group: "커뮤니케이션" },
-  { href: "/messenger/settings", label: "알림 설정", icon: <Bell size={18} />, group: "커뮤니케이션" },
-  { href: "/admin/messenger/moderation", label: "신고/차단 운영", icon: <ShieldCheck size={18} />, group: "커뮤니케이션" },
-  { href: "/admin/messenger/health", label: "메신저 헬스", icon: <Activity size={18} />, group: "커뮤니케이션" },
+  { href: "/messenger/notification-preferences", label: "알림 설정", icon: <Bell size={18} />, group: "커뮤니케이션" },
+  { href: "/messenger/blocked-users", label: "차단 관리", icon: <Lock size={18} />, group: "커뮤니케이션" },
+  { href: "/messenger/admin/reports", label: "신고 운영", icon: <ShieldCheck size={18} />, group: "커뮤니케이션" },
 
   // 데이터베이스 (신규 — 세션 14)
   { href: "/tables", label: "테이블 에디터", icon: <Table2 size={18} />, group: "데이터베이스" },
@@ -107,7 +109,6 @@ const ADMIN_ONLY_PATHS = [
   "/members",
   "/functions",
   "/database/backups",
-  "/admin/messenger/health",
 ];
 
 /** MANAGER 이상만 접근 가능한 경로 */
@@ -121,7 +122,7 @@ const MANAGER_PLUS_PATHS = [
   "/realtime",
   "/advisors/security",
   "/advisors/performance",
-  "/admin/messenger/moderation",
+  "/messenger/admin/reports",
 ];
 
 const GROUP_ORDER = [

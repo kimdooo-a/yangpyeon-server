@@ -50,11 +50,15 @@ let prismaWithTenant: PrismaWithTenantModule["prismaWithTenant"];
 let runWithTenant: TenantContextModule["runWithTenant"];
 let adminPool: PgPool | null = null;
 let userIdA: string;
+let userIdA2: string; // M5-ATTACH-6 — mention/block 의미 있는 시나리오 위해 보조 사용자.
 let userIdB: string;
+let userIdB2: string;
 let convIdA: string;
 let convIdB: string;
 let msgIdA: string;
 let msgIdB: string;
+let fileIdA: string;
+let fileIdB: string;
 
 async function loadModules() {
   if (!HAS_DB) return;
@@ -82,6 +86,31 @@ async function bootstrap() {
 async function reseed() {
   if (!adminPool) return;
   // 메신저 데이터 cleanup (tenant_a / tenant_b 만, RLS BYPASS 로).
+  // M5-ATTACH-6 (S96): 6 모델 추가 — children → parents FK 순서 엄수.
+  await adminPool.query(
+    `DELETE FROM notification_preferences WHERE tenant_id IN ($1, $2)`,
+    [TENANTS.a, TENANTS.b],
+  );
+  await adminPool.query(
+    `DELETE FROM abuse_reports WHERE tenant_id IN ($1, $2)`,
+    [TENANTS.a, TENANTS.b],
+  );
+  await adminPool.query(
+    `DELETE FROM user_blocks WHERE tenant_id IN ($1, $2)`,
+    [TENANTS.a, TENANTS.b],
+  );
+  await adminPool.query(
+    `DELETE FROM message_receipts WHERE tenant_id IN ($1, $2)`,
+    [TENANTS.a, TENANTS.b],
+  );
+  await adminPool.query(
+    `DELETE FROM message_attachments WHERE tenant_id IN ($1, $2)`,
+    [TENANTS.a, TENANTS.b],
+  );
+  await adminPool.query(
+    `DELETE FROM message_mentions WHERE tenant_id IN ($1, $2)`,
+    [TENANTS.a, TENANTS.b],
+  );
   await adminPool.query(
     `DELETE FROM messages WHERE tenant_id IN ($1, $2)`,
     [TENANTS.a, TENANTS.b],
@@ -95,25 +124,63 @@ async function reseed() {
     [TENANTS.a, TENANTS.b],
   );
   await adminPool.query(
-    `DELETE FROM users WHERE email IN ('msg-a@x.com', 'msg-b@x.com')`,
+    `DELETE FROM files WHERE tenant_id IN ($1, $2) AND stored_name LIKE 'rls-test-%'`,
+    [TENANTS.a, TENANTS.b],
+  );
+  await adminPool.query(
+    `DELETE FROM folders WHERE tenant_id IN ($1, $2) AND name LIKE 'rls-test-%'`,
+    [TENANTS.a, TENANTS.b],
+  );
+  await adminPool.query(
+    `DELETE FROM users WHERE email IN ('msg-a@x.com', 'msg-a2@x.com', 'msg-b@x.com', 'msg-b2@x.com')`,
   );
 
   // adminPool 이 any 이므로 row 결과를 명시 캐스트.
   type Row = { id: string; tenant_id: string };
 
-  // user_a / user_b 1명씩.
+  // M5-ATTACH-6: tenant 당 user 2명 (mention/block 시나리오 의미 있는 최소 셋업).
   const u = await adminPool.query(
     `INSERT INTO users (id, tenant_id, email, password_hash, created_at, updated_at)
-     VALUES (gen_random_uuid(), $1, 'msg-a@x.com', 'h', NOW(), NOW()),
-            (gen_random_uuid(), $2, 'msg-b@x.com', 'h', NOW(), NOW())
-     RETURNING id, tenant_id`,
+     VALUES (gen_random_uuid(), $1, 'msg-a@x.com',  'h', NOW(), NOW()),
+            (gen_random_uuid(), $1, 'msg-a2@x.com', 'h', NOW(), NOW()),
+            (gen_random_uuid(), $2, 'msg-b@x.com',  'h', NOW(), NOW()),
+            (gen_random_uuid(), $2, 'msg-b2@x.com', 'h', NOW(), NOW())
+     RETURNING id, tenant_id, email`,
     [TENANTS.a, TENANTS.b],
   );
-  const uRows = u.rows as Row[];
-  userIdA = uRows.find((r) => r.tenant_id === TENANTS.a)!.id;
-  userIdB = uRows.find((r) => r.tenant_id === TENANTS.b)!.id;
+  const uRows = u.rows as Array<Row & { email: string }>;
+  userIdA = uRows.find((r) => r.email === "msg-a@x.com")!.id;
+  userIdA2 = uRows.find((r) => r.email === "msg-a2@x.com")!.id;
+  userIdB = uRows.find((r) => r.email === "msg-b@x.com")!.id;
+  userIdB2 = uRows.find((r) => r.email === "msg-b2@x.com")!.id;
 
-  // conv_a / conv_b 각 1개 (DIRECT, member 1명만 — 멤버 검증은 RLS 와 별개).
+  // folders + files (message_attachments FK 위해 필요).
+  const fo = await adminPool.query(
+    `INSERT INTO folders (id, tenant_id, name, parent_id, owner_id, is_root, created_at, updated_at)
+     VALUES (gen_random_uuid(), $1, 'rls-test-folder-a', NULL, $3, false, NOW(), NOW()),
+            (gen_random_uuid(), $2, 'rls-test-folder-b', NULL, $4, false, NOW(), NOW())
+     RETURNING id, tenant_id`,
+    [TENANTS.a, TENANTS.b, userIdA, userIdB],
+  );
+  const foRows = fo.rows as Row[];
+  const folderIdA = foRows.find((r) => r.tenant_id === TENANTS.a)!.id;
+  const folderIdB = foRows.find((r) => r.tenant_id === TENANTS.b)!.id;
+
+  const fi = await adminPool.query(
+    `INSERT INTO files (id, tenant_id, original_name, stored_name, size, mime_type,
+                        folder_id, owner_id, created_at, updated_at)
+     VALUES (gen_random_uuid(), $1, 'a.png', 'rls-test-stored-a', 100, 'image/png',
+             $3, $5, NOW(), NOW()),
+            (gen_random_uuid(), $2, 'b.png', 'rls-test-stored-b', 100, 'image/png',
+             $4, $6, NOW(), NOW())
+     RETURNING id, tenant_id`,
+    [TENANTS.a, TENANTS.b, folderIdA, folderIdB, userIdA, userIdB],
+  );
+  const fiRows = fi.rows as Row[];
+  fileIdA = fiRows.find((r) => r.tenant_id === TENANTS.a)!.id;
+  fileIdB = fiRows.find((r) => r.tenant_id === TENANTS.b)!.id;
+
+  // conv_a / conv_b 각 1개 (DIRECT).
   const c = await adminPool.query(
     `INSERT INTO conversations (id, tenant_id, kind, created_by_id, created_at, updated_at)
      VALUES (gen_random_uuid(), $1, 'DIRECT', $3, NOW(), NOW()),
@@ -124,6 +191,25 @@ async function reseed() {
   const cRows = c.rows as Row[];
   convIdA = cRows.find((r) => r.tenant_id === TENANTS.a)!.id;
   convIdB = cRows.find((r) => r.tenant_id === TENANTS.b)!.id;
+
+  // M5-ATTACH-6: conversation_members (각 tenant 2명).
+  await adminPool.query(
+    `INSERT INTO conversation_members (id, tenant_id, conversation_id, user_id, role, joined_at)
+     VALUES (gen_random_uuid(), $1, $3, $5, 'OWNER',  NOW()),
+            (gen_random_uuid(), $1, $3, $6, 'MEMBER', NOW()),
+            (gen_random_uuid(), $2, $4, $7, 'OWNER',  NOW()),
+            (gen_random_uuid(), $2, $4, $8, 'MEMBER', NOW())`,
+    [
+      TENANTS.a,
+      TENANTS.b,
+      convIdA,
+      convIdB,
+      userIdA,
+      userIdA2,
+      userIdB,
+      userIdB2,
+    ],
+  );
 
   // msg_a / msg_b 각 1개.
   const m = await adminPool.query(
@@ -139,6 +225,64 @@ async function reseed() {
   const mRows = m.rows as Row[];
   msgIdA = mRows.find((r) => r.tenant_id === TENANTS.a)!.id;
   msgIdB = mRows.find((r) => r.tenant_id === TENANTS.b)!.id;
+
+  // M5-ATTACH-6: message_attachments (각 tenant 1개).
+  await adminPool.query(
+    `INSERT INTO message_attachments (id, tenant_id, message_id, file_id, kind, display_order)
+     VALUES (gen_random_uuid(), $1, $3, $5, 'IMAGE', 0),
+            (gen_random_uuid(), $2, $4, $6, 'IMAGE', 0)`,
+    [TENANTS.a, TENANTS.b, msgIdA, msgIdB, fileIdA, fileIdB],
+  );
+
+  // M5-ATTACH-6: message_mentions (each tenant: msg → userIdA2/userIdB2 mention).
+  await adminPool.query(
+    `INSERT INTO message_mentions (id, tenant_id, message_id, mentioned_user_id, created_at)
+     VALUES (gen_random_uuid(), $1, $3, $5, NOW()),
+            (gen_random_uuid(), $2, $4, $6, NOW())`,
+    [TENANTS.a, TENANTS.b, msgIdA, msgIdB, userIdA2, userIdB2],
+  );
+
+  // M5-ATTACH-6: message_receipts (각 tenant: userIdA/B 가 자기 msg 읽음).
+  await adminPool.query(
+    `INSERT INTO message_receipts (tenant_id, conversation_id, user_id, last_read_message_id, updated_at)
+     VALUES ($1, $3, $5, $7, NOW()),
+            ($2, $4, $6, $8, NOW())`,
+    [
+      TENANTS.a,
+      TENANTS.b,
+      convIdA,
+      convIdB,
+      userIdA,
+      userIdB,
+      msgIdA,
+      msgIdB,
+    ],
+  );
+
+  // M5-ATTACH-6: user_blocks (각 tenant: userIdA blocks userIdA2 / userIdB blocks userIdB2).
+  await adminPool.query(
+    `INSERT INTO user_blocks (id, tenant_id, blocker_id, blocked_id, created_at)
+     VALUES (gen_random_uuid(), $1, $3, $4, NOW()),
+            (gen_random_uuid(), $2, $5, $6, NOW())`,
+    [TENANTS.a, TENANTS.b, userIdA, userIdA2, userIdB, userIdB2],
+  );
+
+  // M5-ATTACH-6: abuse_reports (각 tenant: userIdA reports msgIdA / userIdB reports msgIdB).
+  await adminPool.query(
+    `INSERT INTO abuse_reports (id, tenant_id, reporter_id, target_kind, target_id, reason, status, created_at)
+     VALUES (gen_random_uuid(), $1, $3, 'MESSAGE', $5, 'spam', 'OPEN', NOW()),
+            (gen_random_uuid(), $2, $4, 'MESSAGE', $6, 'spam', 'OPEN', NOW())`,
+    [TENANTS.a, TENANTS.b, userIdA, userIdB, msgIdA, msgIdB],
+  );
+
+  // M5-ATTACH-6: notification_preferences (각 tenant: userIdA/B 1건).
+  // PK = (tenant_id, user_id), id 컬럼 없음.
+  await adminPool.query(
+    `INSERT INTO notification_preferences (tenant_id, user_id, mentions_only, push_enabled, updated_at)
+     VALUES ($1, $3, false, true, NOW()),
+            ($2, $4, false, true, NOW())`,
+    [TENANTS.a, TENANTS.b, userIdA, userIdB],
+  );
 }
 
 beforeAll(async () => {
@@ -233,10 +377,16 @@ describe("Messenger RLS — cross-tenant isolation (env-gated)", () => {
     "abuseReport",
     "notificationPreference",
   ] as const)("M5-%s: cross-tenant leak 0 (메신저 9 model)", async (model) => {
+    // M5-ATTACH-6 (S96): bootstrap 시드 강화로 trivially-pass 차단.
+    //   - 각 model 은 tenant_a 에 1+ row 시드됨 → length === 0 이면 RLS 가
+    //     양 tenant 의 row 를 모두 가렸거나 시드 누락 → 둘 다 회귀.
+    //   - rows 안 모든 tenantId === TENANTS.a → cross-tenant 침투 0 보장.
     await runWithTenant({ tenantId: TENANTS.a }, async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const client = prismaWithTenant as any;
       const rows: Array<{ tenantId: string }> = await client[model].findMany();
+      // 능동 단언: 시드된 1+ row 가 보여야 한다 (없으면 vacuous truth 가능성 차단).
+      expect(rows.length).toBeGreaterThanOrEqual(1);
       for (const row of rows) {
         expect(row.tenantId).toBe(TENANTS.a);
       }

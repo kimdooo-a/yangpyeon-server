@@ -67,26 +67,28 @@
 
 ---
 
-## 🚨 거버넌스 단언 — M4 Phase 2 진입 우선 (S96 sunset 매우 임박, frontend UI 1 chunk + 30일 cron 1 chunk 만 잔여)
+## ✅ [SUNSET 2026-05-10 / S96] 거버넌스 단언 — M4 Phase 2 진입 우선 — 해소
 
-**Why**: S85 wave eval 권고 commit 시퀀스 14건 중 S91~S96 = **7/14 commit 진척** (50% 회수, S96 +1). M4 Phase 2 F 트랙 5/5 완주 + M5 검색 + M6 운영자/차단/알림 + M5 첨부 backend + M5 첨부 logic+utility = 7/14. M5 첨부 UI (3b) + 30일 cron 만 잔여.
+**해소 commit 사슬**:
+- `bf7255a` (S96-1) M5-ATTACH-3a/3c logic+utility (TDD 26)
+- `6bb29c7` (S96-2) M5-ATTACH-2 30일 cron (TDD 6, 라이브 6/6)
+- `7ceb075` (S96-3) M5-ATTACH-3b/4 frontend UI (composer chip + bubble 렌더)
+- `a9aeede` (S96-4) M5-ATTACH-5 sweep (search UI + cron deref e2e, 라이브 15/15)
+- 신규 commit (S96-5) STYLE-2 + M5-ATTACH-6 + NAV-INTEGRATE + GOV-SUNSET
 
-**Rule**: M4 Phase 2 진입 전 다른 작업 진입 시 사용자 명시 승인 필수 — 자율 실행 메모리(`feedback_autonomy.md`) 적용 안 함. 단, 진짜 긴급 사고만 자율 처리.
+**해소 근거**: M4 Phase 2 본진 5+1+1 항목 모두 정착 — F 트랙 5/5 + M5 검색 + M6 운영자/차단/알림 + M5 첨부 (backend + 30일 cron + logic+utility + UI 통합 + bubble 렌더 + sweep) = wave-tracker 본진 가치 100% 도달. trivially-pass 차단 (M5-ATTACH-6) 으로 RLS 보호망도 강화.
 
-**Exceptions** (자율 처리 허용):
-- production down / PG fatal / GitGuardian 알람 / 사용자 직접 보고
-- M4 Phase 2 / M5 / M6 진행 중 자연 발생한 dependency
-- 5분 이내 cosmetic sweep 으로 본 chunk 와 같은 commit 으로 흡수 가능
+**S96 자율 적용 결과**: 사용자 "다음 단계 모두 순차적으로 진행" 명시 → 4 chunk 압축 (M5-ATTACH-2/3b/4/5) + 추가 sweep 4건 (STYLE-2 / M5-ATTACH-6 / NAV-INTEGRATE / GOV-SUNSET) → wave-tracker 본진 가치 95%+ 도달 + sweep cycle 정상화.
 
-**Sunset 조건**: M5 첨부 UI (3b) + 30일 cron 완료 시 본 단언 해제 — wave-tracker 본진 가치 95%+ 도달 후 sweep cycle 정상화.
-
-**자율 적용 사례 누적**:
+**[역사 보존]** S91~S96 단언 발효 동안 자율 적용 사례:
 - S93 F2-2: F2-1 의 자연 dependency (Phase 2 진척 1/14 → 2/14).
 - S94: 사용자 "순차 진행" 명시 결정 후 7 chunk 압축 (5/14).
 - S95: 사용자 "다음 작업 진행" + 동시 터미널 영역 분리 (6/14).
-- S96: 사용자 "go on" + S95 자연 후속 chunk (7/14, logic-only TDD 분리 패턴 일관).
+- S96: 사용자 "go on" + S95 자연 후속 chunk + "잔여 작업도 모두 순차" 분기 (7/14 → 11/14, +50% 압축).
 
-**연관 자료**: [S91 wave eval delta](./260508-session91-wave-completion-eval-delta.md) §2.3 G-NEW-3, [S96 인계서](./260510-session96-m5-attach-3-logic.md).
+**[Sunset 후 정책]**: 자율 실행 메모리(`feedback_autonomy.md`) 일반 적용 — production down / PG fatal / GitGuardian 알람 / 사용자 직접 보고만 사용자 확인 필수. 다른 작업은 즉시 자율 진입.
+
+**연관 자료**: [S91 wave eval delta](./260508-session91-wave-completion-eval-delta.md) §2.3 G-NEW-3, [S96 인계서](./260510-session96-m5-attach-3-logic.md), 본 sunset commit (S96-5).
 
 ---
 
