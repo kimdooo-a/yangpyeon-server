@@ -69,6 +69,9 @@ export interface FetchReport {
  *
  * cleanup (S84+ 추가): 기존 SQL kind 의 readonly 풀 한계 회피 — 30일 경과
  * rejected/duplicate ingested 행을 tenant-scoped 로 삭제. aggregator/cleanup.ts.
+ *
+ * messenger-attachments-deref (S96 M5-ATTACH-2 추가): 회수된 메시지의 첨부를
+ * 30일 경과 시 dereference. ADR-030 §Q8 (b). messenger/attachment-cleanup.ts.
  */
 export type AggregatorModule =
   | "rss-fetcher"
@@ -76,7 +79,8 @@ export type AggregatorModule =
   | "api-poller"
   | "classifier"
   | "promoter"
-  | "cleanup";
+  | "cleanup"
+  | "messenger-attachments-deref";
 
 /**
  * runner 가 cron 에 반환하는 표준 결과 포맷.

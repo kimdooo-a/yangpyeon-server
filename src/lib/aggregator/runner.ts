@@ -36,6 +36,7 @@ import { dedupeAgainstDb, urlHash } from "./dedupe";
 import { enrichItem } from "./llm";
 import { promotePending } from "./promote";
 import { runCleanup } from "./cleanup";
+import { runMessengerAttachmentCleanup } from "@/lib/messenger/attachment-cleanup";
 
 const FAILURE_THRESHOLD = 5;
 const DEFAULT_CLASSIFIER_BATCH = 50;
@@ -77,6 +78,8 @@ export async function runAggregatorModule(
         );
       case "cleanup":
         return await runCleanupModule(ctx, started);
+      case "messenger-attachments-deref":
+        return await runMessengerAttachmentCleanupModule(ctx, started);
       default:
         return {
           status: "FAILURE",
@@ -326,5 +329,21 @@ async function runCleanupModule(
     status: "SUCCESS",
     durationMs: Date.now() - startedAt,
     message: `deleted=${result.deleted}`,
+  };
+}
+
+/**
+ * messenger-attachments-deref 모듈 — 회수된 메시지의 첨부 30일 경과 시 deref.
+ * ADR-030 §Q8 (b), S96 M5-ATTACH-2.
+ */
+async function runMessengerAttachmentCleanupModule(
+  ctx: TenantContext,
+  startedAt: number,
+): Promise<AggregatorRunResult> {
+  const result = await runMessengerAttachmentCleanup(ctx);
+  return {
+    status: "SUCCESS",
+    durationMs: Date.now() - startedAt,
+    message: `dereferenced=${result.dereferenced}`,
   };
 }
