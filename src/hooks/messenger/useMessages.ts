@@ -37,14 +37,24 @@ import { useSse } from "./use-sse";
 
 export type { MessageRow } from "@/lib/messenger/optimistic-messages";
 
+/**
+ * sendOptimistic payload 시그니처 — `composer-logic.ts` 의 `SendPayload` 와 정합.
+ * F2-1 TEXT 단독 → F2-3 replyToId/mentions → M5-ATTACH-3 (S96) IMAGE/FILE + attachments.
+ */
 interface SendOptimisticPayload {
-  kind: "TEXT";
-  body: string;
+  kind: "TEXT" | "IMAGE" | "FILE";
+  body: string | null;
   clientGeneratedId: string;
   /** F2-3 — 답장 인용 대상 메시지 ID. */
   replyToId?: string;
   /** F2-3 — 멘션 받는 사용자 ID 배열 (자기 자신 제외는 server-side filter). */
   mentions?: string[];
+  /** M5-ATTACH-3 — 첨부 fileId 배열 (uploadAttachment 결과 합산). */
+  attachments?: Array<{
+    fileId: string;
+    kind: "IMAGE" | "FILE" | "VOICE";
+    displayOrder?: number;
+  }>;
 }
 
 interface SendOptimisticResult {

@@ -55,11 +55,19 @@ export interface MessageRow {
 
 export interface OptimisticBuildInput {
   payload: {
-    kind: "TEXT";
-    body: string;
+    /** F2-1 TEXT 단독 → M5-ATTACH-3 IMAGE/FILE 도 허용 (S96). */
+    kind: "TEXT" | "IMAGE" | "FILE";
+    /** 캡션 빈 문자열은 null 로 보냄 (backend `sendMessageSchema` 정합). */
+    body: string | null;
     clientGeneratedId: string;
     /** F2-3 — 답장 인용 대상 (optimistic 메시지에도 quote preview 즉시 표시). */
     replyToId?: string;
+    /** M5-ATTACH-3 — 첨부 fileId 배열 (optimistic 버블에 미리보기 표시). */
+    attachments?: Array<{
+      fileId: string;
+      kind: "IMAGE" | "FILE" | "VOICE";
+      displayOrder?: number;
+    }>;
   };
   senderId: string;
   now?: Date;
@@ -68,11 +76,22 @@ export interface OptimisticBuildInput {
 /**
  * Optimistic message 생성. id 는 clientGeneratedId 그대로 — UUIDv7 라 server 메시지 id 와
  * 동일 정렬 영역. server 응답 후 실제 id 로 swap 되므로 React key 충돌 없음.
+ *
+ * 첨부 attachments 의 id 는 client 측 임시값 (`opt-att-{cgid}-{idx}`) — server 응답
+ * swap 시 실제 MessageAttachment.id 로 교체. fileId 는 그대로 신뢰 (UI 렌더 키).
  */
 export function buildOptimisticMessage(
   input: OptimisticBuildInput,
 ): MessageRow {
   const now = input.now ?? new Date();
+  const attachments: MessageAttachmentRow[] = (input.payload.attachments ?? []).map(
+    (a, idx) => ({
+      id: `opt-att-${input.payload.clientGeneratedId}-${idx}`,
+      fileId: a.fileId,
+      kind: a.kind,
+      displayOrder: a.displayOrder ?? idx,
+    }),
+  );
   return {
     id: input.payload.clientGeneratedId,
     kind: input.payload.kind,
@@ -85,7 +104,7 @@ export function buildOptimisticMessage(
     deletedAt: null,
     deletedBy: null,
     createdAt: now.toISOString(),
-    attachments: [],
+    attachments,
     mentions: [],
     _optimistic: { status: "pending" },
   };
