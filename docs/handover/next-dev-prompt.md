@@ -1,11 +1,95 @@
-# 다음 세션 프롬프트 (세션 99)
+# 다음 세션 프롬프트 (세션 100)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 98 후속 PLUGIN-MIG-2 + 5 본격 이전 종료, commit `f7a0253` 19 files +1030/-413, vitest 810 → 821 PASS +11 신규 회귀 0, tsc 0 errors)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 99 PLUGIN-MIG-3 정찰 + chunk A/B/C 설계 종료, 코드 변경 0)
+
+세션 99 = S98 후속 commit `f7a0253` (PLUGIN-MIG-2 + 5) 직후 새 세션 진입. 사용자 "새로운 새션 시작" + S98 후속 마감 보고 paste → next-dev-prompt P0 PLUGIN-MIG-3 자율 진입 → 정찰 + 설계만 완료한 시점에 사용자 `/cs` 호출. **본격 구현은 S100 진입.** 정찰 + 설계 가치를 인수인계서에 보존하여 S100 재진입 비용 회피.
+
+- **5 routes + 2 dispatcher 정밀 정찰**: categories 149 / sources 117 / today-top 207 / items[slug] 135 / contents 253 = 928줄 + 308 alias 44줄 + catch-all 67줄. 공통 패턴 = withTenant + buildCorsHeaders (5×17줄 cors 중복) + tenantPrismaFor + successResponse/errorResponse + OPTIONS handler. 개별 차이 = today-top score 1.5x boost / items tenantId_slug composite + viewCount fire-and-forget / contents 7 query + base64 cursor + ALMANAC_CONTENTS_LIST audit.
+- **TenantRouteRegistration 한계 발견**: PLUGIN-MIG-1 (S98) 에서 path + dynamic-import handler 인터페이스 정의됐으나 route registry/dispatch lookup **미구현** (S99 PLUGIN-MIG-5 dispatcher.ts 는 cron handler 만). PLUGIN-MIG-3 추가 작업 = TenantRouteHandler 타입 신설 + path 의미 재정의 (절대 → subPath pattern "contents"/"items/:slug") + handler strict typing + dispatch.ts manifest lookup + `:slug` 동적 param 추출.
+- **chunk A/B/C 분할 설계** (회귀 위험 분리): A = 인프라 (~150 신규 LOC, 0 회귀 — 5 explicit 가 흡수 중이라 catch-all 변경 영향 없음) / B = 5 handler 본체 packages/tenant-almanac/src/routes/ 이전 + cors helper 공통화 + manifest.routes 등록 (~700 LOC 이전, 0 회귀 — 5 explicit 보존이라 hot path 무관) / C = 5 explicit route.ts 삭제 + 라이브 cutover (-928 LOC, vitest + 수동 curl smoke 게이트).
+- **308 alias 보존 결정**: 44줄 redirect 결합 0, Almanac frontend 직접 호출 검증 후 별도 sub-chunk (v1.1 cutover) 로 제거.
+- **withTenant 단일 위치 전환**: catch-all 측 단일 적용 → plugin handler signature `(req, user, tenant, params) => Promise<Response>` 단순화. K3 cross-validation 도 catch-all 한 곳 강제 (ADR-022 7원칙 #3 router 레이어 현실화).
+- **packages → app 역방향 import 정책**: PLUGIN-MIG-2 manifest.ts 가 이미 @/lib/aggregator/types import — 허용 상태. 진정한 격리는 PLUGIN-MIG-4+ (5 Content* 모델 + audit-log + api-response 의 packages 화 동반).
+- **TaskCreate 7 등록**: chunk A/B/C 단계별 task 7 (#1 정찰만 완료, #2-#7 /cs 시점 deleted — S100 본 인수인계서 읽고 재등록 가능).
+- **본 세션 변경 0**: 정찰 + 설계 + handover 보존만, 코드/테스트/빌드 모두 미실행. baseline = HEAD `f7a0253` + vitest 821 PASS 그대로.
+- **알려진 이슈**: 없음 (코드 변경 0, 회귀 위험 0).
+- **터치 안 함**: PLUGIN-MIG-3 본격 구현 (chunk A → B → C, ~1-2일, S100 진입) / PLUGIN-MIG-4 (Prisma fragment + RLS, PR 게이트 #4 live test 필수) / 308 alias 제거 (v1.1) / FILE-UPLOAD-MIG / 사용자 + 운영자 carry-over.
+
+---
+
+## ⭐ 세션 100 첫 작업 우선순위 (세션 99 PLUGIN-MIG-3 정찰 종료 시점, 2026-05-10)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **PLUGIN-MIG-3-A** | **인프라 — TenantRouteHandler 타입 + dispatcher route registry + dispatch.ts manifest lookup** | **P0** | ~30분 | S99 정찰에서 설계 완료 (`260510-session99-plugin-mig-3-recon.md` §"다음 작업 제안"). 0 회귀 (5 explicit 가 catch-all 흡수 중). |
+| **PLUGIN-MIG-3-B** | **5 handler 본체 packages/tenant-almanac/src/routes/ 이전 + cors helper 공통화 + manifest.routes 등록** | **P0** | ~1시간 | A 완료 후 진입. 0 회귀 (5 explicit 보존이라 hot path 무관). |
+| **PLUGIN-MIG-3-C** | **5 explicit route.ts 삭제 + vitest + curl smoke + commit** | **P0** | ~30분 | B 완료 후 진입. 라이브 cutover 위험 — vitest 821 → 같거나 + 신규 / tsc 0 / 5 routes × GET smoke. |
+| **PLUGIN-MIG-4** | **Prisma fragment 활성 + tenantId backfill + RLS** | P0~P1 | ~1-2일 | PLUGIN-MIG-3 완료 후 묶음 권장. **PR 게이트 #4 live non-BYPASSRLS 테스트 필수** — `bash scripts/run-integration-tests.sh tests/almanac/`. |
+| **308 alias 제거** | `/api/v1/almanac/[...path]/route.ts` 44줄 삭제 | P3 | ~5분 | Almanac v1.1 cutover 시점. 본 chunk 보류. |
+| **S88-USER-VERIFY** | **사용자 휴대폰 stylelucky4u.com/notes 재검증** | **P0 사용자** | 1분 | 누적 carry-over. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 사용자** | 30초 | (S86~S99 미수행) Settings 확인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=true** | P2 운영자 | 30분 | 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | 사용자 짬에. |
+| **CRON-MA-ENABLE** | **`messenger-attachments-deref` enabled=true** | P3 | 1분 | 운영자 결정, 30일 도달 시점. |
+| **FILE-UPLOAD-MIG** | filebox file-upload-zone → attachment-upload utility 통합 | P3 sweep | ~30분 | 결합 0 유지 마이그레이션. |
+| **STYLE-3** | sticky-note-card.tsx:114 endDrag stale closure | P3 sweep | ~15분 | 별도 PR. |
+| **DEBOUNCE-1** | M5 검색 300ms debounce | P3 sweep | ~30분 | UX 개선. |
+| **NEW-BLOCK-UI** | 대화 화면 hover → 차단 진입 메뉴 | P3 sweep | ~30분 | UX 보완. |
+| ~~PLUGIN-MIG-3 정찰~~ | ~~5 routes + dispatcher 정찰 + chunk A/B/C 설계~~ | — | — | ✅ **세션 99 완료** (handover `260510-session99-plugin-mig-3-recon.md`) |
+
+### S100 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **S99 인수인계서 read** — `docs/handover/260510-session99-plugin-mig-3-recon.md` §"다음 작업 제안 (S100)" 의 chunk A/B/C 본격 구현 가이드 그대로 사용 (정찰 비용 회피)
+4. **자율 진입 메모리 적용** (분기 질문 X) — 권장 순서 = chunk A (~30분) → B (~1시간) → C (~30분) 단계별 commit, 각 단계 vitest 회귀 0 검증 후 진행
+5. 또는 사용자 carry-over 처리 우선 (S88-USER-VERIFY 1분 + S86-SEC-1 30초 = 1.5분 비용으로 P0 carry-over 2건 해소)
+
+### chunk A/B/C 본격 구현 가이드 (S99 정찰 결과)
+
+**Chunk A — 인프라 (~30분, 0 회귀):**
+1. `packages/core/src/tenant/manifest.ts` — `TenantRouteHandler` 타입 신설 (`(req, user, tenant, params) => Promise<Response>`), `TenantRouteRegistration.path` 의미 재정의 (subPath pattern, 예 "contents"/"items/:slug"), `TenantRouteRegistration.handler` strict typing
+2. `packages/core/src/tenant/dispatcher.ts` — route registry 함수 추가 (manifest.routes 활용 또는 별도 `registerTenantRoutes`)
+3. `src/lib/tenant-router/dispatch.ts` — `HANDLER_TABLE` 제거, `getTenantManifest(tenant.id).routes` lookup → method+pattern 매칭 → dynamic import → handler 호출. `:slug` 동적 param 추출
+4. `src/lib/tenant-router/dispatch.test.ts` — 신규 케이스 (registered tenant + 매칭 / unmatched resource 404 / unmatched method 405 / `:slug` param 추출)
+
+**Chunk B — 본체 이전 (~1시간, 0 회귀):**
+1. `packages/tenant-almanac/src/lib/cors.ts` — `buildCorsHeaders` + OPTIONS factory 공통화 (5 routes 중복 ~85줄 흡수)
+2. `packages/tenant-almanac/src/routes/categories.ts` (149 → ~80줄)
+3. `packages/tenant-almanac/src/routes/sources.ts` (117 → ~70줄)
+4. `packages/tenant-almanac/src/routes/today-top.ts` (207 → ~150줄)
+5. `packages/tenant-almanac/src/routes/items.ts` (135 → ~90줄, params.slug 추출 시그니처)
+6. `packages/tenant-almanac/src/routes/contents.ts` (253 → ~190줄, audit-log 의존 보존)
+7. `packages/tenant-almanac/manifest.ts` — `routes: []` → 5 entry 등록 (path: "categories" / "sources" / "today-top" / "items/:slug" / "contents")
+
+**Chunk C — cutover (~30분, 라이브 검증 필요):**
+1. 5 explicit route.ts 삭제: `src/app/api/v1/t/[tenant]/{categories,sources,today-top,items/[slug],contents}/route.ts`
+2. `npx vitest run` — 821 → 같거나 + 신규 (회귀 0 확인)
+3. `npx tsc --noEmit` — 0 errors 확인
+4. 라이브 smoke (선택): WSL 빌드 + curl 5 routes × GET (ALMANAC_ALLOWED_ORIGINS 헤더 검증)
+5. commit `feat(plugin-mig-3): Almanac 5 라우트 본체 이전 + dispatch registry`
+6. PR 게이트 5 항목 본문 명시 (신규 모델 0 / withTenant 가드 catch-all 단일 적용 / Prisma tenantPrismaFor 패턴 보존 / RLS 변경 0 / timezone 0)
+7. `git push origin spec/aggregator-fixes`
+
+### S100+ wave 평가 권장 시점
+
+`kdywavecompletion --compare session-96` — PLUGIN-MIG-3 + 4 완료 후 (~S101+). Track C 인프라 보강 효과 + plugin 격리 정량화 + ADR-022 7원칙 #4 router 레이어 현실화 검증.
+
+### 정책
+
+- 거버넌스 단언 [SUNSET 2026-05-10/S96] 후 → `feedback_autonomy.md` 일반 적용. 자율 진입 (긴급 사고만 사용자 확인).
+- /cs 6단계 공식화 권고 진행 중 (글로벌 룰 변경 영역).
+- ADR-024 옵션 D plugin 격리 본격 진입 — PLUGIN-MIG-1/2/5 ✅ 정착, PLUGIN-MIG-3 + 4 (라우트 + 모델 fragment + RLS) 가 다음 큰 결정.
+- 메모리 룰 누적 = 18건 + MEMORY.md 색인. 본 세션 새 룰 추가 0 (정찰 + 설계만).
+
+---
+
+## 이전 컨텍스트 (참고용 — 세션 98 후속 PLUGIN-MIG-2 + 5 본격 이전 종료, commit `f7a0253` 19 files +1030/-413, vitest 810 → 821 PASS +11 신규 회귀 0, tsc 0 errors)
 
 세션 98 후속 = 다른 터미널의 S98 /cs docs 마감 (`727bb24` + `b5bed64`) 직후 이 터미널이 영역 분리 후속 chunk 진입. PLUGIN-MIG-2 (6 almanac 핸들러 본체 추출) + PLUGIN-MIG-5 (cron runner generic dispatch — `@yangpyeon/core` dispatcher registry 정착) 한 commit 마감. **TDD +11 신규 (dispatcher 11)**. 누적 S98 = TDD +59 (S98 본진 +48 + S98 후속 +11).
 
