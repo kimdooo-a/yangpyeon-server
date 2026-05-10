@@ -5,9 +5,23 @@
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 98 INFRA-2 wave + PLUGIN-MIG-1 골격 종료, commits `ff698fe` INFRA-2 16 files +1346/-170 + `4840fa6` PLUGIN-MIG-1 16 files +499, vitest 761 → 809 PASS, 회귀 0)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 98 후속 PLUGIN-MIG-2 + 5 본격 이전 종료, commit `f7a0253` 19 files +1030/-413, vitest 810 → 821 PASS +11 신규 회귀 0, tsc 0 errors)
 
-세션 98 = S97 사용자 "1, 2 순차적으로 진행" 직후 자율 진입. INFRA-2 4 task 완수 + PLUGIN-MIG-1 골격 정착. **TDD +48 신규 (smoke 2 + hook 9 + uploadAttachment 5 + 컴포넌트 26 + manifest 6)**.
+세션 98 후속 = 다른 터미널의 S98 /cs docs 마감 (`727bb24` + `b5bed64`) 직후 이 터미널이 영역 분리 후속 chunk 진입. PLUGIN-MIG-2 (6 almanac 핸들러 본체 추출) + PLUGIN-MIG-5 (cron runner generic dispatch — `@yangpyeon/core` dispatcher registry 정착) 한 commit 마감. **TDD +11 신규 (dispatcher 11)**. 누적 S98 = TDD +59 (S98 본진 +48 + S98 후속 +11).
+
+- **PLUGIN-MIG-2 핸들러 본체 이전**: 6 handler (rss-fetcher / html-scraper / api-poller / classifier / promoter / cleanup) → `packages/tenant-almanac/src/handlers/`. 공유 fetcher 파이프라인 = `packages/tenant-almanac/src/lib/fetcher-pipeline.ts` (runFetchersByKind + processSingleSource + markSourceFailure + buildPendingRow, RSS/HTML/API 3 핸들러 공유). support libs (dedupe/fetchers/llm/promote/cleanup/types) 는 PLUGIN-MIG-4 까지 `src/lib/aggregator/` 잔존 — 5 Content* Prisma 모델이 글로벌 schema 잔존이라 동시 이동 시 import path 1번 정리. messenger-attachments-deref 는 almanac 외 도메인 → core handler 로 분리. manifest.ts = todoHandler stub → 실제 handler invoke + AggregatorRunResult → TenantCronResult adapter, **enabled=true**. src/lib/aggregator/runner.ts 326 → 97줄 (thin dispatcher).
+- **PLUGIN-MIG-5 cron runner generic dispatch**: `packages/core/src/tenant/dispatcher.ts` 신설 — globalThis 싱글턴 registry (memory rule `project_workspace_singleton_globalthis` 정합, Turbopack chunk 복제 환경 분기 방지). registerTenant + registerCoreHandler + dispatchTenantHandler 3축 API. dispatchTenantHandler 우선순위 = (1) core handler map (예: messenger-attachments-deref) → (2) tenant manifest cronHandlers → (3) ok=false + 에러 메시지. cron/runner.ts `dispatchAggregatorOnMain` → `dispatchTenantHandlerOnMain` (generic, aggregator 도메인 모름). `src/lib/tenant-bootstrap.ts` 신설 — almanac manifest + messenger-attachments-deref core handler 를 import 시 side-effect 등록. cron/runner.ts top-level `import "@/lib/tenant-bootstrap"` 1줄로 보장.
+- **테스트 갱신**: dispatcher.test.ts 11 신규 (registry 라이프사이클 + 우선순위 4 분기). cron-aggregator-dispatch.test.ts 갱신 — mock boundary `@/lib/aggregator/runner` → `@yangpyeon/core` dispatchTenantHandler. **importOriginal 부분 mock 패턴 채택** (defineTenant/registerTenant 등 actual 유지로 bootstrap import-time side-effect 보존). manifest.test.ts +1.
+- **메타 가치**: ADR-022 7원칙 #4 "컨슈머 추가는 코드 수정 0줄" 의 cron 레이어 현실화 — 향후 jobboard 추가 시 cron/runner.ts 변경 0줄, tenant-bootstrap.ts 에 register 1-2줄 + jobboard manifest 정의만. PLUGIN-MIG-5 가 cron 도메인-decoupling 의 단일 진입점.
+- **PR 게이트 5항목 자동 통과**: 신규 모델 0 / 라우트 0 / Prisma 호출 closure 패턴 보존 / RLS 변경 0 / timezone 변경 0.
+- **검증**: vitest 821 PASS / 94 skip / tsc 0 errors / commit `f7a0253` push (b5bed64 → f7a0253).
+- **알려진 이슈**: 없음.
+- **터치 안 함**: PLUGIN-MIG-3 (5 라우트 928줄 — 단독 시 functional 변화 0) / PLUGIN-MIG-4 (Prisma fragment + tenantId backfill + RLS — PR 게이트 #4 live test 필수, 가장 위험) / FILE-UPLOAD-MIG sweep / 사용자/운영자 carry-over.
+
+### S98 본진 (다른 터미널, 참고)
+
+- **INFRA-2 wave 본진** (commit `ff698fe`, +1346/-170, TDD +40): SWR 2.4.1 + MSW 2.14.5 + jsdom 29 + RTL 16 인프라. 글로벌 env=node + per-file `// @vitest-environment jsdom` opt-in. setup.ts jsdom 분기 = jest-dom + RTL afterEach(cleanup) + scrollIntoView polyfill. SWR 마이그레이션 (useConversations + useMessages, page.tsx 변경 0, dedup TDD RED→GREEN). uploadAttachment 본체 jsdom+MSW 5 시나리오. 4 컴포넌트 렌더 TDD 26 — wave-tracker §6 가정 정정 ("M4 UI = TDD 압축 적용 불가" 무너짐).
+- **PLUGIN-MIG-1 골격** (commit `4840fa6`, +499, TDD +8): TenantManifest interface (cronHandlers + routes + adminPages + prismaFragment + envVarsRequired + dataApiAllowlist 6 필드) + defineTenant helper + packages/tenant-almanac/ 골격.
 
 - **INFRA-2 wave 본진**: SWR 2.4.1 + MSW 2.14.5 + jsdom 29 + RTL 16 인프라. 글로벌 env=node 유지 + `// @vitest-environment jsdom` 파일 단위 opt-in (속도 회귀 0). setup.ts jsdom 분기 = jest-dom matcher + RTL afterEach(cleanup) + scrollIntoView polyfill.
 - **SWR 마이그레이션**: useConversations + useMessages 둘 다 useState/fetch → useSWR. mutate(updater, {revalidate: false}) 패턴으로 sendOptimistic + SSE applyEventToMessages 통일. **page.tsx 변경 0** (시그니처 보존). dedup TDD (3 fetches → 1 fetch) RED→GREEN.
@@ -25,43 +39,67 @@
 
 ---
 
-## ⭐ 세션 99 첫 작업 우선순위 (세션 98 INFRA-2 + PLUGIN-MIG-1 종료 시점, 2026-05-10)
+## ⭐ 세션 99 첫 작업 우선순위 (세션 98 후속 PLUGIN-MIG-2 + 5 종료 시점, 2026-05-10)
 
 | # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
 |---|------|------|------|----------|
-| **DECISION-1** | **다음 큰 가치 결정 — PLUGIN-MIG-2 vs FILE-UPLOAD-MIG vs sweep / carry-over** | **P0 사용자** | 5분 | (A) PLUGIN-MIG-2 본체 이전 (~1일, apps/web 빌드 entry 분리 필요 — 모노레포 도구 채택 turborepo/pnpm-workspace) / (B) FILE-UPLOAD-MIG sweep (~30분, INFRA-2 인프라 활용 가능) / (C) 사용자 carry-over 처리 (S88-USER-VERIFY 1분 + S86-SEC-1 30초). 권장 = (B) → (A) (sweep 짧은 chunk 후 본격 plugin 본체 이전). |
-| **PLUGIN-MIG-2** | **`src/lib/aggregator/*` → `packages/tenant-almanac/src/handlers/*` 이전** | P0 | ~1일 | apps/web 빌드 entry 분리 (Next.js) — turborepo / pnpm-workspace 도입 결정 필요. |
-| **PLUGIN-MIG-3** | **정식 REST 라우트 + admin UI 신설 (308 alias 제거)** | P1 | ~1-2일 | manifest dispatch 가 cron runner AGGREGATOR 분기 대체 가능 (PLUGIN-MIG-5 의존성). |
-| **PLUGIN-MIG-4** | **Prisma fragment 활성 + tenantId backfill + RLS** | P1 | ~1-2일 | ADR-023 옵션 B 정합. ContentXxx 5 모델 backfill SQL + RLS 정책 마이그레이션. |
-| **PLUGIN-MIG-5** | **cron runner AGGREGATOR 분기 제거 → manifest dispatch** | P1 | ~0.5일 | PLUGIN-MIG-2~4 모두 완료. |
-| **FILE-UPLOAD-MIG** | **filebox file-upload-zone.tsx → attachment-upload utility 통합** | P3 sweep | ~30분 | INFRA-2 정착 직후 자연 후보, 결합 0 유지 마이그레이션. |
+| **PLUGIN-MIG-3 + 4 묶음 chunk** | **5 라우트 + 5 Content* 모델 fragment + tenantId backfill + RLS + support libs 동시 이전** | P0 | ~2-4일 | 단계별 commit 권장 = (a) Prisma fragment 분리 + tenantId backfill / (b) RLS 정책 + 마이그레이션 deploy + 라이브 검증 / (c) 라우트 + support libs 이동 / (d) src/app/ thin re-export. **PR 게이트 #4 live non-BYPASSRLS 테스트 통과 필수** (S82 4 latent bug 패턴 재발 차단). app_admin GRANT 도 검증 (`feedback_grant_check_for_bypassrls_roles`). MIG-4 단독 = 가장 위험한 단계. |
+| **FILE-UPLOAD-MIG** | **filebox file-upload-zone.tsx → attachment-upload utility 통합** | P3 sweep | ~30분 | INFRA-2 인프라 활용 가능. 결합 0 유지 마이그레이션. |
 | **S88-USER-VERIFY** | **사용자 휴대폰 stylelucky4u.com/notes 재검증** | **P0 사용자** | 1분 | S88+S89+S90 silent catch + S91 origin push + S96 후속-2 OPS-LIVE PASS 후 final 검증. |
 | **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 사용자** | 30초 | (S86~S98 미수행) Settings 확인. |
 | **S87-RSS-ACTIVATE** | **anthropic-news active=true** | P2 운영자 | 30분 | 운영자 결정. |
 | **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | 사용자 짬에. |
-| **CRON-MA-ENABLE** | **`messenger-attachments-deref` enabled=true** | P3 | 1분 | 운영자 결정, 30일 도달 시점. |
+| **CRON-MA-ENABLE** | **`messenger-attachments-deref` enabled=true** | P3 | 1분 | 운영자 결정, 30일 도달 시점. PLUGIN-MIG-5 정착으로 dispatcher 가 core handler 로 처리. |
 | **STYLE-3** | sticky-note-card.tsx:114 endDrag stale closure | P3 sweep | ~15분 | 별도 PR. |
 | **DEBOUNCE-1** | M5 검색 300ms debounce | P3 sweep | ~30분 | UX 개선. |
 | **NEW-BLOCK-UI** | 대화 화면 hover → 차단 진입 메뉴 | P3 sweep | ~30분 | UX 보완. |
-| ~~INFRA-2~~ | ~~SWR + MSW 도입 + 컴포넌트 렌더 TDD~~ | — | — | ✅ **세션 98 완료** (commit `ff698fe`, TDD +40) |
-| ~~PLUGIN-MIG-1~~ | ~~Almanac plugin schema-first 골격~~ | — | — | ✅ **세션 98 완료** (commit `4840fa6`, TDD +8) |
+| ~~INFRA-2~~ | ~~SWR + MSW 도입 + 컴포넌트 렌더 TDD~~ | — | — | ✅ **세션 98 본진 완료** (commit `ff698fe`, TDD +40) |
+| ~~PLUGIN-MIG-1~~ | ~~Almanac plugin schema-first 골격~~ | — | — | ✅ **세션 98 본진 완료** (commit `4840fa6`, TDD +8) |
+| ~~PLUGIN-MIG-2~~ | ~~6 almanac 핸들러 본체 → packages/tenant-almanac/src/handlers/~~ | — | — | ✅ **세션 98 후속 완료** (commit `f7a0253`, TDD +11 dispatcher 일괄) |
+| ~~PLUGIN-MIG-5~~ | ~~cron runner AGGREGATOR 분기 → manifest dispatch~~ | — | — | ✅ **세션 98 후속 완료** (commit `f7a0253`) |
 
 ### S99 진입 시 첫 행동
 
 1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`)
 2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
-3. **DECISION-1 사용자 결정** — 다음 큰 가치 (PLUGIN-MIG-2 / FILE-UPLOAD-MIG / 사용자 carry-over) 진입.
-4. 또는 자율 진입 메모리 적용 (분기 질문 금지) — 권장 순서 = FILE-UPLOAD-MIG (~30분) → PLUGIN-MIG-2 본체 이전 (~1일, apps/web 빌드 entry 분리 결정 동반).
+3. **자율 진입 메모리 적용** (분기 질문 X) — 권장 순서 = PLUGIN-MIG-3 + 4 묶음 chunk 시작 (단계별 commit, PR 게이트 #4 live test 사전 준비).
+4. 또는 사용자 carry-over 처리 우선 (S88-USER-VERIFY 1분 + S86-SEC-1 30초 = 1.5분 비용으로 P0 carry-over 2건 해소).
+
+### MIG-3 + 4 단계별 commit 가이드
+
+**Stage A — Prisma fragment 분리 + tenantId backfill** (1 commit, 코드 변경 + 마이그레이션):
+- `prisma/schema.prisma` 의 5 Content* 모델 → `packages/tenant-almanac/prisma/fragment.prisma` (또는 schema.prisma 통합 빌드 도구 도입 결정 필요)
+- 신규 마이그레이션 = `tenantId` 컬럼 추가 + 기존 row backfill (`tenantId = '00000000-0000-0000-0000-000000000001'` default tenant, memory rule `project_tenant_default_sentinel`)
+- `wsl -d Ubuntu -- bash -lc 'npx prisma migrate deploy'` 직접 적용 (memory rule `feedback_migration_apply_directly`)
+- 검증: `wsl -d Ubuntu -- bash -lc 'psql ... -c "SELECT COUNT(*) FROM content_categories WHERE tenant_id IS NULL"'` = 0 row
+
+**Stage B — RLS 정책 + 라이브 검증** (1 commit):
+- 5 모델 × SELECT/INSERT/UPDATE/DELETE = 20 정책 마이그레이션
+- 신규 라이브 통합 테스트 = non-BYPASSRLS role 로 (a) 다른 tenant id 조회 시 0 row 검증 / (b) cross-tenant write 차단 검증
+- `bash scripts/run-integration-tests.sh tests/almanac/` 라이브 통과 (CLAUDE.md PR 게이트 #4)
+- app_admin GRANT 검증 (memory rule `feedback_grant_check_for_bypassrls_roles`, S88 사례 재발 차단)
+
+**Stage C — 라우트 + support libs 이동** (1 commit, functional 변화 0):
+- `src/app/api/v1/t/[tenant]/{categories,sources,today-top,items,contents}/route.ts` → `packages/tenant-almanac/src/routes/`
+- `src/lib/aggregator/{dedupe,fetchers,llm,promote,cleanup,types}.ts` → `packages/tenant-almanac/src/lib/`
+- `src/lib/aggregator/runner.ts` 마저 슬림화 또는 제거
+- src/app/ 의 라우트 파일은 thin re-export shim 으로 유지 (Next.js App Router 파일 시스템 제약)
+
+**Stage D — manifest.routes wire-up + 308 alias 정리** (1 commit):
+- manifest.routes 에 5 라우트 등록
+- 향후 catch-all dispatcher 가 manifest.routes 로 dispatch 하는 패턴 정착
+- `src/app/api/v1/almanac/[...path]/route.ts` 308 alias 제거 또는 SUNSET 표식
 
 ### S99+ wave 평가 권장 시점
 
-`kdywavecompletion --compare session-96` — PLUGIN-MIG-2~5 진척 후 (~S101+). Track C 인프라 보강 효과 + plugin 격리 정량화 + G-NEW-4 wave-tracker stale 재발 차단 효과 검증.
+`kdywavecompletion --compare session-96` — PLUGIN-MIG-3+4 완료 후 (~S100+ 또는 PLUGIN 5 phase 종결 시점). Track C 인프라 보강 효과 + plugin 격리 정량화 + G-NEW-4 wave-tracker stale 재발 차단 효과 검증.
 
 ### 정책
 
 - 거버넌스 단언 [SUNSET 2026-05-10/S96] 후 → `feedback_autonomy.md` 일반 적용. 자율 진입 (긴급 사고만 사용자 확인).
-- /cs 6단계 공식화 권고 진행 중 (글로벌 룰 변경 영역, 본 /cs 가 두 번째 wave-tracker §8 row 갱신 사례).
-- ADR-024 옵션 D plugin 격리 본격 진입 (PLUGIN-MIG-1 골격 정착) → PLUGIN-MIG-2 부터 본체 이전 + apps/web 빌드 entry 분리 결정.
+- /cs 6단계 공식화 권고 진행 중 (글로벌 룰 변경 영역).
+- ADR-024 옵션 D plugin 격리 본격 진입 — PLUGIN-MIG-1/2/5 ✅ 정착, PLUGIN-MIG-3 + 4 (라우트 + 모델 fragment + RLS) 가 다음 큰 결정.
+- 메모리 룰 누적 = 18건 + MEMORY.md 색인. 본 chunk 새 룰 추가 0 (기존 `project_workspace_singleton_globalthis` 정합 적용만).
 
 ---
 
