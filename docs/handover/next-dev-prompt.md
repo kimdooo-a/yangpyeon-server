@@ -1,7 +1,63 @@
-# 다음 세션 프롬프트 (세션 97)
+# 다음 세션 프롬프트 (세션 98)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 97 wave eval 3차 + DOC-WAVE-2 + TAG-2 + S87-CK-MEMORY 종료, commit `719bfa7`, 2 files +407/-31, 5 tags push, 92/100 A-)
+
+세션 97 = 다른 터미널 S96 후속-2 (`c706275` PM2 timeline correlation PASS) 직후 본 터미널 진입. 사용자 "wave 기반 구현도 검증" → kdywavecompletion 스킬 호출 → S91 baseline (82/100 B+) 대비 delta 평가 → **S96 92/100 A- (+10 회복)**.
+
+- **G-NEW-3 극적 해소** (M4 Phase 2 6 세션 정체 0/14 → 12/14, 86%) — S91+ 거버넌스 단언이 5 세션 16 commit 동안 효력 발휘 → S96 [SUNSET 2026-05-10] 자연 해소. 시간 한정 룰의 책임감 있는 종료 사례, 향후 비슷한 단언 도입 시 재사용 가능 패턴.
+- **G-NEW-7~11 신규 발견**: schema-first 정량효과 (M5-ATTACH 5-6일 → 1-2일) / logic-only TDD 분리 9 모듈 일관 (F2-1~M5/M6/M5-ATTACH) / WSL 빌드 미러 4-stage 표준 (라이브 누적 47 PASS) / M5-ATTACH-6 active assertion trivially-pass 차단 / SUNSET 표식 + 역사 보존 패턴.
+- **G-NEW-4 wave-tracker stale 재발** (S91+ 이후 5 세션 stale, 동일 패턴 정확 재발) — DOC-WAVE-2 chunk 가 첫 정정. **/cs 6단계 공식화 권고** (글로벌 룰 변경 영역, pre-commit hook 자동화 옵션).
+- **G-NEW-1 ✅ S96 후속-2 흡수** — PM2 log timeline correlation PASS (마지막 ACL 에러 5/5 08:51:58 KST → S88 migration 5/5 08:57:15 KST → 5일+ 0 errors). 운영자 carry-over 6 세션 채무 해소.
+- **DOC-WAVE-2 wave-tracker.md 7 섹션 갱신**: §0 (S91~S96 진척 + 92/100) + §1 4-Track 매트릭스 (Track C 70% → ~95%) + §2.3 잔여 (8 항목 ✅) + §4.1 M0~M6 (M4 Phase 2 + M5 검색/첨부 + M6 모두 ✅) + §4.3 잔여 (3건 = INFRA-2 + 라이브 e2e + cron enable) + §7 S97+ 우선순위 (S84+ 표 [SUNSET]) + §8 9 row 추가 (S92~S97).
+- **TAG-2 5 마일스톤 git tag 소급**: `s94-sharpedge-pass` (8f873c3) / `s94-m4-phase2-f-complete` (5a29980) / `s95-m5-attach-1` (652ff88) / `s96-gov-sunset` (da8786b) / `s96-2-ops-live-verified` (c706275) — R-W7+ 해소.
+- **S87-CK-MEMORY 2 메모리 룰 신규**: `feedback_wsl2_single_foreground_call.md` (WSL2 HCS child SIGHUP, 단일 foreground 또는 PM2/systemd 표준) + `feedback_tsx_no_dotenv_autoload.md` (tsx .env 미로드 4종 우회 + 함정 4종) + MEMORY.md 색인 2 row.
+- **검증**: tsc/vitest 무관 (docs only) / commit `719bfa7` + push origin spec/aggregator-fixes + 5 신규 tags push (3 alpha tags rejected = 이미 origin 존재 무해).
+- **알려진 이슈**: 없음 (G-NEW-3 회복 완료 + 거버넌스 단언 sunset + tsc errors 0 유지 + 라이브 누적 47 PASS).
+- **터치 안 함**: INFRA-2 (SWR + MSW 별도 chunk ~3-4h) / Almanac plugin 마이그레이션 (ADR-024 옵션 D 단독 chunk ~5-7일) / sweep 4건 (STYLE-3 / DEBOUNCE-1 / FILE-UPLOAD-MIG / NEW-BLOCK-UI) / S88-USER-VERIFY 사용자 / S86-SEC-1 사용자 / S87-RSS-ACTIVATE 운영자 / S87-TZ-MONITOR / cron enable.
+
+---
+
+## ⭐ 세션 98 첫 작업 우선순위 (세션 97 wave eval 3차 + DOC-WAVE-2 + TAG-2 종료 시점, 2026-05-10)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **DECISION-1** | **다음 큰 가치 결정 — INFRA-2 vs Almanac plugin vs sweep 4건** | **P0 사용자** | 5분 | 본진 100% 도달 후 첫 메이저 결정. (A) INFRA-2 (SWR+MSW ~3-4h, M5-ATTACH-3b 라이브 검증 자연 흡수) / (B) Almanac plugin 마이그레이션 (ADR-024 옵션 D 첫 컨슈머 plugin 분리 ~5-7일) / (C) sweep 4건 일괄 (~2h). 권장 = (A) → (B) (jsdom+MSW 인프라가 plugin 도메인 검증에도 자연 활용). |
+| **INFRA-2** | **SWR + MSW 도입 + 컴포넌트 렌더 TDD 보강** | P2 | ~3-4h | S94 INFRA-1 부분 도입 위에 추가. uploadAttachment 본체 + MessageComposer chip + MessageBubble 렌더 + useMessages SWR 마이그레이션. M5-ATTACH-3b 수동 영역 자연 해소. |
+| **ALMANAC-PLUGIN** | **Almanac → `packages/tenant-almanac/` plugin 마이그레이션** | P0~P1 | ~5-7일 | ADR-024 옵션 D (hybrid 격리). manifest.ts + aggregator 이관 + DB tenant row + router/cron/auth 자동 구성 + 1.0 출시 cutover. |
+| **S88-USER-VERIFY** | **사용자 휴대폰 stylelucky4u.com/notes 재검증** | **P0 사용자** | 1분 | S88+S89+S90 silent catch + S91 origin push + S96 후속-2 OPS-LIVE PASS 후 final 검증. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 사용자** | 30초 | (S86~S97 미수행) Settings 확인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=true** | P2 운영자 | 30분 | 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | 사용자 짬에. |
+| **CRON-MA-ENABLE** | **`messenger-attachments-deref` enabled=true** | P3 | 1분 | 운영자 결정, 30일 도달 시점. |
+| **STYLE-3** | sticky-note-card.tsx:114 endDrag stale closure | P3 sweep | ~15분 | 별도 PR. |
+| **DEBOUNCE-1** | M5 검색 300ms debounce | P3 sweep | ~30분 | UX 개선. |
+| **FILE-UPLOAD-MIG** | file-upload-zone.tsx → attachment-upload utility 통합 | P3 sweep | ~30분 | 결합 0 유지 마이그레이션. |
+| **NEW-BLOCK-UI** | 대화 화면 hover → 차단 진입 메뉴 | P3 sweep | ~30분 | UX 보완. |
+| ~~DOC-WAVE-2~~ | ~~wave-tracker S91+~S96 row 추가~~ | — | — | ✅ **세션 97 완료** (commit `719bfa7`) |
+| ~~TAG-2~~ | ~~5 마일스톤 git tag 소급~~ | — | — | ✅ **세션 97 완료** (5 tags push) |
+| ~~S87-CK-MEMORY~~ | ~~2 메모리 룰 승격~~ | — | — | ✅ **세션 97 완료** (memory 룰 2 + MEMORY.md 색인) |
+| ~~S88-OPS-LIVE~~ | ~~다른 ops 콘솔 라이브 호출~~ | — | — | ✅ **세션 96 후속-2 완료** (`c706275` PM2 timeline correlation) |
+
+### S98 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes`
+3. **DECISION-1 사용자 결정** — 다음 큰 가치 (INFRA-2 / Almanac plugin / sweep 4건) 진입.
+4. 또는 사용자 carry-over 처리 우선 (S88-USER-VERIFY 1분 + S86-SEC-1 30초).
+
+### S98+ wave 평가 권장 시점
+
+`kdywavecompletion --compare session-96` — INFRA-2 또는 Almanac plugin 마이그레이션 완료 후 (~S101+) Track C 인프라 보강 효과 + plugin 격리 정량화 + G-NEW-4 재발 차단 효과 검증.
+
+### 정책 전환
+
+- 거버넌스 단언 [SUNSET 2026-05-10/S96] → `feedback_autonomy.md` 일반 적용. 다음 세션부터 자율 진입 (긴급 사고만 사용자 확인).
+- **본 세션 G-NEW-4 재발 차단 권고 = /cs 6단계 공식화** (wave-tracker §8 row 자연 흡수). `kdyselfreflection` 또는 글로벌 CLAUDE.md 룰 추가 검토 가능.
 
 ---
 
