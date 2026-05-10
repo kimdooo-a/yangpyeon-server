@@ -16,6 +16,8 @@ import {
   formatReplyPreview,
   type MessageKindForQuote,
 } from "@/lib/messenger/reply-quote";
+import { MessageAttachment } from "./MessageAttachment";
+import type { MessageAttachmentRow } from "@/lib/messenger/optimistic-messages";
 
 export interface MessageBubbleProps {
   message: {
@@ -26,6 +28,8 @@ export interface MessageBubbleProps {
     replyToId?: string | null;
     deletedAt: string | Date | null;
     createdAt: string | Date;
+    /** M5-ATTACH-4 — IMAGE/FILE/VOICE 첨부 묶음. body 와 함께 또는 단독 표시. */
+    attachments?: MessageAttachmentRow[];
   };
   isOwn: boolean;
   showTime?: boolean;
@@ -129,7 +133,16 @@ export function MessageBubble({
           aria-label={ariaLabel}
           data-variant={v.variant}
         >
-          <div className={v.textClass}>{displayBody}</div>
+          {/* body 가 있을 때만 텍스트 영역 표시. IMAGE/FILE 캡션 X 시 빈 div 회피. */}
+          {(v.variant === "recalled" || displayBody.length > 0) && (
+            <div className={v.textClass}>{displayBody}</div>
+          )}
+          {message.attachments && message.attachments.length > 0 && (
+            <MessageAttachment
+              attachments={message.attachments}
+              recalled={v.variant === "recalled"}
+            />
+          )}
           {showTime && v.variant !== "system" && (
             <div
               className={`text-[10px] mt-1 ${isOwn ? "text-white/70 text-right" : "text-gray-500"}`}

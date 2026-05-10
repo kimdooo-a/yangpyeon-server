@@ -238,7 +238,7 @@ export default function MessengerConversationPage() {
           onClearReply={() => setReplyTo(null)}
         />
         <p className="text-[10px] text-gray-400 px-3 pb-1.5">
-          ⓘ F2-4 — SSE 실시간 수신 활성 (헤더 점 = 연결 상태). 첨부/이모지 = F2-5+
+          ⓘ F2-4 — SSE 실시간 수신 활성 (헤더 점 = 연결 상태). 첨부 5장/5GB · 이모지 = F2-5+
         </p>
       </section>
     </div>
