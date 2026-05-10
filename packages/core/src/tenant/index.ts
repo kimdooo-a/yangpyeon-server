@@ -13,3 +13,12 @@ export {
   runWithTenant,
   type TenantContext,
 } from "./context";
+
+export {
+  defineTenant,
+  type TenantManifest,
+  type TenantCronHandler,
+  type TenantCronResult,
+  type TenantRouteRegistration,
+  type TenantAdminPageRegistration,
+} from "./manifest";

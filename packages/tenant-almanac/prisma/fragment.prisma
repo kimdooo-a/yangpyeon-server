@@ -1,0 +1,30 @@
+// =============================================================================
+// @yangpyeon/tenant-almanac — Prisma schema fragment (PLUGIN-MIG-4 placeholder)
+// =============================================================================
+//
+// ADR-024 옵션 D 의 schema 병합 방식: 빌드 시 scripts/assemble-schema.ts 가
+// packages/core/prisma/schema.prisma + 모든 packages/tenant-*/prisma/fragment.prisma
+// 를 단일 apps/web/prisma/schema.prisma 로 병합 → prisma generate.
+//
+// 본 파일은 PLUGIN-MIG-1 (S98) 시점의 placeholder — 실제 모델 정의는 아직
+// prisma/schema.prisma (root) 에 그대로 존재. PLUGIN-MIG-4 에서 다음 5 모델을
+// 본 파일로 이전:
+//
+//   - ContentCategory  (트랙별 카테고리)
+//   - ContentSource    (RSS / HTML / API 소스 정의)
+//   - ContentIngestedItem (fetcher 가 수집한 raw item, 분류 전)
+//   - ContentItem      (분류 + 게시 후의 정식 아이템)
+//   - ContentItemMetric (조회/공유 카운터)
+//
+// 모든 모델은 ADR-023 옵션 B 정합 → 첫 컬럼 `tenantId String` 신설 필요
+// (현 시점 모델은 single-tenant 가정 잔존). PLUGIN-MIG-4 가 동시에 처리:
+//   1. ALTER TABLE ADD COLUMN tenant_id (default 'almanac', NOT NULL 후속 마이그레이션)
+//   2. RLS 정책 추가
+//   3. composite UNIQUE 인덱스 갱신 (id 단독 → (tenantId, id))
+//
+// PLUGIN-MIG-4 마이그레이션 순서:
+//   step 1: 본 fragment 작성 + scripts/assemble-schema.ts 병합 검증 (dummy fragment 비교)
+//   step 2: tenant_id 컬럼 backfill 마이그레이션 작성/적용
+//   step 3: RLS 정책 마이그레이션
+//   step 4: prisma/schema.prisma 본체에서 5 모델 삭제, 본 fragment 가 단일 출처
+//   step 5: src/lib/aggregator/* 의 prisma 호출이 tenantPrismaFor(ctx) 사용 검증

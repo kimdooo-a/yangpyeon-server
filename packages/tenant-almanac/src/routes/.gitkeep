@@ -1,0 +1,11 @@
+PLUGIN-MIG-3 시점에 정식 REST 라우트 본체를 이 디렉토리로 이전.
+
+이전 단위 (예상):
+- packages/tenant-almanac/src/routes/contents.ts (/api/v1/t/almanac/contents — 검색 + 페이지네이션)
+- packages/tenant-almanac/src/routes/categories.ts (/api/v1/t/almanac/categories — 트랙별 카테고리 조회)
+- packages/tenant-almanac/src/routes/sources.ts (/api/v1/t/almanac/sources — RSS 소스 CRUD)
+- packages/tenant-almanac/src/routes/items.ts (/api/v1/t/almanac/items — 단일 아이템 + 즉시 promote)
+- packages/tenant-almanac/src/routes/today-top.ts (/api/v1/t/almanac/today-top — 트랙별 상위 N)
+
+현 src/app/api/v1/almanac/[...path]/route.ts 의 308 alias 는 PLUGIN-MIG-3 완료 시 제거.
+정식 라우트는 apps/web 빌드 시 manifest.ts 의 routes 필드 → codegen 으로 expand.

@@ -31,6 +31,12 @@
       ],
       "@yangpyeon/core/*": [
         "./packages/core/src/*"
+      ],
+      "@yangpyeon/tenant-almanac": [
+        "./packages/tenant-almanac/src/index.ts"
+      ],
+      "@yangpyeon/tenant-almanac/*": [
+        "./packages/tenant-almanac/src/*"
       ]
     }
   },

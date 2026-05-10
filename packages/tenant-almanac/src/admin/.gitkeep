@@ -1,0 +1,9 @@
+PLUGIN-MIG-3 또는 후속 chunk 에서 admin UI 페이지를 이 디렉토리에 작성.
+
+예상 페이지 (운영자 대시보드):
+- packages/tenant-almanac/src/admin/sources/page.tsx — RSS 소스 등록/편집/비활성화
+- packages/tenant-almanac/src/admin/categories/page.tsx — 트랙별 카테고리 관리
+- packages/tenant-almanac/src/admin/items/page.tsx — 수동 promote / 회수 / 미리보기
+- packages/tenant-almanac/src/admin/dashboard/page.tsx — fetch 통계 + LLM 비용 + 게시 비율
+
+apps/web 빌드 시 manifest.ts 의 adminPages 필드 → codegen 으로 apps/web/app/admin/(almanac)/* 자동 생성.

@@ -21,11 +21,18 @@
 export const CORE_VERSION = "0.0.1";
 
 // Phase 1.1: TenantContext (AsyncLocalStorage)
+// Phase 2.1 (S98 PLUGIN-MIG-1): TenantManifest 인터페이스 (workspace plugin)
 export {
   getCurrentTenant,
   getCurrentTenantOrNull,
   runWithTenant,
+  defineTenant,
   type TenantContext,
+  type TenantManifest,
+  type TenantCronHandler,
+  type TenantCronResult,
+  type TenantRouteRegistration,
+  type TenantAdminPageRegistration,
 } from "./tenant";
 
 // Phase 1.5: Cron pure logic (lock key, circuit breaker state)
