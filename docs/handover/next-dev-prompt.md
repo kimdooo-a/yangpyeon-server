@@ -1,7 +1,87 @@
-# 다음 세션 프롬프트 (세션 95)
+# 다음 세션 프롬프트 (세션 96)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 95 단독 sub-chunk 종료 — M5-ATTACH-1 백엔드 갭 폐쇄, commit `652ff88`, TDD 1, 라이브 vitest 13/13 PASS)
+
+세션 95 = 직전 터미널 S94 sharpedge follow-up commit `8f873c3` 처리 중 사용자 "다음 작업 진행" 분기 → 본 터미널은 코드 영역(M5)으로 분업 (memory `feedback_concurrent_terminal_overlap`). M5-ATTACH 의 첫 sub-chunk = 백엔드 갭 폐쇄. **사전 추정 5-6일 → 실측 1-2일 압축 발견** (schema-first 설계 + ADR-030 §FK 재사용 결정의 정량 효과).
+
+- **ADR-033 후속 결정 자연 해소**: §2.5 X1 server proxy 패턴 ACCEPTED + ADR-030 §"첨부 = filebox FK 재사용" + §Q8 "30일 cron deref" 결정 모두 정착 → 신규 ADR 불필요, messenger 첨부는 filebox `upload-multipart/{init,part,complete,abort}` 4 라우트 재사용으로 진입 가능.
+
+- **백엔드 갭 분석**: prisma `MessageAttachment` 모델 (line 1001, RLS 첫 컬럼 + ON DELETE RESTRICT + 인덱스 2) ✅ / sendMessage tx INSERT + owner 검증 ✅ / listMessages + searchMessages include attachments ✅ / ATTACHMENT_NOT_OWNED 부정 케이스 ✅. **잔여 갭 = positive flow + cross-tenant RLS 격리 + 30일 cron + frontend 3 컴포넌트**.
+
+- **M5-ATTACH-1 단일 testcase** (`652ff88` 1 file +86): messages.test.ts ATTACHMENT_NOT_OWNED 다음 (line 414) 추가. alice IMAGE 파일 2개 owner → conv_a 첨부 IMAGE 2개 송신 → (a) MessageAttachment row 2개 INSERT 검증 (b) listMessages 응답 attachments 정합 (c) tenant_b context 에서 conv_a 메시지 0 row (S82 Prisma extension RLS escape 회귀 시 fail). **라이브 vitest 13/13 PASS (850ms)** = `~/dev/ypserver-build/` 미러에 변경분 cp + 거기서 실행.
+
+- **WSL 빌드 미러 우회 4-stage 표준 절차 정착**: PowerShell native = ECONNREFUSED ::1:5432 / WSL bash + Win npx = env URL `?`/`%` 손실 (scripts §13-16) / WSL Linux node + Win modules = `@rolldown/binding-linux-x64-gnu` 부재 / **회피 = WSL 빌드 미러 cp + 거기서 `bash scripts/run-integration-tests.sh`**. solutions 문서 산출 (`docs/solutions/2026-05-10-wsl-vitest-windows-modules-rolldown-binding.md`).
+
+- **trivially-pass 함정 인지** (M5-ATTACH-6 신규 task): `tests/messenger/rls.test.ts` bootstrap 이 user/conversation/message 만 시드 → message_attachment 외 5 모델 (mention, receipt, block, abuse_report, notification_pref) 은 `findMany() → []` 빈 결과로 vacuous truth pass. 4개월간 RLS 정책 깨져도 통과 가능 — S82 "4 latent bug" 패턴.
+
+- **PR 게이트 5항목 자동 통과**: 신규 모델 0 / 신규 라우트 0 / Prisma 호출 변경 0 (tenantPrismaFor 그대로) / non-BYPASSRLS app_test_runtime role 라이브 PASS ✅ / timezone-sensitive 비교 0.
+
+- **거버넌스 단언 sunset 임박**: M5 검색 ✅ + M6 운영자/차단/알림 ✅ + 보안 리뷰 ✅ + M5 첨부 backend ✅. **잔여 = M5 첨부 frontend (3 컴포넌트) + 30일 cron 만**.
+
+- **알려진 이슈**: e2e tsc 사전 존재 2건 (`phase-14c-alpha-ui.spec.ts:19/20`, STYLE-2 영역) / rls.test.ts bootstrap 6 모델 시드 부재 (M5-ATTACH-6 분리) / WSL 빌드 미러 sync 는 다음 deploy 사이클 또는 frontend chunk 진입 시.
+
+- **터치 안 함**: 30일 cron deref / frontend MessageComposer/MessageBubble/MessageAttachment / RLS test bootstrap 6 모델 시드 강화 / 사이드바 nav / S88-USER-VERIFY / S88-OPS-LIVE / DB password 회전 / S86-SEC-1 / S87 carry-over / 다른 터미널 sharp-edges follow-up `8f873c3` 영역.
+
+---
+
+## ⭐ 세션 96 첫 작업 우선순위 (세션 95 M5-ATTACH-1 종료 시점, 2026-05-10)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **M5-ATTACH-3** | **frontend MessageComposer 첨부 UI** (filebox upload-multipart 4 라우트 재사용) | **P0 messenger** | 1-1.5 작업일 | 클립 버튼 → 파일 선택 → multipart upload (50MB part × 동시 3) → fileId 수집 → POST messages attachmentIds 동봉. 진행률 + 5장 묶음 + 5GB 제한. tenantSlug = 'default' 하드코드. |
+| **M5-ATTACH-4** | **MessageBubble + `<MessageAttachment>` 렌더** | **P0 messenger** | 0.5-1 작업일 | IMAGE 미리보기 (lightbox) + FILE 다운로드 버튼 + VOICE play. backend 응답 attachments 항목 사용. ON DELETE RESTRICT 회수 시 placeholder. |
+| **M5-ATTACH-2** | **30일 message_attachments dereference cron** | **P1** | ~0.5일 | `src/lib/cron/registry.ts` 에 `messenger-attachments-deref` 등록. ADR-030 §Q8 (b) 정착. |
+| **M5-ATTACH-6** | **rls.test.ts bootstrap 6 모델 시드 강화** (M5-NEW: trivially-pass 차단) | P2 | ~1일 | folders + files + message_attachments + message_mentions + message_receipts + user_blocks + abuse_reports + notification_preferences 8 모델 시드. 추가 user (userIdA2/B2) = mention/block 의미 있는 시나리오. |
+| **M5-ATTACH-5** | **search 응답 attachments + e2e 시나리오** | P2 sweep | ~0.5일 | searchMessages 가 이미 attachments include 하나 e2e (송신→첨부→수신→deref) 시나리오 부재. |
+| **GOV-SUNSET** | **거버넌스 단언 sunset 결정** | P3 | 5분 | M5-ATTACH-3 + M5-ATTACH-4 완료 시점. next-dev-prompt 상단 단언 제거. |
+| **NAV-INTEGRATE** | **사이드바 "커뮤니케이션" 그룹 확장** | P3 sweep | ~30분 | sidebar.tsx 의 admin/reports + blocked-users + notification-preferences 메뉴 통합. |
+| **STYLE-2** | **e2e 사전 존재 tsc 2 errors fix** | P3 sweep | 5분 | `phase-14c-alpha-ui.spec.ts:19/20`, S85 secret recovery 후속. 별도 sweep PR. |
+| **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도** | **P0 사용자** | 1분 | S88+S89+S90 8 위치 silent catch 표면화 + S91 origin push 후 final 검증. |
+| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** | **P1 운영자** | ~30분 | Webhooks/SQL Editor/Cron 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터로 새 42501 0건 확인. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86~S95 미수행) Settings 확인. public 이면 비밀번호 회전 권고 강화. |
+| **S87-CK-MEMORY** | **S87-CK-WSL 2 CK → memory/feedback_*.md 룰 승격** | P2 | ~30분 | `feedback_wsl2_single_foreground_call.md` + `feedback_tsx_no_dotenv_autoload.md`. MEMORY.md 색인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=true** (+ 4 feed 확장) | P2 운영자 | 30분 | DB url 갱신 완료. 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
+| ~~M5-ATTACH-1~~ | ~~positive 첨부 flow + RLS 격리 testcase~~ | — | — | ✅ **세션 95 완료** (commit `652ff88`) |
+
+### S96 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **M5-ATTACH-3 진입** (frontend MessageComposer 첨부 UI) — filebox `upload-multipart` 4 라우트 호출 패턴은 `src/components/filebox/file-upload-zone.tsx` 참조. tenantSlug = 'default' 하드코드 (memory `project_tenant_default_sentinel`). 라이브 검증은 `~/dev/ypserver-build/` 미러 cp + bash scripts/run-integration-tests.sh (S95 정착 절차).
+4. 또는 **M5-ATTACH-2 30일 cron** 단독 진입 (frontend 와 독립적).
+5. P0 운영자 carry-over: S88-USER-VERIFY + S88-OPS-LIVE + S86-SEC-1.
+
+### S97 wave 평가 권장 시점
+
+`kdywavecompletion --compare session-92` — M5 첨부 frontend 완료 후 Track C M4+M5+M6 진척 측정. 거버넌스 단언 sunset 결정 자료 + S82 trivially-pass 차단 (M5-ATTACH-6) 효과 정량화.
+
+---
+
+## 🚨 거버넌스 단언 — M4 Phase 2 진입 우선 (S95 sunset 임박, frontend chunk 만 잔여)
+
+**Why**: S85 wave eval 권고 commit 시퀀스 14건 중 S91~S95 = **6/14 commit 진척** (43% 회수, S95 +1). M4 Phase 2 F 트랙 5/5 완주 + M5 검색 + M6 운영자/차단/알림 + M5 첨부 backend = 6/14. M5 첨부 frontend (2 chunk) + 30일 cron 만 잔여.
+
+**Rule**: M4 Phase 2 진입 전 다른 작업 진입 시 사용자 명시 승인 필수 — 자율 실행 메모리(`feedback_autonomy.md`) 적용 안 함. 단, 진짜 긴급 사고만 자율 처리.
+
+**Exceptions** (자율 처리 허용):
+- production down / PG fatal / GitGuardian 알람 / 사용자 직접 보고
+- M4 Phase 2 / M5 / M6 진행 중 자연 발생한 dependency
+- 5분 이내 cosmetic sweep 으로 본 chunk 와 같은 commit 으로 흡수 가능
+
+**Sunset 조건**: M5 첨부 frontend + 30일 cron 완료 시 본 단언 해제 — wave-tracker 본진 가치 95%+ 도달 후 sweep cycle 정상화.
+
+**자율 적용 사례 누적**:
+- S93 F2-2: F2-1 의 자연 dependency (Phase 2 진척 1/14 → 2/14).
+- S94: 사용자 "순차 진행" 명시 결정 후 7 chunk 압축 (5/14).
+- S95: 사용자 "다음 작업 진행" + 동시 터미널 영역 분리 (6/14).
+
+**연관 자료**: [S91 wave eval delta](./260508-session91-wave-completion-eval-delta.md) §2.3 G-NEW-3, [S95 인계서](./260510-session95-m5-attach-rls-positive.md).
 
 ---
 
