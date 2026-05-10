@@ -1,22 +1,67 @@
 /**
- * tenant-almanac manifest TDD — PLUGIN-MIG-1 (S98) 골격 검증.
+ * tenant-almanac manifest TDD — PLUGIN-MIG-2 (S98) 핸들러 본체 이전 후 갱신.
  *
  * 검증 범위:
- *   - alias `@yangpyeon/tenant-almanac` 가 동작 (tsconfig + vitest 동기화)
+ *   - alias `@yangpyeon/tenant-almanac` 동작 (tsconfig + vitest 동기화)
  *   - manifest 가 TenantManifest satisfies + 6 cron handler 선언
- *   - enabled=false (cron runner 가 manifest dispatch 채택 전 의도적 OFF)
+ *   - enabled=true (PLUGIN-MIG-2 핸들러 본체 이전 완료)
  *   - 5 dataApiAllowlist 모델 명시 (PLUGIN-MIG-3 정합)
- *   - todoHandler 가 ok=false + 마이그레이션 안내 메시지 (PLUGIN-MIG-2 미완 노출)
+ *   - 핸들러는 실제 runRssFetcher 등을 invoke (todoHandler stub 제거)
+ *
+ * 핸들러 호출 자체의 비즈니스 로직 (DB IO) 은 별도 테스트
+ * (tests/aggregator/runner.test.ts + handlers/*.test.ts) 에서 mock 으로 검증.
+ * 본 파일은 manifest 의 형태/구조만 검증.
  */
-import { describe, it, expect } from "vitest";
-import { manifest } from "@yangpyeon/tenant-almanac";
+import { describe, it, expect, vi } from "vitest";
 
-describe("tenant-almanac manifest (PLUGIN-MIG-1 골격)", () => {
+// 핸들러를 mock — manifest import 시 DB 의존성 회피.
+vi.mock("../src/handlers/rss-fetcher", () => ({
+  runRssFetcher: vi.fn().mockResolvedValue({
+    status: "SUCCESS",
+    durationMs: 1,
+    message: "mock-rss",
+  }),
+}));
+vi.mock("../src/handlers/html-scraper", () => ({
+  runHtmlScraper: vi.fn().mockResolvedValue({
+    status: "SUCCESS",
+    durationMs: 1,
+  }),
+}));
+vi.mock("../src/handlers/api-poller", () => ({
+  runApiPoller: vi.fn().mockResolvedValue({
+    status: "SUCCESS",
+    durationMs: 1,
+  }),
+}));
+vi.mock("../src/handlers/classifier", () => ({
+  runClassifierHandler: vi.fn().mockResolvedValue({
+    status: "FAILURE",
+    durationMs: 1,
+    message: "mock-classifier-fail",
+  }),
+}));
+vi.mock("../src/handlers/promoter", () => ({
+  runPromoterHandler: vi.fn().mockResolvedValue({
+    status: "SUCCESS",
+    durationMs: 1,
+  }),
+}));
+vi.mock("../src/handlers/cleanup", () => ({
+  runCleanupHandler: vi.fn().mockResolvedValue({
+    status: "SUCCESS",
+    durationMs: 1,
+  }),
+}));
+
+const { manifest } = await import("@yangpyeon/tenant-almanac");
+
+describe("tenant-almanac manifest (PLUGIN-MIG-2)", () => {
   it("identifier 가 'almanac' + Complex tenant 표시", () => {
     expect(manifest.id).toBe("almanac");
     expect(manifest.displayName).toContain("Almanac");
-    // 골격 단계에서는 enabled=false — cron runner 의 manifest dispatch 미채택.
-    expect(manifest.enabled).toBe(false);
+    // PLUGIN-MIG-2: 핸들러 본체 이전 완료 → enabled=true.
+    expect(manifest.enabled).toBe(true);
   });
 
   it("6 cron 핸들러 선언 (rss/html/api/classify/promote/cleanup)", () => {
@@ -30,16 +75,26 @@ describe("tenant-almanac manifest (PLUGIN-MIG-1 골격)", () => {
     expect(keys.length).toBe(6);
   });
 
-  it("핸들러 본체는 미이전 stub (ok=false + 안내 메시지)", async () => {
+  it("rss-fetcher 핸들러: SUCCESS adapter 가 ok=true 변환", async () => {
     const handler = manifest.cronHandlers?.["rss-fetcher"];
     expect(handler).toBeDefined();
     const result = await handler!(
       {},
       { tenantId: "almanac", userId: null, source: "test" },
     );
+    expect(result.ok).toBe(true);
+    expect(result.errorMessage).toBeUndefined();
+  });
+
+  it("classifier 핸들러: FAILURE adapter 가 ok=false + errorMessage 전달", async () => {
+    const handler = manifest.cronHandlers?.["classifier"];
+    expect(handler).toBeDefined();
+    const result = await handler!(
+      {},
+      { tenantId: "almanac", userId: null, source: "test" },
+    );
     expect(result.ok).toBe(false);
-    expect(result.errorMessage).toContain("PLUGIN-MIG-2");
-    expect(result.errorMessage).toContain("rss-fetcher");
+    expect(result.errorMessage).toBe("mock-classifier-fail");
   });
 
   it("5 ContentXxx 모델 dataApiAllowlist read-only 노출", () => {
@@ -52,7 +107,11 @@ describe("tenant-almanac manifest (PLUGIN-MIG-1 골격)", () => {
       "ContentItemMetric",
     ];
     for (const model of expected) {
-      expect(allowlist[model]).toEqual({ read: true, list: true, write: false });
+      expect(allowlist[model]).toEqual({
+        read: true,
+        list: true,
+        write: false,
+      });
     }
   });
 

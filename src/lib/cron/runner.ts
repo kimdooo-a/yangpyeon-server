@@ -2,14 +2,20 @@ import { prisma } from "@/lib/prisma";
 import { runReadonly } from "@/lib/pg/pool";
 import { runIsolatedFunction } from "@/lib/runner/isolated";
 import type { CronKindPayload } from "@/lib/types/supabase-clone";
-import { runAggregatorModule } from "@/lib/aggregator/runner";
-import type { AggregatorModule } from "@/lib/aggregator/types";
+import { dispatchTenantHandler } from "@yangpyeon/core";
+// PLUGIN-MIG-5 (S98): tenant + core handler registry 를 import 시점에 채움.
+// 본 side-effect import 가 dispatcher 전 단 한 줄로 등록을 보장.
+import "@/lib/tenant-bootstrap";
 
 /**
  * 세션 14 Cluster B: Cron 실행 디스패처.
  * Phase 1.5 (T1.5) — 07-adr-028-impl-spec §2.3:
  *   - SQL: main thread (PG connection 안정성 + advisory lock 호환).
  *   - FUNCTION/WEBHOOK: TenantWorkerPool 위임 (격리 + timeout + memory cap).
+ *
+ * Phase 2.2 (S98 PLUGIN-MIG-5): AGGREGATOR 분기를 generic tenant manifest dispatch 로 교체.
+ *   - 본 파일은 더 이상 aggregator 의 module 이름을 알 필요 없음.
+ *   - dispatchTenantHandler(name, payload, ctx) 가 core handler / tenant manifest 를 lookup.
  *
  * 본 함수는 main thread 에서 호출되며 tenantId 를 명시적 인자로 받는다.
  * 라우팅 결정은 Phase 1.5 시작점 — Phase 3 pg-boss 진입 시 본 함수가 boss.work handler 로 이동.
@@ -158,22 +164,48 @@ async function dispatchWebhookOnMain(
 }
 
 /**
- * AGGREGATOR kind — main thread 에서 runAggregatorModule 호출 (Track B B6).
- * tenantId 는 ctx 로 전달되어 aggregator 가 tenantPrismaFor(ctx) 로 격리 사용.
- * memory rule project_workspace_singleton_globalthis: ALS 사용 X, ctx closure 사용.
+ * AGGREGATOR kind — generic tenant manifest dispatch (PLUGIN-MIG-5).
+ *
+ * dispatcher (packages/core/src/tenant/dispatcher.ts) 가 다음 우선순위로 lookup:
+ *   1. core handler (tenant 비특정, 예: messenger-attachments-deref)
+ *   2. tenant manifest cronHandlers[name] (예: almanac 의 rss-fetcher)
+ *
+ * payload.module 누락 시 즉시 FAILURE — handler invocation 시도 X.
+ *
+ * 본 함수는 더 이상 module 이름 / aggregator 도메인을 알 필요 없음.
+ * AGGREGATOR kind 는 향후 "TENANT" 로 rename 가능 (DB 마이그레이션 필요, 별도 ADR).
  */
-async function dispatchAggregatorOnMain(
+async function dispatchTenantHandlerOnMain(
   payload: Partial<CronKindPayload> & Record<string, unknown>,
   tenantId: string,
   started: number,
 ): Promise<CronRunResult> {
-  const moduleName = typeof payload.module === "string" ? payload.module : null;
+  const moduleName =
+    typeof payload.module === "string" ? payload.module : null;
   if (!moduleName) return failure(started, "payload.module 누락");
-  const batch = typeof payload.batch === "number" ? payload.batch : undefined;
-  return await runAggregatorModule(
+
+  const result = await dispatchTenantHandler(
+    moduleName,
+    payload as Record<string, unknown>,
     { tenantId },
-    { module: moduleName as AggregatorModule, batch },
   );
+
+  if (result.ok) {
+    return {
+      status: "SUCCESS",
+      durationMs: Date.now() - started,
+      message:
+        typeof result.processedCount === "number"
+          ? `processed=${result.processedCount}`
+          : undefined,
+    };
+  }
+
+  return {
+    status: "FAILURE",
+    durationMs: Date.now() - started,
+    message: result.errorMessage,
+  };
 }
 
 /**
@@ -183,8 +215,7 @@ async function dispatchAggregatorOnMain(
  *   - SQL: main thread (07-adr-028-impl-spec §2.3 — connection 안정성).
  *   - FUNCTION/WEBHOOK: 현 PR 에서는 main thread 유지 (현행 회귀 0).
  *     후속 PR 에서 TenantWorkerPool 로 격리 진입.
- *   - AGGREGATOR: main thread 에서 runAggregatorModule 호출 (B6, multi-tenant
- *     ctx 전달).
+ *   - AGGREGATOR: dispatchTenantHandlerOnMain → core/tenant manifest dispatch (PLUGIN-MIG-5).
  *
  * 인자 변경 — registry.ts/runNow 가 tenantId 명시 전달.
  *
@@ -215,7 +246,7 @@ export async function dispatchCron(
       return await dispatchWebhookOnMain(job, started);
     }
     if (job.kind === "AGGREGATOR") {
-      return await dispatchAggregatorOnMain(payload, tenantId, started);
+      return await dispatchTenantHandlerOnMain(payload, tenantId, started);
     }
     return failure(started, `지원하지 않는 kind: ${job.kind as string}`);
   } catch (err) {

@@ -22,11 +22,21 @@ export const CORE_VERSION = "0.0.1";
 
 // Phase 1.1: TenantContext (AsyncLocalStorage)
 // Phase 2.1 (S98 PLUGIN-MIG-1): TenantManifest 인터페이스 (workspace plugin)
+// Phase 2.2 (S98 PLUGIN-MIG-5): tenant + core handler 통합 dispatcher (cron runner 전용)
 export {
   getCurrentTenant,
   getCurrentTenantOrNull,
   runWithTenant,
   defineTenant,
+  registerTenant,
+  unregisterTenant,
+  getTenantManifest,
+  listTenantManifests,
+  registerCoreHandler,
+  unregisterCoreHandler,
+  getCoreHandler,
+  clearTenantRegistry,
+  dispatchTenantHandler,
   type TenantContext,
   type TenantManifest,
   type TenantCronHandler,

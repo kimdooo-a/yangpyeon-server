@@ -1,7 +1,18 @@
 /**
  * @yangpyeon/tenant-almanac — 진입점.
  *
- * PLUGIN-MIG-1 (S98) 골격: manifest re-export 만.
- * PLUGIN-MIG-2 부터 핸들러 / 라우트 / admin 모듈을 본격 export.
+ * PLUGIN-MIG-2 (S98): manifest + 6 handler 본체 export.
+ * - manifest: cron runner / route registry 가 dispatch 시 사용.
+ * - handlers/*: 직접 호출 가능 (테스트, 운영 콘솔, future tenant 자체 dispatch).
+ *
+ * 향후 PLUGIN-MIG-3 에서 routes/* 추가, PLUGIN-MIG-4 에서 prisma fragment 별도 보관.
  */
 export { default as manifest } from "../manifest";
+
+// 6 handler — 외부에서 직접 import 가능 (테스트 + 운영 콘솔)
+export { runRssFetcher } from "./handlers/rss-fetcher";
+export { runHtmlScraper } from "./handlers/html-scraper";
+export { runApiPoller } from "./handlers/api-poller";
+export { runClassifierHandler } from "./handlers/classifier";
+export { runPromoterHandler } from "./handlers/promoter";
+export { runCleanupHandler } from "./handlers/cleanup";

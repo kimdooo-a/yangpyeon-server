@@ -22,3 +22,16 @@ export {
   type TenantRouteRegistration,
   type TenantAdminPageRegistration,
 } from "./manifest";
+
+// Phase 2.2 (S98 PLUGIN-MIG-5): tenant + core handler 통합 dispatch.
+export {
+  registerTenant,
+  unregisterTenant,
+  getTenantManifest,
+  listTenantManifests,
+  registerCoreHandler,
+  unregisterCoreHandler,
+  getCoreHandler,
+  clearTenantRegistry,
+  dispatchTenantHandler,
+} from "./dispatcher";

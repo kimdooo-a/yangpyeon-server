@@ -3,45 +3,62 @@
  *
  * Track B / B6 commit — cron AGGREGATOR dispatcher TDD (5 케이스 / 15 중).
  *
- * dispatchCron 의 새 분기:
- *   - job.kind='AGGREGATOR' → dispatchAggregatorOnMain(payload, tenantId, started)
- *   - payload.module 누락 → failure
- *   - 정상 호출 → runAggregatorModule 결과 그대로 반환
+ * PLUGIN-MIG-5 (S98) 갱신: cron/runner.ts 가 더 이상 runAggregatorModule 을
+ * 직접 부르지 않고 @yangpyeon/core 의 dispatchTenantHandler 를 호출.
+ *
+ * dispatchCron 의 AGGREGATOR 분기:
+ *   - job.kind='AGGREGATOR' + payload.module → dispatchTenantHandler(name, payload, ctx)
+ *   - payload.module 누락 → dispatcher 호출 없이 즉시 FAILURE
+ *   - dispatcher 의 TenantCronResult({ ok, errorMessage }) → CronRunResult({ status, message })
+ *     로 매핑.
  *
  * Spec: docs/research/baas-foundation/05-aggregator-migration/2026-04-26-plan.md §2.1
+ *       packages/core/src/tenant/dispatcher.ts (PLUGIN-MIG-5)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1) runAggregatorModule 모킹 — cron dispatcher 가 호출하는 boundary
+// 1) dispatchTenantHandler 모킹 — cron dispatcher 가 호출하는 boundary
 // ─────────────────────────────────────────────────────────────────────────────
-const { runAggregatorModuleMock } = vi.hoisted(() => ({
-  runAggregatorModuleMock: vi.fn(),
+const { dispatchTenantHandlerMock } = vi.hoisted(() => ({
+  dispatchTenantHandlerMock: vi.fn(),
 }));
 
-vi.mock("@/lib/aggregator/runner", () => ({
-  runAggregatorModule: runAggregatorModuleMock,
+// @yangpyeon/core 의 dispatchTenantHandler 만 mock 하고 나머지(defineTenant,
+// registerTenant 등) 는 actual export 유지 — bootstrap 이 manifest import 시
+// defineTenant 를 사용하기 때문.
+vi.mock("@yangpyeon/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@yangpyeon/core")>();
+  return {
+    ...actual,
+    dispatchTenantHandler: dispatchTenantHandlerMock,
+  };
+});
+
+// tenant-bootstrap 이 import 하는 messenger cleanup 도 mock — 실제 실행은 발생하지
+// 않으므로 빈 stub 으로 충분.
+vi.mock("@/lib/messenger/attachment-cleanup", () => ({
+  runMessengerAttachmentCleanup: vi.fn(),
 }));
+
+// almanac manifest 가 trigger 하는 prisma-tenant-client 의 lazy import 는 안전
+// (모듈 로드 시 DB 접근 없음, getter proxy 만 생성됨). 별도 mock 불필요.
 
 import { dispatchCron } from "@/lib/cron/runner";
 
 const FAKE_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 beforeEach(() => {
-  runAggregatorModuleMock.mockReset();
+  dispatchTenantHandlerMock.mockReset();
 });
 
 // =============================================================================
 // dispatchCron AGGREGATOR (5 케이스)
 // =============================================================================
 
-describe("dispatchCron — AGGREGATOR kind 분기", () => {
-  it("11. job.kind='AGGREGATOR' + payload.module → runAggregatorModule 호출", async () => {
-    runAggregatorModuleMock.mockResolvedValue({
-      status: "SUCCESS",
-      durationMs: 100,
-      message: "ok",
-    });
+describe("dispatchCron — AGGREGATOR kind 분기 (PLUGIN-MIG-5)", () => {
+  it("11. job.kind='AGGREGATOR' + payload.module → dispatchTenantHandler 호출", async () => {
+    dispatchTenantHandlerMock.mockResolvedValue({ ok: true });
 
     const result = await dispatchCron(
       {
@@ -53,12 +70,11 @@ describe("dispatchCron — AGGREGATOR kind 분기", () => {
       FAKE_TENANT_ID,
     );
 
-    expect(runAggregatorModuleMock).toHaveBeenCalledTimes(1);
+    expect(dispatchTenantHandlerMock).toHaveBeenCalledTimes(1);
     expect(result.status).toBe("SUCCESS");
-    expect(result.message).toBe("ok");
   });
 
-  it("12. payload.module 누락 → status FAILURE + 'payload.module' 메시지", async () => {
+  it("12. payload.module 누락 → status FAILURE + 'payload.module' 메시지 (dispatcher 호출 X)", async () => {
     const result = await dispatchCron(
       {
         id: "cron-2",
@@ -71,11 +87,11 @@ describe("dispatchCron — AGGREGATOR kind 분기", () => {
 
     expect(result.status).toBe("FAILURE");
     expect(result.message).toMatch(/payload\.module/);
-    expect(runAggregatorModuleMock).not.toHaveBeenCalled();
+    expect(dispatchTenantHandlerMock).not.toHaveBeenCalled();
   });
 
-  it("13. job.tenantId 가 ctx.tenantId 로 전달된다", async () => {
-    runAggregatorModuleMock.mockResolvedValue({ status: "SUCCESS", durationMs: 10 });
+  it("13. tenantId 가 dispatchTenantHandler ctx 로 전달된다", async () => {
+    dispatchTenantHandlerMock.mockResolvedValue({ ok: true });
     const otherTenant = "11111111-1111-1111-1111-111111111111";
 
     await dispatchCron(
@@ -88,16 +104,23 @@ describe("dispatchCron — AGGREGATOR kind 분기", () => {
       otherTenant,
     );
 
-    const ctxArg = runAggregatorModuleMock.mock.calls[0]?.[0] as {
-      tenantId: string;
-    };
-    expect(ctxArg.tenantId).toBe(otherTenant);
+    const [name, payload, ctx] = dispatchTenantHandlerMock.mock.calls[0] as [
+      string,
+      Record<string, unknown>,
+      { tenantId: string },
+    ];
+    expect(name).toBe("promoter");
+    expect(payload.module).toBe("promoter");
+    expect(ctx.tenantId).toBe(otherTenant);
   });
 
-  it("14. payload.batch 가 runAggregatorModule 두 번째 인자에 전달", async () => {
-    runAggregatorModuleMock.mockResolvedValue({ status: "SUCCESS", durationMs: 5 });
+  it("14. payload 전체가 dispatchTenantHandler 두 번째 인자로 전달 (batch 등 plumbing)", async () => {
+    dispatchTenantHandlerMock.mockResolvedValue({
+      ok: true,
+      processedCount: 25,
+    });
 
-    await dispatchCron(
+    const result = await dispatchCron(
       {
         id: "cron-4",
         name: "batch-test",
@@ -107,19 +130,21 @@ describe("dispatchCron — AGGREGATOR kind 분기", () => {
       FAKE_TENANT_ID,
     );
 
-    const payloadArg = runAggregatorModuleMock.mock.calls[0]?.[1] as {
-      module: string;
-      batch?: number;
-    };
+    const [, payloadArg] = dispatchTenantHandlerMock.mock.calls[0] as [
+      string,
+      { module: string; batch?: number },
+      unknown,
+    ];
     expect(payloadArg.module).toBe("classifier");
     expect(payloadArg.batch).toBe(25);
+    // processedCount 가 message 에 노출되어 운영 콘솔이 처리 수량 확인 가능.
+    expect(result.message).toBe("processed=25");
   });
 
-  it("15. runAggregatorModule 결과의 status/durationMs/message 가 그대로 반환된다", async () => {
-    runAggregatorModuleMock.mockResolvedValue({
-      status: "FAILURE",
-      durationMs: 999,
-      message: "rss feed 다운",
+  it("15. ok=false TenantCronResult → status FAILURE + errorMessage 그대로 노출", async () => {
+    dispatchTenantHandlerMock.mockResolvedValue({
+      ok: false,
+      errorMessage: "rss feed 다운",
     });
 
     const result = await dispatchCron(

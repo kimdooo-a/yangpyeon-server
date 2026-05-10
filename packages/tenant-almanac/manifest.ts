@@ -2,68 +2,87 @@
  * @yangpyeon/tenant-almanac/manifest — Almanac (RSS aggregator) tenant 매니페스트.
  *
  * ADR-024 옵션 D (Hybrid: Complex=workspace) 의 첫 적용 사례.
- * PLUGIN-MIG-1 (S98) 골격 — schema-first 정의, 본 핸들러 본체는 추후 chunk 에서 이전.
+ * PLUGIN-MIG-2 (S98) 본격 적용 — 6 핸들러 본체 이전 + adapter 적용.
  *
  * 마이그레이션 단계:
- *   - PLUGIN-MIG-1 (S98, 본 chunk): 골격만 — manifest.ts + 빈 src/handlers/ 디렉토리
- *   - PLUGIN-MIG-2 (Phase 16): src/lib/aggregator/* → packages/tenant-almanac/src/handlers/*
- *   - PLUGIN-MIG-3: src/app/api/v1/almanac/* (alias) + 정식 routes 본체 이전
- *   - PLUGIN-MIG-4: prisma/schema.prisma 의 5 Content* 모델 → packages/tenant-almanac/prisma/fragment.prisma
+ *   - PLUGIN-MIG-1 (S98 1차): 골격만 — manifest.ts + 빈 src/handlers/ 디렉토리
+ *   - PLUGIN-MIG-2 (S98 2차, 본 chunk): src/lib/aggregator/* 핸들러 6개 → packages/tenant-almanac/src/handlers/* 이전
+ *   - PLUGIN-MIG-3: src/app/api/v1/t/[tenant]/{categories,sources,today-top,items,contents}/route.ts → packages/tenant-almanac/src/routes/*
+ *   - PLUGIN-MIG-4: prisma/schema.prisma 의 5 Content* 모델 → packages/tenant-almanac/prisma/fragment.prisma + tenantId backfill + RLS
  *   - PLUGIN-MIG-5: src/lib/cron/runner.ts 의 AGGREGATOR kind 분기 제거 → manifest dispatch
  *
- * 본 단계의 핸들러는 모두 "미이전" stub — cron runner 가 본 매니페스트로 dispatch 되기
- * 전까지는 기존 `src/lib/aggregator/runner.ts:runAggregatorModule` 가 계속 사용됨.
+ * 핸들러는 본격 이전 완료. 단, cron runner 가 본 매니페스트로 dispatch 되기 전까지 (PLUGIN-MIG-5)
+ * 기존 `src/lib/aggregator/runner.ts:runAggregatorModule` 가 thin wrapper 로 동일 핸들러를 호출.
  */
 import { defineTenant, type TenantCronHandler } from "@yangpyeon/core";
+import type { AggregatorRunResult } from "@/lib/aggregator/types";
+import { runRssFetcher } from "./src/handlers/rss-fetcher";
+import { runHtmlScraper } from "./src/handlers/html-scraper";
+import { runApiPoller } from "./src/handlers/api-poller";
+import { runClassifierHandler } from "./src/handlers/classifier";
+import { runPromoterHandler } from "./src/handlers/promoter";
+import { runCleanupHandler } from "./src/handlers/cleanup";
+import type { TenantContext } from "@/lib/db/prisma-tenant-client";
 
-/** 핸들러 본체 미이전 placeholder — PLUGIN-MIG-2 에서 실제 import 로 교체. */
-function todoHandler(moduleName: string): TenantCronHandler {
-  return async () => ({
-    ok: false,
-    errorMessage: `tenant-almanac '${moduleName}' 핸들러 본체 미이전 (PLUGIN-MIG-2 에서 src/lib/aggregator/${moduleName}.ts 본체 → packages/tenant-almanac/src/handlers/${moduleName}.ts 이전 필요)`,
-  });
+/**
+ * AggregatorRunResult → TenantCronResult adapter.
+ *
+ * AggregatorRunResult: { status: "SUCCESS"|"FAILURE"|"TIMEOUT", durationMs, message? }
+ * TenantCronResult:    { ok, processedCount?, errorMessage? }
+ *
+ * 매핑:
+ *   - ok = (status === "SUCCESS")
+ *   - errorMessage = (status !== "SUCCESS") 시 message
+ *   - processedCount = undefined (message 가 freeform 이라 안전한 파싱 어려움;
+ *     향후 enhancement 필요 시 AggregatorRunResult 에 structured count 필드 추가)
+ */
+function adapt(
+  fn: (
+    ctx: TenantContext,
+    payload?: Record<string, unknown>,
+  ) => Promise<AggregatorRunResult>,
+): TenantCronHandler {
+  return async (payload, ctx) => {
+    const result = await fn(ctx, payload);
+    return {
+      ok: result.status === "SUCCESS",
+      errorMessage:
+        result.status === "SUCCESS" ? undefined : result.message,
+    };
+  };
 }
 
 export default defineTenant({
   id: "almanac",
-  version: "0.0.1",
+  version: "0.1.0",
   displayName: "Almanac (RSS Aggregator)",
-  /** 본격 dispatch 전까지 false — cron runner 가 본 manifest 를 무시하고 기존 AGGREGATOR 분기 사용. */
-  enabled: false,
+  /**
+   * PLUGIN-MIG-2: 핸들러 본체 이전 완료 → enabled=true.
+   * cron runner 가 manifest dispatch 채널을 사용하도록 PLUGIN-MIG-5 에서 전환.
+   * 그 전까지는 src/lib/aggregator/runner.ts 가 동일 핸들러를 호출 (호환 경로).
+   */
+  enabled: true,
 
   cronHandlers: {
-    "rss-fetcher": todoHandler("rss-fetcher"),
-    "html-scraper": todoHandler("html-scraper"),
-    "api-poller": todoHandler("api-poller"),
-    classifier: todoHandler("classifier"),
-    promoter: todoHandler("promoter"),
-    cleanup: todoHandler("cleanup"),
+    "rss-fetcher": adapt(runRssFetcher),
+    "html-scraper": adapt(runHtmlScraper),
+    "api-poller": adapt(runApiPoller),
+    classifier: adapt(runClassifierHandler),
+    promoter: adapt(runPromoterHandler),
+    cleanup: adapt(runCleanupHandler),
   },
 
   /**
-   * Phase 1.6 (T1.6) 시점에 src/app/api/v1/almanac/[...path]/route.ts 가 308 alias 로
-   * /api/v1/t/almanac/* 으로 redirect 만 한다. 정식 핸들러 본체는 PLUGIN-MIG-3 에서 이전.
+   * PLUGIN-MIG-3 에서 본격 추가 — 현재는 src/app/api/v1/t/[tenant]/{...}/route.ts 가
+   * 직접 처리. manifest.routes 는 [tenant]/[...path] catch-all dispatcher 가 사용 예정.
    */
-  routes: [
-    // PLUGIN-MIG-3 에서 본격 추가:
-    // { path: "/api/v1/t/almanac/contents", handler: () => import("./src/routes/contents") },
-    // { path: "/api/v1/t/almanac/categories", handler: () => import("./src/routes/categories") },
-    // { path: "/api/v1/t/almanac/sources", handler: () => import("./src/routes/sources") },
-    // { path: "/api/v1/t/almanac/items", handler: () => import("./src/routes/items") },
-    // { path: "/api/v1/t/almanac/today-top", handler: () => import("./src/routes/today-top") },
-  ],
+  routes: [],
 
   /**
-   * 현재 admin UI (현 코드베이스) — src/app/(protected)/admin/aggregator/* 에 존재 안 함.
-   * 본 컨슈머의 운영자 대시보드는 차후 구현 (PLUGIN-MIG-3 와 동시 또는 그 후).
+   * 현재 admin UI (현 코드베이스) — src/app/(protected)/admin/aggregator/* 에 존재.
+   * PLUGIN-MIG-3 또는 후속에서 본 manifest 의 adminPages 에 등록.
    */
-  adminPages: [
-    // PLUGIN-MIG-3 또는 후속에서 본격 추가:
-    // { slug: "sources", page: () => import("./src/admin/sources/page") },
-    // { slug: "categories", page: () => import("./src/admin/categories/page") },
-    // { slug: "items", page: () => import("./src/admin/items/page") },
-    // { slug: "dashboard", page: () => import("./src/admin/dashboard/page") },
-  ],
+  adminPages: [],
 
   /** PLUGIN-MIG-4 에서 본격 채택. 현재는 prisma/schema.prisma 본체에 5 Content* 모델 그대로. */
   prismaFragment: "./prisma/fragment.prisma",
