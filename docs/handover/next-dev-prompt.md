@@ -5,9 +5,68 @@
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 96 logic+utility sub-chunk 종료 — M5-ATTACH-3a/3c, commit `bf7255a`, TDD +26, vitest 61/61 PASS)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 96 후속 sub-chunk 종료 — M5-ATTACH 잔여 4 chunk + 4 sweep 압축, M4 Phase 2 본진 100% + 거버넌스 단언 sunset, 5 commit 사슬 `6bb29c7→7ceb075→a9aeede→da8786b`, TDD +17, 라이브 vitest 누적 34 PASS)
 
-세션 96 = S95 /cs push 직후 같은 컨텍스트에서 자율 진입 (사용자 "go on"). M5-ATTACH-3 (1-1.5일) 을 3 sub-step (3a utility / 3b UI 통합 / 3c logic 확장) 으로 분해, 본 세션 = 3a + 3c logic-only 단일 commit. 3b UI 통합은 jsdom 미도입 = 수동 영역 다음 세션 분리.
+세션 96 후속 sub-chunk = 직전 logic+utility sub-chunk (`bf7255a` + /cs `ee82c8c`) 종료 후 사용자 "다음 단계 모두 순차적으로 진행" + "잔여 작업도 모두 순차적으로 진행" 두 분기. 본 터미널이 M5-ATTACH 잔여 4 chunk (M5-ATTACH-2 cron / M5-ATTACH-3b UI / M5-ATTACH-4 Bubble / M5-ATTACH-5 sweep) + S96 P3 sweep 4건 (STYLE-2 + M5-ATTACH-6 + NAV-INTEGRATE + GOV-SUNSET) 일괄 마감. **M4 Phase 2 본진 100% 도달 → 거버넌스 단언 sunset**.
+
+- **M5-ATTACH-2 30일 cron deref**: ADR-030 §Q8 (b) 정착. AggregatorModule 에 `messenger-attachments-deref` 추가 (광범위 수정 회피). `runMessengerAttachmentCleanup(ctx, opts)` = withTenantTx + tenantId 명시 (S84-D defense-in-depth) + 30일 cutoff. seed-messenger-cron.ts default tenant 시드 (enabled=FALSE, 운영자 결정 보류). 라이브 6/6 PASS.
+
+- **M5-ATTACH-3b/4 frontend UI**: 직전 chunk `bf7255a` 의 `composer-logic.SendPayload` 시그니처 정합 → **page.tsx 변경 0** (logic-only TDD 분리 패턴 정량 효과 실증). MessageComposer.tsx Paperclip 활성화 + chip 5장 + 진행률 bar + 제거 버튼. MessageAttachment.tsx 신규 (IMAGE 단일 max 240×240 / 다수 2열 grid, FILE/VOICE 다운로드, recalled placeholder). filebox download endpoint 재사용 (Content-Disposition 강제하지만 `<img src>` 무시).
+
+- **M5-ATTACH-5 sweep**: backend 이미 정합 → MessageSearch.tsx 빈 본문 "📎 첨부 N건" 표식 + messages.test.ts 30일 cron deref e2e (admin pool deletedAt 31일/5일 강제 → tenant_b 0 row 격리 검증). 라이브 15/15 PASS.
+
+- **M5-ATTACH-6 trivially-pass 차단**: rls.test.ts bootstrap 6 모델 시드 강화 + `expect(rows.length >= 1)` active assertion 추가. **S82 "4 latent bug" 패턴 재발 방지** — 4개월 prod hidden 위험 해소. 라이브 13/13 PASS.
+
+- **STYLE-2**: phase-14c-alpha-ui.spec.ts requireEnv() 헬퍼 도입 (TS narrowing). **S82 이후 처음으로 tsc 사전 errors 0**.
+
+- **NAV-INTEGRATE**: sidebar.tsx 커뮤니케이션 그룹 4 항목 실제 라우트 정합 (3 wrong fix + 1 missing add). 사용자가 모든 메신저 기능 도달 가능.
+
+- **GOV-SUNSET**: 거버넌스 단언 [SUNSET 2026-05-10 / S96] 표식 + 해소 commit 사슬 + 정책 전환 명시. 자율 적용 사례 누적 그대로 보존 (CLAUDE.md "역사 삭제 금지"). Sunset 후 정책: feedback_autonomy.md 일반 적용.
+
+- **PR 게이트 5항목 모든 chunk 자동 통과**: 신규 모델 0 / 신규 라우트 0 / Prisma 호출 = withTenantTx + tenantId 명시 / non-BYPASSRLS 라이브 PASS (rls.test.ts 13/13) / timezone-sensitive 비교 0.
+
+- **검증**: tsc 신규 0 + 사전 0 / vitest unit 169/169 PASS (composer-logic + bubble-variant + 13 file 회귀) / 라이브 vitest 누적 34 PASS (attachment-cleanup 6 + messages 15 + rls 13) / origin push `ee82c8c..a9aeede..da8786b`.
+
+- **터치 안 함**: file-upload-zone.tsx → attachment-upload utility 마이그레이션 (별도 sweep) / 사용자 P0 carry-over (S88-USER-VERIFY 사용자 / S88-OPS-LIVE 운영자 / S86-SEC-1 운영자) / DB password 회전 / S87 carry-over (S87-CK-MEMORY 메모리 룰 승격, S87-RSS-ACTIVATE, S87-TZ-MONITOR) / cron 활성화 (운영자 검토 대기).
+
+---
+
+## ⭐ 세션 97 첫 작업 우선순위 (세션 96 후속 sub-chunk 종료 시점, 2026-05-10)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **S97-WAVE-EVAL** | **kdywavecompletion --compare session-92** — Track C M4+M5+M6 진척 측정 | **P0** | ~1시간 | M5 첨부 frontend 완료 + S82 trivially-pass 차단 효과 정량화 + 거버넌스 단언 sunset baseline. wave-tracker §0 갱신 자료. |
+| **S87-CK-MEMORY** | **S87-CK-WSL 2 CK → memory/feedback_*.md 룰 승격** | P2 | ~30분 | `feedback_wsl2_single_foreground_call.md` + `feedback_tsx_no_dotenv_autoload.md`. MEMORY.md 색인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=true** (+ 4 feed 확장) | P2 운영자 | 30분 | DB url 갱신 완료. 운영자 결정. |
+| **CRON-ACTIVATE** | **messenger-attachments-deref enable** | P2 운영자 | 1분 | `npx tsx scripts/seed-messenger-cron.ts --tenant=default --enabled` 실행. 운영자 검토 후. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | M3 SSE / 메신저 / 운영 콘솔 정상 동작 확인. |
+| **FILEBOX-MIGRATE** | **file-upload-zone.tsx → attachment-upload.ts utility 통합** | P3 sweep | ~30분 | 결합 0 유지하며 단일 utility 로 마이그레이션 (filebox 측 변경). 별도 commit. |
+| **S88-USER-VERIFY** | **사용자 휴대폰에서 stylelucky4u.com/notes 재시도** | **P0 사용자** | 1분 | S88+S89+S90 8 위치 silent catch 표면화 + S91 origin push 후 final 검증. |
+| **S88-OPS-LIVE** | **다른 ops 콘솔 라이브 호출** | **P1 운영자** | ~30분 | Webhooks/SQL Editor/Cron 콘솔 5~7 메뉴 클릭 + PM2 stderr 모니터. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 운영자** | 30초 | (S86~S96 미수행) Settings 확인. public 이면 비밀번호 회전 권고 강화. |
+| ~~M5-ATTACH-2~~ | ~~30일 첨부 dereference cron~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `6bb29c7`) |
+| ~~M5-ATTACH-3b~~ | ~~MessageComposer 첨부 UI 통합~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `7ceb075`) |
+| ~~M5-ATTACH-4~~ | ~~MessageBubble + MessageAttachment 렌더~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `7ceb075`) |
+| ~~M5-ATTACH-5~~ | ~~search 응답 attachments + e2e 시나리오~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `a9aeede`) |
+| ~~M5-ATTACH-6~~ | ~~rls.test.ts bootstrap 6 모델 시드 강화~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `da8786b`) |
+| ~~STYLE-2~~ | ~~e2e 사전 존재 tsc 2 errors fix~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `da8786b`) |
+| ~~NAV-INTEGRATE~~ | ~~사이드바 "커뮤니케이션" 그룹 정합~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `da8786b`) |
+| ~~GOV-SUNSET~~ | ~~거버넌스 단언 sunset 결정~~ | — | — | ✅ **세션 96 후속 sub-chunk 완료** (commit `da8786b`, [SUNSET 2026-05-10] 표식) |
+
+### S97 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **S97-WAVE-EVAL 진입 권장** — `kdywavecompletion --compare session-92` 호출. M4 Phase 2 완주 + S82 trivially-pass 차단 + 거버넌스 단언 sunset 효과 정량화. wave-tracker §0 갱신 자료 산출.
+4. 또는 P2 sweep 일괄 진입 (`S87-CK-MEMORY` ~30분 + `S87-RSS-ACTIVATE` 운영자 결정 + `CRON-ACTIVATE` 1분 + `FILEBOX-MIGRATE` ~30분).
+5. P0 운영자 carry-over: S88-USER-VERIFY + S88-OPS-LIVE + S86-SEC-1.
+6. **거버넌스 단언 sunset 후 정책**: 자율 실행 메모리(`feedback_autonomy.md`) 일반 적용. 다음 작업 진입 시 분기 질문 없이 권장안 즉시 채택. 긴급 사고만 사용자 확인 필수.
+
+### S97 wave 평가 권장 시점
+
+`kdywavecompletion --compare session-92` — M5 첨부 frontend (M5-ATTACH-2/3b/4/5) 완료 + S82 trivially-pass 차단 (M5-ATTACH-6) 효과 정량화 + 거버넌스 단언 sunset baseline. Track C M4+M5+M6 진척 측정 + Track A/B/C/D 4-Track 매트릭스 갱신.
+
+---
 
 - **ADR-033 X1 server proxy + ADR-030 §FK 재사용 결정 정합 확인** — backend 변경 0, filebox `upload-multipart/{init,part,complete,abort}` 4 라우트 그대로 호출.
 
