@@ -1,11 +1,73 @@
-# 다음 세션 프롬프트 (세션 98)
+# 다음 세션 프롬프트 (세션 99)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
 
 ---
 
-## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 97 wave eval 3차 + DOC-WAVE-2 + TAG-2 + S87-CK-MEMORY 종료, commit `719bfa7`, 2 files +407/-31, 5 tags push, 92/100 A-)
+## 프로젝트 컨텍스트 — 멀티테넌트 BaaS (세션 98 INFRA-2 wave + PLUGIN-MIG-1 골격 종료, commits `ff698fe` INFRA-2 16 files +1346/-170 + `4840fa6` PLUGIN-MIG-1 16 files +499, vitest 761 → 809 PASS, 회귀 0)
+
+세션 98 = S97 사용자 "1, 2 순차적으로 진행" 직후 자율 진입. INFRA-2 4 task 완수 + PLUGIN-MIG-1 골격 정착. **TDD +48 신규 (smoke 2 + hook 9 + uploadAttachment 5 + 컴포넌트 26 + manifest 6)**.
+
+- **INFRA-2 wave 본진**: SWR 2.4.1 + MSW 2.14.5 + jsdom 29 + RTL 16 인프라. 글로벌 env=node 유지 + `// @vitest-environment jsdom` 파일 단위 opt-in (속도 회귀 0). setup.ts jsdom 분기 = jest-dom matcher + RTL afterEach(cleanup) + scrollIntoView polyfill.
+- **SWR 마이그레이션**: useConversations + useMessages 둘 다 useState/fetch → useSWR. mutate(updater, {revalidate: false}) 패턴으로 sendOptimistic + SSE applyEventToMessages 통일. **page.tsx 변경 0** (시그니처 보존). dedup TDD (3 fetches → 1 fetch) RED→GREEN.
+- **uploadAttachment 본체 jsdom+MSW**: 5 시나리오 (local happy / 4xx server error / 5GB cap / multipart happy / multipart abort fallback). `Object.defineProperty(file, "size", ...)` 로 file.size mock. **G-NEW-12 갭 해소**.
+- **4 컴포넌트 렌더 TDD**: MessageAttachment 7 + MessageBubble 7 + MessageList 7 + MessageComposer 5 = 26 test. **wave-tracker §6 가정 정정**: "M4 UI = TDD 압축 적용 불가" 가정 무너짐 — logic-only 와 동일 분량/시간 압축률.
+- **함정 자가 발견 2건**: (a) `@testing-library/react` auto-cleanup 은 vitest globals=true 일 때만 동작 → setup.ts jsdom 분기에 `afterEach(cleanup)` 명시 등록. (b) jsdom 29 미구현 `scrollIntoView` polyfill 추가. 두 함정 모두 setup.ts 에 흡수 → 향후 hook/component test 작성 시 자동 적용.
+- **PLUGIN-MIG-1 골격** (ADR-024 옵션 D, Hybrid: Complex=workspace): TenantManifest interface (cronHandlers + routes + adminPages + prismaFragment + envVarsRequired + dataApiAllowlist 6 필드) + defineTenant helper. **packages/tenant-almanac/** = manifest.ts (6 todoHandler stub = ok=false + PLUGIN-MIG-2 안내 메시지) + package.json (peer-dep @yangpyeon/core) + tsconfig + prisma/fragment.prisma placeholder + src/{handlers,routes,admin}/.gitkeep (이전 매핑 표) + README (5 단계 마이그레이션 표 + 호출 흐름 현재 vs 목표).
+- **alias 정착**: tsconfig + vitest 양쪽에 `@yangpyeon/tenant-almanac` 추가.
+- **메타 가치**: ADR-022 7원칙 #4 "코드 수정 0줄 신규 컨슈머" 토대 + todoHandler stub 의 ok=false 메시지가 PLUGIN-MIG-2~5 진척도 자동 노출 + S97 G-NEW-7 (schema-first 6배 압축) 의 작동 메커니즘.
+- **PR 게이트 5항목 모든 chunk 자동 통과**: 신규 모델 0 / 라우트 0 (manifest.routes 빈 배열 + 308 alias 그대로) / Prisma 호출 변경 0 (cron runner AGGREGATOR 분기 그대로) / RLS 라이브 N/A (UI 인프라 + 골격) / timezone 비교 0.
+- **검증**: vitest 809 PASS / 94 skip / tsc 0 errors / 2 commits + push origin spec/aggregator-fixes.
+- **다른 터미널 fe8ea02 동시 commit**: 본 세션 진행 중 다른 터미널이 S97 /cs 마감 docs commit 정착 (영역 분리 명시). `feedback_concurrent_terminal_overlap` 정합. 충돌 0.
+- **알려진 이슈**: 없음 (인프라 + 골격 정착 + 0 회귀).
+- **터치 안 함**: PLUGIN-MIG-2~5 (Phase 16+ 단독 chunk) / FILE-UPLOAD-MIG (filebox file-upload-zone → attachment-upload utility, 별도 sweep) / S88-USER-VERIFY 사용자 / S86-SEC-1 사용자 / S87-RSS-ACTIVATE 운영자 / S87-TZ-MONITOR / cron enable 30일 도달 시점 / sweep 4건.
+
+---
+
+## ⭐ 세션 99 첫 작업 우선순위 (세션 98 INFRA-2 + PLUGIN-MIG-1 종료 시점, 2026-05-10)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **DECISION-1** | **다음 큰 가치 결정 — PLUGIN-MIG-2 vs FILE-UPLOAD-MIG vs sweep / carry-over** | **P0 사용자** | 5분 | (A) PLUGIN-MIG-2 본체 이전 (~1일, apps/web 빌드 entry 분리 필요 — 모노레포 도구 채택 turborepo/pnpm-workspace) / (B) FILE-UPLOAD-MIG sweep (~30분, INFRA-2 인프라 활용 가능) / (C) 사용자 carry-over 처리 (S88-USER-VERIFY 1분 + S86-SEC-1 30초). 권장 = (B) → (A) (sweep 짧은 chunk 후 본격 plugin 본체 이전). |
+| **PLUGIN-MIG-2** | **`src/lib/aggregator/*` → `packages/tenant-almanac/src/handlers/*` 이전** | P0 | ~1일 | apps/web 빌드 entry 분리 (Next.js) — turborepo / pnpm-workspace 도입 결정 필요. |
+| **PLUGIN-MIG-3** | **정식 REST 라우트 + admin UI 신설 (308 alias 제거)** | P1 | ~1-2일 | manifest dispatch 가 cron runner AGGREGATOR 분기 대체 가능 (PLUGIN-MIG-5 의존성). |
+| **PLUGIN-MIG-4** | **Prisma fragment 활성 + tenantId backfill + RLS** | P1 | ~1-2일 | ADR-023 옵션 B 정합. ContentXxx 5 모델 backfill SQL + RLS 정책 마이그레이션. |
+| **PLUGIN-MIG-5** | **cron runner AGGREGATOR 분기 제거 → manifest dispatch** | P1 | ~0.5일 | PLUGIN-MIG-2~4 모두 완료. |
+| **FILE-UPLOAD-MIG** | **filebox file-upload-zone.tsx → attachment-upload utility 통합** | P3 sweep | ~30분 | INFRA-2 정착 직후 자연 후보, 결합 0 유지 마이그레이션. |
+| **S88-USER-VERIFY** | **사용자 휴대폰 stylelucky4u.com/notes 재검증** | **P0 사용자** | 1분 | S88+S89+S90 silent catch + S91 origin push + S96 후속-2 OPS-LIVE PASS 후 final 검증. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 사용자** | 30초 | (S86~S98 미수행) Settings 확인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=true** | P2 운영자 | 30분 | 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | 사용자 짬에. |
+| **CRON-MA-ENABLE** | **`messenger-attachments-deref` enabled=true** | P3 | 1분 | 운영자 결정, 30일 도달 시점. |
+| **STYLE-3** | sticky-note-card.tsx:114 endDrag stale closure | P3 sweep | ~15분 | 별도 PR. |
+| **DEBOUNCE-1** | M5 검색 300ms debounce | P3 sweep | ~30분 | UX 개선. |
+| **NEW-BLOCK-UI** | 대화 화면 hover → 차단 진입 메뉴 | P3 sweep | ~30분 | UX 보완. |
+| ~~INFRA-2~~ | ~~SWR + MSW 도입 + 컴포넌트 렌더 TDD~~ | — | — | ✅ **세션 98 완료** (commit `ff698fe`, TDD +40) |
+| ~~PLUGIN-MIG-1~~ | ~~Almanac plugin schema-first 골격~~ | — | — | ✅ **세션 98 완료** (commit `4840fa6`, TDD +8) |
+
+### S99 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -10` (memory `feedback_concurrent_terminal_overlap`)
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **DECISION-1 사용자 결정** — 다음 큰 가치 (PLUGIN-MIG-2 / FILE-UPLOAD-MIG / 사용자 carry-over) 진입.
+4. 또는 자율 진입 메모리 적용 (분기 질문 금지) — 권장 순서 = FILE-UPLOAD-MIG (~30분) → PLUGIN-MIG-2 본체 이전 (~1일, apps/web 빌드 entry 분리 결정 동반).
+
+### S99+ wave 평가 권장 시점
+
+`kdywavecompletion --compare session-96` — PLUGIN-MIG-2~5 진척 후 (~S101+). Track C 인프라 보강 효과 + plugin 격리 정량화 + G-NEW-4 wave-tracker stale 재발 차단 효과 검증.
+
+### 정책
+
+- 거버넌스 단언 [SUNSET 2026-05-10/S96] 후 → `feedback_autonomy.md` 일반 적용. 자율 진입 (긴급 사고만 사용자 확인).
+- /cs 6단계 공식화 권고 진행 중 (글로벌 룰 변경 영역, 본 /cs 가 두 번째 wave-tracker §8 row 갱신 사례).
+- ADR-024 옵션 D plugin 격리 본격 진입 (PLUGIN-MIG-1 골격 정착) → PLUGIN-MIG-2 부터 본체 이전 + apps/web 빌드 entry 분리 결정.
+
+---
+
+## 이전 컨텍스트 (참고용 — 세션 97)
+
+세션 97 wave eval 3차 + DOC-WAVE-2 + TAG-2 + S87-CK-MEMORY 종료, commit `719bfa7`, 2 files +407/-31, 5 tags push, 92/100 A-.
 
 세션 97 = 다른 터미널 S96 후속-2 (`c706275` PM2 timeline correlation PASS) 직후 본 터미널 진입. 사용자 "wave 기반 구현도 검증" → kdywavecompletion 스킬 호출 → S91 baseline (82/100 B+) 대비 delta 평가 → **S96 92/100 A- (+10 회복)**.
 
