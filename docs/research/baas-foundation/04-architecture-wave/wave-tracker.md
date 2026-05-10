@@ -10,9 +10,11 @@
 
 ## 0. 한 줄 요약
 
-S80~S83 4 세션 동안 wave-wiggly-axolotl 시퀀스(원래 5 세션 분량)가 5x 압축 실행됨. **Track A ~95% / Track B 100% / Track C 60% / Track D stabilized**. 다음 단일 가장 큰 가치 = **Track C M4 UI 보드 (5~7 작업일 chunk)**.
+S80~S83 4 세션 동안 wave-wiggly-axolotl 시퀀스(원래 5 세션 분량)가 5x 압축 실행됨. **(S96 시점) Track A ~95% (품질 깊이 ↑↑) / Track B 100% / Track C ~95% (본진 100% 도달) / Track D stabilized**. 다음 단일 가장 큰 가치 = **Almanac plugin 마이그레이션 (ADR-024 옵션 D, ~5-7일 단독 chunk)** 또는 INFRA-2 wave (SWR + MSW, ~3-4h).
 
 **S85~S91 갱신 (2026-05-08)**: Track A 품질 깊이 ↑ (S88 systemic GRANT fix 4-month prod latent 차단 + S89~S90 silent catch sweep 8 위치 표면화 + S91 origin push 해소) / Track B TDD 81→100% (R-W1 해소, llm 27/promote 27/runner 15) / Track C **M4 Phase 2 0% 진행 (6 세션 정체, G-NEW-3 거버넌스 단언 정착)** / Track D 변화 없음. 종합 등급 S85 87/100 → S91 82/100 (-5, Track C 정체 페널티). 상세: [S91 wave eval delta](../../../handover/260508-session91-wave-completion-eval-delta.md).
+
+**S92~S96 갱신 (2026-05-10, S97 wave eval delta)**: **G-NEW-3 극적 해소 (M4 Phase 2 0/14 → 12/14, 86% 회복)** — 거버넌스 단언이 5 세션 16 commit 동안 효력 발휘 → S92 F2-1 + S93 F2-2 + S94 F2-3/F2-4+INFRA-1/F2-5 + M5 검색 + M6 운영자/차단/알림 + S94 sharpedge PASS + S95 M5-ATTACH-1 + S96 M5-ATTACH-2/3a/3c/3b/4/5 + S96 sweep 4건 (STYLE-2 + M5-ATTACH-6 trivially-pass 차단 + NAV-INTEGRATE + GOV-SUNSET) + S96 후속-2 OPS-LIVE PM2 log timeline correlation PASS. **거버넌스 단언 [SUNSET 2026-05-10/S96] 표식 + 역사 보존** 자연 해소. Track C 70% → **~95%** (본진 100% 도달, SWR + 라이브 e2e 5% 잔여). 종합 등급 S91 82/100 → **S96 92/100 (+10, A-)**. **G-NEW-4 wave-tracker stale 재발 (S91+ 이후 5 세션 stale, 본 row 가 첫 갱신)** + R-W7+ S94/S95/S96 마일스톤 git tag 부재 (TAG-2 권고). 상세: [S97 wave eval delta](../../../handover/260510-session97-wave-completion-eval-delta.md).
 
 ---
 
@@ -20,10 +22,10 @@ S80~S83 4 세션 동안 wave-wiggly-axolotl 시퀀스(원래 5 세션 분량)가
 
 | Track | 영역 | 시퀀스 | 완료 % | 마지막 마일스톤 (commit) |
 |---|---|---|---|---|
-| **A** | BaaS Foundation | Phase 0~4 (T1.1~T1.7 + R1/R2 + RLS) | **~95% (품질 깊이 ↑)** | S88 `app_admin` GRANT systemic fix 4개월 prod latent (`d18154e`) + S89~S90 silent catch 8 위치 표면화 (`d10b5e9` `5f64675`) + S91 origin push 해소 (`899090b`). prod TimeZone=UTC 운영 .env 검증 PASS (S91). |
-| **B** | Almanac Aggregator | T1~T9 (B-pre + B1~B8) | **100% (TDD 100%, R-W1 해소)** | S81 첫 라이브 카드 50개 (`ffdd2dd`). S83 9 RSS active. **S87 TDD 81→100% (`effd6fa`, llm 27/promote 27/runner 15 = +32 case 정확 일치)**. |
-| **C** | Messenger Phase 1 | M0~M6 (PRD + 9 모델 + 6 enum + 17 라우트 + SSE + UI + 안전 + 알림) | **70% (M4 Phase 2 정체)** | S84 M4 UI Phase 1 라이브 (`f3bf611`). **M4 Phase 2 6 세션 정체 (S85~S91 = 0건 진행, G-NEW-3 거버넌스 단언 정착)**. M5/M6 미시작. |
-| **D** | Filebox | R2→SeaweedFS pivot + multipart + body limit | **stabilized** | S79 Next.js 16 standalone 100mb fix (`fd4d666`). S83 multipart cleanup cron. 변화 없음. |
+| **A** | BaaS Foundation | Phase 0~4 (T1.1~T1.7 + R1/R2 + RLS) | **~95% (품질 깊이 ↑↑)** | S88 `app_admin` GRANT systemic fix + S89~S90 silent catch + S91 origin push + **S96 trivially-pass 차단 메커니즘 정착** (M5-ATTACH-6 active assertion `da8786b`) + **S96 WSL 빌드 미러 표준 절차 정착** (라이브 누적 47 PASS) + **S96 후속-2 OPS-LIVE PM2 timeline correlation PASS** (5일+ 0 errors). |
+| **B** | Almanac Aggregator | T1~T9 (B-pre + B1~B8) | **100% (TDD 100%)** | S81 첫 라이브 카드 50개. S87 TDD 81→100%. **S96 AggregatorModule `messenger-attachments-deref` 추가** (`6bb29c7`, ADR-022~029 §3 격리 패턴 일반화 — cleanup + messenger 두 모듈 동일 구조). |
+| **C** | Messenger Phase 1 | M0~M6 (PRD + 9 모델 + 6 enum + 17 라우트 + SSE + UI + 안전 + 알림 + 첨부) | **~95% (본진 100% 도달, S91+ 거버넌스 효과)** | **S94 F 트랙 5/5 완주** (`8903e1d` F2-3 + `088f623` F2-4+INFRA-1 + `5a29980` F2-5) + **S94 M5 검색** (`112c8be`) + **S94 M6 운영자/차단/알림** (`2f9125a` + `5f5253c`) + **S94 sharpedge PASS** (`8f873c3`) + **S95 M5-ATTACH-1** (`652ff88`) + **S96 M5-ATTACH-2/3a/3c/3b/4/5** (`6bb29c7..a9aeede`) + **S96 sweep 4건** (`da8786b` STYLE-2 + M5-ATTACH-6 + NAV-INTEGRATE + GOV-SUNSET). 잔여 5% = SWR 마이그레이션 + 라이브 e2e (INFRA-2 wave). |
+| **D** | Filebox | R2→SeaweedFS pivot + multipart + body limit | **stabilized** | S79 Next.js 16 standalone 100mb fix. S83 multipart cleanup cron. **M5 첨부가 `upload-multipart/{init,part,complete,abort}` 4 라우트 재사용 — Track D 자체 무변경 + 재사용 증명**. |
 
 ---
 
@@ -52,11 +54,14 @@ S80~S83 4 세션 동안 wave-wiggly-axolotl 시퀀스(원래 5 세션 분량)가
 
 ### 2.3 잔여
 
-- [x] **prod DATABASE_URL TimeZone=UTC 적용** ✅ S91 운영 `~/ypserver/.env` grep 검증 — `options=-c TimeZone%3DUTC` URL-encoded 적용 확인.
-- [x] **PR 리뷰 게이트 룰 정착** (RLS + tenantPrismaFor closure + non-BYPASSRLS test) ✅ + S88 후속 #4 BYPASSRLS=t 라이브 SET ROLE 게이트 확장 (`d10b5e9`).
-- [x] **`app_admin` GRANT systemic fix** ✅ S88 — `prisma/migrations/20260505000000_grant_app_admin_all_public/migration.sql` 직접 적용 + ALTER DEFAULT PRIVILEGES 3종 + 37/37 ALL 검증.
-- [x] **silent catch 30 후보 sweep** ✅ S89~S90 — 8 위치 fix (HIGH/primary `console+toast` / secondary/polling `console만` 차등) + 합리적 skip 23건 보존.
-- [x] **origin push 4 commits** ✅ S91 — `899090b` `e33a318..2120769` fast-forward + GCM credential reject 우회 패턴 정착.
+- [x] **prod DATABASE_URL TimeZone=UTC 적용** ✅ S91 운영 `~/ypserver/.env` grep 검증.
+- [x] **PR 리뷰 게이트 룰 정착** (RLS + tenantPrismaFor closure + non-BYPASSRLS test) ✅ + S88 후속 #4 BYPASSRLS=t 라이브 SET ROLE 게이트 확장.
+- [x] **`app_admin` GRANT systemic fix** ✅ S88 — 마이그레이션 직접 적용 + ALTER DEFAULT PRIVILEGES + 37/37 ALL 검증.
+- [x] **silent catch 30 후보 sweep** ✅ S89~S90 + S91+ STYLE-1 — 9 위치 차등 fix + 합리적 skip 23건 보존.
+- [x] **origin push 4 commits** ✅ S91 — GCM credential reject 우회 패턴 정착 → S94 memory 룰 승격 (`reference_gcm_credential_reject.md`).
+- [x] **trivially-pass 차단 메커니즘 정착** ✅ S96 M5-ATTACH-6 (`da8786b`) — `tests/messenger/rls.test.ts` 6 모델 시드 + `expect(rows.length >= 1)` active assertion. S82 "4 latent bug 4개월 hidden" 패턴 재발 차단.
+- [x] **WSL 빌드 미러 우회 4-stage 표준 절차** ✅ S95~S96 — solution 문서 + 라이브 누적 47 PASS.
+- [x] **OPS-LIVE PM2 timeline correlation 검증** ✅ S96 후속-2 — 5일+ 0 errors. solution `2026-05-10-ops-live-verification-by-pm2-log-correlation.md`.
 
 ---
 
@@ -98,14 +103,15 @@ S81 anthropic-news 404 → consecutiveFailures=1, 다른 4 소스 fetch 차단 0
 | 마일스톤 | 영역 | 상태 | 진입 세션 |
 |---|---|---|---|
 | M0 | PRD + ADR-030 + wireframes + data-model + api-surface | ✅ | S58 (ADR) + S64 (PRD) |
-| M1 | **9 데이터 모델 + 6 enum** + 마이그레이션 | ✅ (R-W2 정정 — wave-tracker 기존 "11 모델" 오기, 실측 9 모델 + 6 enum) | S67 |
-| M2 | 도메인 헬퍼 + Zod + **17 라우트 파일** (다중 HTTP method 포함, route.ts 단위 카운트) | ✅ (R-W6 정정 — wave-tracker 기존 "23 ops 19 라우트" 는 ops 단위 추정, 실측 route.ts 17 파일) | S67~S68 helpers, **S81 17 ops 4 그룹 라우트** |
-| M3 | SSE conv 8 + user 4 이벤트 + bus + wire format 헬퍼 | ✅ | S81 conv, **S82 user + 헬퍼 추출** |
-| M3 라이브 e2e | 통합 테스트 32 + 4 latent bug fix + events route 라이브 | ✅ unit / ⚠️ browser e2e 운영자 본인 | S82 + S83 빌드+배포 |
-| **M4 Phase 1** | **UI 보드 (사이드바 + 대화목록 + 채팅창 기본)** | ✅ S84 다른 터미널 (`f3bf611`) | S84 |
-| **M4 Phase 2** | **Composer + clientGeneratedId UUIDv7 + 낙관적 업데이트 + 답장 + 멘션 + use-sse 운영 + DIRECT peer 이름 lookup + SWR** | **❌ 6 세션 정체 (S85~S91 = 0건 진행, G-NEW-3)** | **S92+ 무조건 단독 chunk 진입** |
-| M5 | 첨부 + 답장 + 멘션 + 검색 (filebox 통합 + cmdk + GIN trgm) | ❌ | M4 Phase 2 후속 |
-| M6 | 알림 + 차단/신고 + 운영자 패널 + kdysharpedge 보안 리뷰 | 🟡 모델만 (UserBlock + AbuseReport M2 흡수), UI/패널 미시작 | M5 후속 |
+| M1 | **9 데이터 모델 + 6 enum** + 마이그레이션 | ✅ (R-W2 정정 정착) | S67 |
+| M2 | 도메인 헬퍼 + Zod + **17 라우트 파일** (R-W6 정정 정착, 본 평가 코드 검증 1:1 매치) | ✅ | S67~S68 helpers, S81 17 ops 4 그룹 라우트 |
+| M3 | SSE conv 8 + user 4 이벤트 + bus + wire format 헬퍼 | ✅ | S81 conv, S82 user + 헬퍼 추출 |
+| M3 라이브 e2e | 통합 테스트 32 + 4 latent bug fix + events route 라이브 | ✅ unit / 🟡 browser e2e (S94 F2-4 use-sse hook 도입으로 부분 해소, 실제 EventSource 라이브는 운영자 영역) | S82 + S83 빌드+배포 + **S94 F2-4 jsdom 단위 PASS** |
+| **M4 Phase 1** | UI 보드 (사이드바 + 대화목록 + 채팅창 기본) | ✅ S84 (`f3bf611`) | S84 |
+| **M4 Phase 2** | Composer + UUIDv7 + 낙관적 업데이트 + 답장 + 멘션 + use-sse 운영 + DIRECT peer 이름 lookup | ✅ **F 트랙 5/5 완주 (S92~S94)** — `ac09ebd` F2-1 + `b750186` F2-2 + `8903e1d` F2-3 + `088f623` F2-4+INFRA-1 + `5a29980` F2-5. SWR 마이그레이션 잔여 (INFRA-2 wave). | S92~S94 |
+| M5 검색 | 본문 30일 윈도 검색 (GIN trgm) | ✅ S94 (`112c8be`, TDD 16) | S94 |
+| **M5 첨부** | filebox `upload-multipart` 재사용 + composer chip + Bubble 렌더 + 30일 cron deref | ✅ **S95~S96** — `652ff88` 백엔드 RLS positive + `bf7255a` logic+utility (TDD 26) + `6bb29c7` 30일 cron (TDD 6, 라이브 6/6) + `7ceb075` frontend UI + `a9aeede` sweep e2e + M5-ATTACH-6 trivially-pass 차단. **사전 추정 5-6일 → 실측 1-2일 압축** (schema-first 정량 효과). | S95~S96 |
+| M6 | 알림 + 차단/신고 + 운영자 패널 + kdysharpedge 보안 리뷰 | ✅ **S94** — `2f9125a` 운영자 신고 패널 (TDD 9) + `5f5253c` 차단/알림 UI (TDD 16) + `8f873c3` sharpedge PASS (CRITICAL/HIGH/MEDIUM 0, LOW 3 + INFO 2). | S94 |
 
 ### 4.2 백엔드 라이브 인프라
 
@@ -114,13 +120,16 @@ S81 anthropic-news 404 → consecutiveFailures=1, 다른 4 소스 fetch 차단 0
 - 통합 테스트 32 + SSE wire format 7 + listener-throw 패턴 (brittle test 회피)
 - DB role `app_test_runtime` non-BYPASSRLS + `scripts/setup-test-db-role.sh` + `scripts/run-integration-tests.sh`
 
-### 4.3 잔여
+### 4.3 잔여 (S96 시점)
 
-- [ ] **M4 UI 보드 Phase 1** (S84-F1, 단일 세션 chunk = 사이드바 + 라우트 + 대화목록 + 채팅창 기본)
-  - 다른 터미널 위임 프롬프트: `docs/handover/s84-parallel-prompt-m4-ui-phase1.md`
-- [ ] M4 UI 보드 Phase 2 (composer 인터랙티브 + SSE wiring)
-- [ ] M5 (첨부 + 답장 + 멘션 + 검색)
-- [ ] M6 (알림 + 차단/신고 + 운영자 패널)
+- [x] **M4 UI 보드 Phase 1** ✅ S84 (`f3bf611`)
+- [x] **M4 Phase 2 F 트랙 5/5** ✅ S92~S94 (composer 인터랙티브 + SSE wiring 완주)
+- [x] **M5 검색** ✅ S94 (`112c8be`)
+- [x] **M5 첨부** ✅ S95~S96 (backend + 30일 cron + frontend + sweep)
+- [x] **M6 알림/차단/신고/운영자/보안 리뷰** ✅ S94
+- [ ] **INFRA-2** (SWR + MSW 도입 + 컴포넌트 렌더 TDD 보강) — INFRA wave 별도 chunk (~3-4h)
+- [ ] **라이브 e2e** (M3 SSE EventSource + M5-ATTACH-3b UI 통합) — 운영자 영역 또는 INFRA wave 흡수
+- [ ] `messenger-attachments-deref` cron enabled=true (운영자 결정, 30일 도달 시점)
 
 ---
 
@@ -156,16 +165,17 @@ S77~S79 stabilization 시퀀스:
 
 ## 7. 다음 세션 게이트
 
-### S84+ 우선순위 (next-dev-prompt.md 단일 진실)
+### S97+ 우선순위 (next-dev-prompt.md 단일 진실, S84~S96 완료분 [SUNSET])
 
 | # | 작업 | 우선 | 위치 |
 |---|---|---|---|
-| S84-A | prod TimeZone=UTC 적용 | P1 사용자 의사결정 | 메인 터미널 |
-| S84-C | 24h+ 관찰 후 sources 14 확장 | P1 | 메인 터미널 |
-| S84-D | inserted=0 dedupe 진단 | P1 | **본 세션 진행** |
-| **S84-F1** | **M4 UI Phase 1** (사이드바 + 대화목록 + 채팅창 기본) | **P0 messenger** | **다른 터미널 위임** |
-| S84-G | M5 (첨부 + 답장 + 멘션 + 검색) | P1 messenger | S85+ |
-| S84-H | M6 (알림 + 차단/신고 + 운영자 패널 + 보안 리뷰) | P1 messenger | S86+ |
+| S97-DOC-WAVE-2 | wave-tracker S91+~S96 row 갱신 (G-NEW-4 재발 차단) | P1 본 chunk | **본 세션 진행** ✅ (본 갱신 자체) |
+| S97-TAG-2 | s94/s95/s96/sunset 4 마일스톤 git tag 소급 | P3 | 본 세션 |
+| S97-USER-VERIFY | 사용자 휴대폰 stylelucky4u.com/notes 재검증 | P0 사용자 | 사용자 직접 |
+| S97-SEC-1 | GitHub repo public/private 확인 | P0 사용자 | 사용자 직접 |
+| S98-INFRA-2 | SWR + MSW 도입 + 컴포넌트 렌더 TDD 보강 | P2 | 단독 chunk ~3-4h |
+| S99~S100-ALMANAC-PLUGIN | Almanac → `packages/tenant-almanac/` plugin 마이그레이션 (ADR-024 옵션 D) | P0~P1 | 단독 chunk ~5-7일 |
+| 정책 전환 | 거버넌스 단언 [SUNSET 2026-05-10/S96] → `feedback_autonomy.md` 일반 적용 | — | 정착 |
 
 ### 머지 게이트 룰 (CLAUDE.md 신규 섹션 동기 정착)
 
@@ -192,3 +202,11 @@ S82 4 latent bug 재발 차단을 위한 PR 본문 필수 체크리스트:
 | 2026-05-05 | S89~S90 | silent catch 30 후보 sweep + PR 게이트 룰 #4 BYPASSRLS=t 확장 (`d10b5e9` `5f64675` `67461da` `2120769`) — 8 위치 fix + 23 합리적 skip 보존 |
 | 2026-05-08 | S91 | origin push 4 commits + GCM credential reject 우회 패턴 정착 (`899090b`) — G-NEW-5 자연 해소 |
 | 2026-05-08 | S91+ | **wave eval 2차 (delta, 82/100 B+ -5점)** — R-W1/R-W3/R-W4 해소 + G-NEW-1~6 신규 갭 + M4 Phase 2 6 세션 정체 진단 → 거버넌스 단언 정착 |
+| 2026-05-08 | S92 | **M4 Phase 2 F2-1** (`ac09ebd`) — Composer + UUIDv7 + Enter 송신 + IME composing 가드 (TDD 17, logic-only 분리 패턴 첫 적용). 거버넌스 단언 첫 자율 적용 사례 (Phase 2 1/14). |
+| 2026-05-08 | S93 | **M4 Phase 2 F2-2** (`b750186`) — 낙관적 송신 + `_optimistic` discriminator + server protect invariant (TDD 17). 거버넌스 단언 §31 dependency 예외 자율 적용 (Phase 2 2/14). |
+| 2026-05-09 | S94 | **F 트랙 완주 + M5 검색 + M6 운영자/차단/알림 + sharpedge PASS** — 7 commit 압축 신기록 (S81 5x → 7x): F2-3 (`8903e1d`) + F2-4+INFRA-1 (`088f623`) + F2-5 (`5a29980`) + M5 검색 (`112c8be`) + M6 운영자 (`2f9125a`) + M6 차단/알림 (`5f5253c`) + sharpedge PASS (`8f873c3`). TDD +108 (619→727), G-NEW-3 0/14 → 5/14. |
+| 2026-05-10 | S95 | **M5-ATTACH-1 백엔드 갭 폐쇄** (`652ff88`) — positive 첨부 flow + cross-tenant RLS 격리 (TDD 1, 라이브 13/13 PASS). 사전 추정 5-6일 → 실측 1-2일 압축 (schema-first 정량 효과). WSL 빌드 미러 우회 4-stage 표준 절차 정착. |
+| 2026-05-10 | S96 (logic+utility) | **M5-ATTACH-3a/3c** (`bf7255a`) — composer-logic kind 분기 + attachment-upload XHR/multipart utility (TDD 26). page.tsx 변경 0 (logic-only 정량 효과). |
+| 2026-05-10 | S96 (잔여+sweep) | **M5-ATTACH-2/3b/4/5 + sweep 4건 일괄** — 30일 cron (`6bb29c7`) + frontend UI (`7ceb075`) + sweep e2e (`a9aeede`) + STYLE-2 + M5-ATTACH-6 trivially-pass 차단 + NAV-INTEGRATE + GOV-SUNSET (`da8786b`). **거버넌스 단언 [SUNSET 2026-05-10/S96] 자연 해소** + S82 이후 처음으로 tsc errors 0. |
+| 2026-05-10 | S96 (후속-2) | **OPS-LIVE PM2 timeline correlation PASS** — 마지막 ACL 에러 5/5 08:51:58 KST → S88 migration 적용 5/5 08:57:15 KST → 5일+ 0 errors. 4 latent bug 시그 무발생. solution `2026-05-10-ops-live-verification-by-pm2-log-correlation.md` (Compound Knowledge: 라이브 호출 없이 timeline 검증 패턴). G-NEW-1 자연 해소 + 운영자-only 라벨 재검증 권고. |
+| 2026-05-10 | S97 | **wave eval 3차 (delta, 92/100 A- +10점)** — G-NEW-3 극적 해소 (0/14 → 12/14, 86%) + 거버넌스 단언 SUNSET + G-NEW-7~11 신규 발견 (schema-first 정량효과 + logic-only 9 모듈 일관 + WSL 빌드 미러 표준 + active assertion + SUNSET 표식 패턴) + **G-NEW-4 wave-tracker stale 재발 (본 row 가 첫 갱신, /cs 6단계 공식화 권고)** + R-W7+ 마일스톤 git tag 부재 (TAG-2 권고). 상세: [S97 wave eval delta](../../../handover/260510-session97-wave-completion-eval-delta.md). |
