@@ -13,7 +13,7 @@
 // =============================================================================
 
 import type { TenantContext } from "@/lib/db/prisma-tenant-client";
-import type { AggregatorModule, AggregatorRunResult } from "./types";
+import type { AggregatorModule, AggregatorRunResult } from "@yangpyeon/tenant-almanac/lib/types";
 import {
   runRssFetcher,
   runHtmlScraper,

@@ -5,6 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "prebuild": "node scripts/assemble-schema.mjs",
+    "prisma:assemble": "node scripts/assemble-schema.mjs",
+    "prisma:generate": "node scripts/assemble-schema.mjs && prisma generate",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",

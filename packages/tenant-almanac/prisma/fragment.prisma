@@ -1,30 +1,238 @@
 // =============================================================================
-// @yangpyeon/tenant-almanac — Prisma schema fragment (PLUGIN-MIG-4 placeholder)
+// @yangpyeon/tenant-almanac — Prisma schema fragment
 // =============================================================================
 //
-// ADR-024 옵션 D 의 schema 병합 방식: 빌드 시 scripts/assemble-schema.ts 가
-// packages/core/prisma/schema.prisma + 모든 packages/tenant-*/prisma/fragment.prisma
-// 를 단일 apps/web/prisma/schema.prisma 로 병합 → prisma generate.
+// ADR-024 옵션 D (Hybrid plugin 격리) + ADR-023 옵션 B (shared+RLS) 정합.
+// 본 파일은 packages/tenant-almanac/prisma/fragment.prisma — single source of truth.
+// scripts/assemble-schema.mjs 가 빌드 시 prisma/almanac.prisma 로 복사 → Prisma 7
+// multi-file schema (GA v6.7.0+) 가 prisma/schema.prisma 와 자동 머지.
 //
-// 본 파일은 PLUGIN-MIG-1 (S98) 시점의 placeholder — 실제 모델 정의는 아직
-// prisma/schema.prisma (root) 에 그대로 존재. PLUGIN-MIG-4 에서 다음 5 모델을
-// 본 파일로 이전:
+// 5 모델 + 3 enum 정의. tenantId 첫 컬럼 + RLS 정책 + composite unique 는
+// 이미 마이그레이션 20260427140000_t1_6_aggregator_with_tenant 에서 적용 완료.
+// 본 PLUGIN-MIG-4 단계는 "schema 파일 위치 분리" 만 수행 — 컬럼/정책 변경 0.
 //
-//   - ContentCategory  (트랙별 카테고리)
-//   - ContentSource    (RSS / HTML / API 소스 정의)
-//   - ContentIngestedItem (fetcher 가 수집한 raw item, 분류 전)
-//   - ContentItem      (분류 + 게시 후의 정식 아이템)
-//   - ContentItemMetric (조회/공유 카운터)
+// Tenant 모델의 backref (Tenant.contentCategories 등) 는 schema.prisma 본체에 잔존.
+// Prisma 7 multi-file 이 cross-file 모델 참조 자동 처리 (Step A `prisma validate` 검증).
 //
-// 모든 모델은 ADR-023 옵션 B 정합 → 첫 컬럼 `tenantId String` 신설 필요
-// (현 시점 모델은 single-tenant 가정 잔존). PLUGIN-MIG-4 가 동시에 처리:
-//   1. ALTER TABLE ADD COLUMN tenant_id (default 'almanac', NOT NULL 후속 마이그레이션)
-//   2. RLS 정책 추가
-//   3. composite UNIQUE 인덱스 갱신 (id 단독 → (tenantId, id))
-//
-// PLUGIN-MIG-4 마이그레이션 순서:
-//   step 1: 본 fragment 작성 + scripts/assemble-schema.ts 병합 검증 (dummy fragment 비교)
-//   step 2: tenant_id 컬럼 backfill 마이그레이션 작성/적용
-//   step 3: RLS 정책 마이그레이션
-//   step 4: prisma/schema.prisma 본체에서 5 모델 삭제, 본 fragment 가 단일 출처
-//   step 5: src/lib/aggregator/* 의 prisma 호출이 tenantPrismaFor(ctx) 사용 검증
+// 이전 (PLUGIN-MIG-1 placeholder) → 본 fragment 채워짐 (PLUGIN-MIG-4 S100):
+//   - ContentCategory, ContentSource, ContentIngestedItem, ContentItem, ContentItemMetric
+//   - ContentSourceKind, ContentIngestStatus, ContentQualityFlag
+// =============================================================================
+
+// ─────────────────────────────────────────────────────────────
+// Phase 1.6 (T1.6) — Almanac 콘텐츠 어그리게이터 스키마
+// ADR-022 §7원칙: tenant_id 첫 컬럼 강제 + RLS 적용
+// 원본 spec: docs/assets/yangpyeon-aggregator-spec/code/prisma/schema-additions.prisma
+// ─────────────────────────────────────────────────────────────
+
+/// 콘텐츠 소스 종류 — 수집기 디스패처가 분기 기준으로 사용
+/// - RSS:        표준 RSS/Atom 피드 (rss-parser)
+/// - HTML:       cheerio 셀렉터 기반 스크랩 (parserConfig.list/title/link 셀렉터 필수)
+/// - API:        JSON/GraphQL 엔드포인트 (parserConfig.headers/queryParams 활용)
+/// - FIRECRAWL:  RSS/HTML이 모두 막히거나 SPA인 경우 Firecrawl SaaS 폴백
+enum ContentSourceKind {
+  RSS
+  HTML
+  API
+  FIRECRAWL
+}
+
+/// 수집된 원본 아이템의 처리 상태 머신
+///   pending      → 큐에 들어옴 (정규화 직전)
+///   classifying  → AI 분류 진행 중
+///   ready        → 분류 완료, promote 대기
+///   promoted     → ContentItem 으로 승격 완료 (재처리 제외용)
+///   rejected     → 광고/저품질/지역 부적합 등으로 거부
+///   duplicate    → urlHash 중복 감지
+enum ContentIngestStatus {
+  pending
+  classifying
+  ready
+  promoted
+  rejected
+  duplicate
+}
+
+/// 발행된 콘텐츠 품질 플래그 — 피드 노출 정책 결정에 사용
+/// - auto_ok:        AI 자동 분류만으로 노출 가능
+/// - manual_review:  편집자 검수 대기 (낮은 컨피던스, 민감 토픽)
+/// - blocked:        절대 노출 금지 (어뷰즈/저작권 침해 등)
+enum ContentQualityFlag {
+  auto_ok
+  manual_review
+  blocked
+}
+
+/// 콘텐츠 카테고리 — Track(대분류) × Slug(소분류) 트리
+/// 트랙: hustle / work / build / invest / learn / community
+/// T1.6: tenantId 첫 컬럼 + RLS 적용. (tenantId, slug) composite unique.
+model ContentCategory {
+  id          String   @id @default(cuid())
+  // T1.6 — tenant 1급 시민. ADR-023 옵션 B + RLS.
+  tenantId    String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  tenant      Tenant   @relation("TenantContentCategory", fields: [tenantId], references: [id], onDelete: Cascade)
+  track       String // "hustle" | "work" | "build" | "invest" | "learn" | "community"
+  slug        String // 기존 @unique 제거 → (tenantId, slug) composite
+  name        String // 한국어 표시명
+  nameEn      String?  @map("name_en")
+  description String?
+  icon        String? // Lucide 아이콘 이름 (예: "Rocket", "Briefcase")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // 관계
+  items   ContentItem[]   @relation("CategoryItems")
+  sources ContentSource[] @relation("CategoryDefaultSources")
+
+  // 기존 @@unique([track, slug]) → (tenantId, track, slug)
+  @@unique([tenantId, slug])
+  @@unique([tenantId, track, slug])
+  @@index([tenantId, track, sortOrder])
+  @@map("content_categories")
+}
+
+/// 콘텐츠 소스 정의 — 어떤 RSS/HTML/API 에서 수집할지
+/// T1.6: tenantId 첫 컬럼 + RLS 적용. (tenantId, slug) composite unique.
+model ContentSource {
+  id                  Int               @id @default(autoincrement())
+  // T1.6 — tenant 1급 시민.
+  tenantId            String            @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  tenant              Tenant            @relation("TenantContentSource", fields: [tenantId], references: [id], onDelete: Cascade)
+  slug                String // 기존 @unique 제거 → (tenantId, slug) composite
+  name                String // 사람이 읽는 이름 (예: "OpenAI Blog")
+  url                 String // RSS URL / HTML 페이지 / API 엔드포인트
+  kind                ContentSourceKind
+  defaultTrack        String?           @map("default_track") // 분류 힌트
+  defaultCategoryId   String?           @map("default_category_id") // 카테고리 외래키
+  country             String? // ISO 639-1 또는 "ko"/"en"/"ja"
+  parserConfig        Json              @default("{}") @map("parser_config") // 셀렉터/헤더/페이지네이션
+  active              Boolean           @default(true)
+  consecutiveFailures Int               @default(0) @map("consecutive_failures")
+  lastFetchedAt       DateTime?         @map("last_fetched_at") @db.Timestamptz(3)
+  lastSuccessAt       DateTime?         @map("last_success_at") @db.Timestamptz(3)
+  lastError           String?           @map("last_error")
+  notes               String?
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // 관계
+  defaultCategory ContentCategory?      @relation("CategoryDefaultSources", fields: [defaultCategoryId], references: [id])
+  ingestedItems   ContentIngestedItem[] @relation("SourceIngested")
+  items           ContentItem[]         @relation("SourceItems")
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, active, lastFetchedAt])
+  @@map("content_sources")
+}
+
+/// 수집기가 가져온 원본 아이템 (정규화 전)
+/// urlHash로 중복 제거 → 통과 시 ContentItem 으로 승격
+/// T1.6: tenantId 첫 컬럼 + RLS 적용. (tenantId, urlHash) composite unique.
+model ContentIngestedItem {
+  id                    String              @id @default(cuid())
+  // T1.6 — tenant 1급 시민.
+  tenantId              String              @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  tenant                Tenant              @relation("TenantContentIngestedItem", fields: [tenantId], references: [id], onDelete: Cascade)
+  sourceId              Int                 @map("source_id")
+  urlHash               String              @map("url_hash") // sha256(canonical_url) — 기존 @unique → (tenantId, urlHash) composite
+  url                   String
+  title                 String
+  summary               String?             @db.Text
+  contentHtml           String?             @map("content_html") @db.Text // 250자 발췌 권장 (저작권)
+  author                String?
+  imageUrl              String?             @map("image_url")
+  publishedAt           DateTime?           @map("published_at") @db.Timestamptz(3)
+  fetchedAt             DateTime            @default(now()) @map("fetched_at") @db.Timestamptz(3)
+  rawJson               Json                @default("{}") @map("raw_json") // 원본 응답 전체 보존
+  status                ContentIngestStatus @default(pending)
+  suggestedTrack        String?             @map("suggested_track")
+  suggestedCategorySlug String?             @map("suggested_category_slug") // 분류기가 제안한 슬러그 — promote 시 categoryId로 룩업
+  aiSummary             String?             @map("ai_summary") @db.Text
+  aiTags                String[]            @default([]) @map("ai_tags")
+  aiLanguage            String?             @map("ai_language")
+  errorMsg              String?             @map("error_msg")
+  processedAt           DateTime?           @map("processed_at") @db.Timestamptz(3)
+
+  // 큐레이션 (관리자 검토) 필드 — admin/aggregator/items 페이지에서 사용
+  qualityFlag  ContentQualityFlag @default(auto_ok) @map("quality_flag")
+  reviewedById String?            @map("reviewed_by_id") // User.id (FK 비참조 — 운영 단순화)
+  reviewedAt   DateTime?          @map("reviewed_at") @db.Timestamptz(3)
+  reviewNote   String?            @map("review_note") @db.Text
+
+  // 관계
+  source       ContentSource @relation("SourceIngested", fields: [sourceId], references: [id], onDelete: Cascade)
+  promotedItem ContentItem?  @relation("IngestedToItem")
+
+  @@unique([tenantId, urlHash])
+  @@index([tenantId, status, fetchedAt])
+  @@index([tenantId, sourceId, fetchedAt])
+  @@map("content_ingested_items")
+}
+
+/// 발행된 콘텐츠 (피드/카테고리 페이지에 노출되는 단위)
+/// T1.6: tenantId 첫 컬럼 + RLS 적용. (tenantId, slug) composite unique.
+/// ingestedItemId: cuid 기반 → 글로벌 @unique 유지 (Prisma 1:1 관계 요건).
+model ContentItem {
+  id             String             @id @default(cuid())
+  // T1.6 — tenant 1급 시민.
+  tenantId       String             @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  tenant         Tenant             @relation("TenantContentItem", fields: [tenantId], references: [id], onDelete: Cascade)
+  // ingestedItemId: cuid 기반 — 글로벌 충돌 0 가정 → @unique 유지 (Prisma 1:1 관계 요건).
+  // T1.6 cross-tenant 안전성: ingestedItem 자체가 (tenantId, urlHash) composite unique 로 보호됨.
+  ingestedItemId String?            @unique @map("ingested_item_id") // 1:1 역참조
+  sourceId       Int                @map("source_id")
+  track          String // "hustle" | "work" | ...
+  categoryId     String?            @map("category_id")
+  slug           String // SEO friendly slug — 기존 @unique → (tenantId, slug) composite
+  title          String
+  excerpt        String             @db.Text
+  aiSummary      String?            @map("ai_summary") @db.Text
+  keywords       String[]           @default([])
+  tags           String[]           @default([])
+  language       String?
+  url            String // canonical 외부 URL
+  imageUrl       String?            @map("image_url")
+  author         String?
+  publishedAt    DateTime           @map("published_at") @db.Timestamptz(3)
+  firstSeenAt    DateTime           @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+  score          Float              @default(0) // popularity proxy (HN points + reactions 등)
+  pinned         Boolean            @default(false)
+  featured       Boolean            @default(false)
+  qualityFlag    ContentQualityFlag @default(auto_ok) @map("quality_flag")
+  viewCount      Int                @default(0) @map("view_count")
+  clickCount     Int                @default(0) @map("click_count")
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // 관계
+  source       ContentSource        @relation("SourceItems", fields: [sourceId], references: [id])
+  category     ContentCategory?     @relation("CategoryItems", fields: [categoryId], references: [id])
+  ingestedItem ContentIngestedItem? @relation("IngestedToItem", fields: [ingestedItemId], references: [id])
+  metrics      ContentItemMetric[]  @relation("ItemMetrics")
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, track, publishedAt(sort: Desc)])
+  @@index([tenantId, categoryId, publishedAt(sort: Desc)])
+  @@index([tenantId, qualityFlag])
+  @@index([tenantId, featured, publishedAt(sort: Desc)])
+  @@map("content_items")
+}
+
+/// 일별 콘텐츠 노출/클릭 메트릭 — 트렌딩 알고리즘 입력
+/// T1.6: tenantId 첫 컬럼 + RLS 적용. PK에 tenantId 포함 → (tenantId, itemId, date).
+model ContentItemMetric {
+  // T1.6 — tenant 1급 시민. PK를 (tenantId, itemId, date) 로 구성.
+  tenantId String   @default(dbgenerated("(current_setting('app.tenant_id'))::uuid")) @map("tenant_id") @db.Uuid
+  tenant   Tenant   @relation("TenantContentItemMetric", fields: [tenantId], references: [id], onDelete: Cascade)
+  itemId   String   @map("item_id")
+  date     DateTime @db.Date
+  views    Int      @default(0)
+  clicks   Int      @default(0)
+
+  item ContentItem @relation("ItemMetrics", fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, itemId, date])
+  @@index([tenantId, date])
+  @@map("content_item_metrics")
+}

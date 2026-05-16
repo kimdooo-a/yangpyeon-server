@@ -25,8 +25,8 @@ import { describe, it, expect } from "vitest";
 import {
   classifyItem,
   getAvailableCategorySlugs,
-} from "@/lib/aggregator/classify";
-import type { RawItem } from "@/lib/aggregator/types";
+} from "@yangpyeon/tenant-almanac/lib/classify";
+import type { RawItem } from "@yangpyeon/tenant-almanac/lib/types";
 
 function makeItem(title: string, summary?: string): RawItem {
   return { url: "https://example.com/x", title, summary };

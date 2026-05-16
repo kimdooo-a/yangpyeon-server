@@ -30,8 +30,8 @@ import {
   canonicalizeUrl,
   urlHash,
   dedupeAgainstDb,
-} from "@/lib/aggregator/dedupe";
-import type { RawItem } from "@/lib/aggregator/types";
+} from "@yangpyeon/tenant-almanac/lib/dedupe";
+import type { RawItem } from "@yangpyeon/tenant-almanac/lib/types";
 
 const FAKE_TENANT_CTX = {
   tenantId: "00000000-0000-0000-0000-000000000001",

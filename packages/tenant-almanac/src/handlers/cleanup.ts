@@ -4,8 +4,8 @@
  * PLUGIN-MIG-2 (S98): src/lib/aggregator/runner.ts:runCleanupModule(ctx, startedAt) 추출.
  */
 import type { TenantContext } from "@/lib/db/prisma-tenant-client";
-import type { AggregatorRunResult } from "@/lib/aggregator/types";
-import { runCleanup } from "@/lib/aggregator/cleanup";
+import type { AggregatorRunResult } from "@yangpyeon/tenant-almanac/lib/types";
+import { runCleanup } from "@yangpyeon/tenant-almanac/lib/cleanup";
 
 export async function runCleanupHandler(
   ctx: TenantContext,

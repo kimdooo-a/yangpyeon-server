@@ -31,7 +31,7 @@ vi.mock("@/lib/db/prisma-tenant-client", () => ({
   }),
 }));
 
-import { runCleanup } from "@/lib/aggregator/cleanup";
+import { runCleanup } from "@yangpyeon/tenant-almanac/lib/cleanup";
 
 const FAKE_TENANT_CTX = {
   tenantId: "00000000-0000-0000-0000-000000000001",

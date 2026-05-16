@@ -9,8 +9,8 @@ import {
   tenantPrismaFor,
   type TenantContext,
 } from "@/lib/db/prisma-tenant-client";
-import type { AggregatorRunResult } from "@/lib/aggregator/types";
-import { enrichItem } from "@/lib/aggregator/llm";
+import type { AggregatorRunResult } from "@yangpyeon/tenant-almanac/lib/types";
+import { enrichItem } from "@yangpyeon/tenant-almanac/lib/llm";
 
 const DEFAULT_BATCH = 50;
 

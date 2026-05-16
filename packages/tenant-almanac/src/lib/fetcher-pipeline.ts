@@ -25,9 +25,9 @@ import type {
   AggregatorRunResult,
   RawItem,
   FetchReport,
-} from "@/lib/aggregator/types";
-import { fetchSource } from "@/lib/aggregator/fetchers";
-import { dedupeAgainstDb, urlHash } from "@/lib/aggregator/dedupe";
+} from "@yangpyeon/tenant-almanac/lib/types";
+import { fetchSource } from "@yangpyeon/tenant-almanac/lib/fetchers";
+import { dedupeAgainstDb, urlHash } from "@yangpyeon/tenant-almanac/lib/dedupe";
 
 const FAILURE_THRESHOLD = 5;
 

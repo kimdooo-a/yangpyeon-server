@@ -15,7 +15,7 @@
  * 기존 `src/lib/aggregator/runner.ts:runAggregatorModule` 가 thin wrapper 로 동일 핸들러를 호출.
  */
 import { defineTenant, type TenantCronHandler } from "@yangpyeon/core";
-import type { AggregatorRunResult } from "@/lib/aggregator/types";
+import type { AggregatorRunResult } from "@yangpyeon/tenant-almanac/lib/types";
 import { runRssFetcher } from "./src/handlers/rss-fetcher";
 import { runHtmlScraper } from "./src/handlers/html-scraper";
 import { runApiPoller } from "./src/handlers/api-poller";

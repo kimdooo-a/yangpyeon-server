@@ -4,8 +4,8 @@
  * PLUGIN-MIG-2 (S98): src/lib/aggregator/runner.ts:runPromoter(ctx, batch, startedAt) 추출.
  */
 import type { TenantContext } from "@/lib/db/prisma-tenant-client";
-import type { AggregatorRunResult } from "@/lib/aggregator/types";
-import { promotePending } from "@/lib/aggregator/promote";
+import type { AggregatorRunResult } from "@yangpyeon/tenant-almanac/lib/types";
+import { promotePending } from "@yangpyeon/tenant-almanac/lib/promote";
 
 const DEFAULT_BATCH = 50;
 

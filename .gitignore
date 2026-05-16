@@ -55,6 +55,12 @@ nul
 
 /src/generated/prisma
 
+# PLUGIN-MIG-4: scripts/assemble-schema.ts 가 생성하는 컨슈머별 schema fragment 사본.
+# Source: packages/tenant-*/prisma/fragment.prisma → build artifact: prisma/<tenant>.prisma
+# schema.prisma (main) 는 추적 대상.
+/prisma/*.prisma
+!/prisma/schema.prisma
+
 # Playwright MCP artifacts (세션 17~)
 /.playwright-mcp/
 /e2e-*.png

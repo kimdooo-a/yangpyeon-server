@@ -62,7 +62,7 @@ vi.mock("@/lib/db/prisma-tenant-client", () => ({
   withTenantTx: withTenantTxMock,
 }));
 
-import { promotePending } from "@/lib/aggregator/promote";
+import { promotePending } from "@yangpyeon/tenant-almanac/lib/promote";
 
 const FAKE_CTX = { tenantId: "00000000-0000-0000-0000-000000000001" };
 

@@ -13,7 +13,7 @@
  */
 import { prisma } from "@/lib/prisma";
 import { tenantPrismaFor } from "@/lib/db/prisma-tenant-client";
-import { canonicalizeUrl } from "@/lib/aggregator/dedupe";
+import { canonicalizeUrl } from "@yangpyeon/tenant-almanac/lib/dedupe";
 
 const NEW_5_SOURCES = [
   "github-blog",

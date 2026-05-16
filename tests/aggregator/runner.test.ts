@@ -63,17 +63,17 @@ const {
   };
 });
 
-vi.mock("@/lib/aggregator/fetchers", () => ({ fetchSource: fetchSourceMock }));
-vi.mock("@/lib/aggregator/dedupe", () => ({
+vi.mock("@yangpyeon/tenant-almanac/lib/fetchers", () => ({ fetchSource: fetchSourceMock }));
+vi.mock("@yangpyeon/tenant-almanac/lib/dedupe", () => ({
   dedupeAgainstDb: dedupeMock,
   urlHash: vi.fn((u: string) => `hash-of-${u}`),
 }));
-vi.mock("@/lib/aggregator/classify", () => ({
+vi.mock("@yangpyeon/tenant-almanac/lib/classify", () => ({
   classifyItem: vi.fn(() => ({ track: "build", categorySlug: "ai-tools" })),
 }));
-vi.mock("@/lib/aggregator/llm", () => ({ enrichItem: enrichMock }));
-vi.mock("@/lib/aggregator/promote", () => ({ promotePending: promoteMock }));
-vi.mock("@/lib/aggregator/cleanup", () => ({ runCleanup: vi.fn(async () => ({ deleted: 0 })) }));
+vi.mock("@yangpyeon/tenant-almanac/lib/llm", () => ({ enrichItem: enrichMock }));
+vi.mock("@yangpyeon/tenant-almanac/lib/promote", () => ({ promotePending: promoteMock }));
+vi.mock("@yangpyeon/tenant-almanac/lib/cleanup", () => ({ runCleanup: vi.fn(async () => ({ deleted: 0 })) }));
 vi.mock("@/lib/db/prisma-tenant-client", () => ({
   tenantPrismaFor: tenantPrismaForMock,
   withTenantTx: vi.fn(),

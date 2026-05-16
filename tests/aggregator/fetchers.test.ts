@@ -38,7 +38,7 @@ import {
   fetchProductHunt,
   fetchArxiv,
   fetchFirecrawl,
-} from "@/lib/aggregator/fetchers";
+} from "@yangpyeon/tenant-almanac/lib/fetchers";
 import type { ContentSource } from "@/generated/prisma/client";
 
 // ─────────────────────────────────────────────────────────────────────────────

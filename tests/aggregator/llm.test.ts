@@ -24,7 +24,7 @@
  * Spec: docs/research/baas-foundation/05-aggregator-migration/2026-04-26-plan.md §6 T6
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { RawItem } from "@/lib/aggregator/types";
+import type { RawItem } from "@yangpyeon/tenant-almanac/lib/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1) @google/genai 모킹 — vi.hoisted 로 resetModules 후에도 mock 상태 보존
@@ -44,8 +44,8 @@ vi.mock("@google/genai", () => ({
 // ─────────────────────────────────────────────────────────────────────────────
 // 2) enrichItem / getLlmStats 동적 로드 — beforeEach 마다 fresh 모듈
 // ─────────────────────────────────────────────────────────────────────────────
-let enrichItem: typeof import("@/lib/aggregator/llm").enrichItem;
-let getLlmStats: typeof import("@/lib/aggregator/llm").getLlmStats;
+let enrichItem: typeof import("@yangpyeon/tenant-almanac/lib/llm").enrichItem;
+let getLlmStats: typeof import("@yangpyeon/tenant-almanac/lib/llm").getLlmStats;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -53,7 +53,7 @@ beforeEach(async () => {
   GoogleGenAICtor.mockClear();
   delete process.env.GEMINI_API_KEY;
   delete process.env.AGGREGATOR_LLM_DAILY_BUDGET;
-  const mod = await import("@/lib/aggregator/llm");
+  const mod = await import("@yangpyeon/tenant-almanac/lib/llm");
   enrichItem = mod.enrichItem;
   getLlmStats = mod.getLlmStats;
 });
