@@ -1,7 +1,101 @@
-# 다음 세션 프롬프트 (세션 100)
+# 다음 세션 프롬프트 (세션 101)
 
 > 이 파일을 복사하여 새 세션 시작 시 Claude에게 전달합니다.
 > 세션 종료 시 반드시 갱신합니다.
+
+---
+
+## 프로젝트 컨텍스트 — S100 후속 (PLUGIN-MIG-4 완성 + Track E 100%, commit `67091d4` push)
+
+S100 후속 = 다른 터미널의 wave eval delta (`260516-session100-wave-completion-eval-delta.md`) 작성 중 본 터미널이 자율 진입 (영역 분리, `feedback_concurrent_terminal_overlap`). /kdynext 7차원 진단 (건강 등급 A) → 사용자 "/ypserver → PLUGIN-MIG-4 자율" 선택.
+
+- **/ypserver 운영 적용**: PLUGIN-MIG-3 manifest dispatcher cutover production 라이브 검증 (PM2 ↺=26, HTTP 307, 에러 0). dev :3100 smoke 만으로 production 라이브 검증 안 된 상태였음 → 정착.
+- **PLUGIN-MIG-4 6 step 완주** (~3h 실측, 가이드 추정 16h → ~5x 압축): T1.6 마이그레이션(2026-04-27)이 이미 tenantId 첫 컬럼 + composite unique + RLS ENABLE+FORCE 5/5 모델 적용 → 본 작업 실질 = schema 파일 위치 분리 + plugin 격리.
+  - **Step A 인프라**: `prisma.config.ts` 디렉토리 모드 (Prisma 7 multi-file GA v6.7.0+) + `scripts/assemble-schema.mjs` 60줄 ASCII-only (Node 24 Windows console 한국어 식별자 인코딩 함정 회피) + `.gitignore` + prebuild hook
+  - **Step B 5 모델 + 3 enum 이전**: schema.prisma 1108→891줄 (-217) → `packages/tenant-almanac/prisma/fragment.prisma` 본체. cross-file 모델 참조 자동 머지 검증 (Tenant.contentCategories[] ↔ ContentCategory)
+  - **Step C support libs 8 파일**: `git mv` (classify/cleanup/dedupe/fetchers/llm/promote/types) → `packages/tenant-almanac/src/lib/` + import 16건 갱신 (`@/lib/aggregator/X` → `@yangpyeon/tenant-almanac/lib/X`)
+  - **Step D**: manifest.ts `prismaFragment` 이미 등록 (자연 활성화)
+  - **Step E `tests/almanac/` 신설** (8 testcase): _fixtures.ts (261줄, messenger 패턴 fork) + rls-isolation 5 (cross-tenant) + composite-unique 3 ((tenantId, slug))
+  - **Step F 라이브 검증** (3 시도 = WSL bash rolldown native binding 함정 + PowerShell ECONNREFUSED 127.0.0.1:5432 WSL postgres only listen → **WSL native ypserver-build rsync + bash scripts/run-integration-tests.sh tests/almanac/** = **8/8 PASS** in 852ms)
+- **PR 게이트 5항목 자동 통과** + #4 라이브 통과 (T1.6 RLS production-equivalent 증명)
+- **검증**: prisma validate (multi-file "schemas are valid") + prisma generate (198ms) + tsc 0 + vitest 846 PASS / 102 skip
+- **ADR-022 7원칙 #2/#4 schema 레이어 현실화** — 신규 컨슈머 `packages/tenant-<id>/prisma/fragment.prisma` 만 추가 시 자동 머지 (zero-touch)
+- **Compound Knowledge**: `docs/solutions/2026-05-16-prisma-multi-file-schema-tenant-fragment.md` (Prisma 7 multi-file 패턴 + assemble-schema 빌드 스크립트)
+- **PLUGIN-MIG-1~5 모두 완료** — Almanac plugin 격리가 schema/handler/route/cron 4 레이어 모두 현실화. wave Track E 100% (5/5 단계 정착, 4 세션 압축)
+
+---
+
+## ⭐ 세션 101 첫 작업 우선순위 (2026-05-16, S100 후속 종료 시점)
+
+| # | 작업 | 우선 | 소요 | 차단 사항 / 상태 |
+|---|------|------|------|----------|
+| **2nd-CONSUMER** | **2번째 컨슈머 등록 시범 (ADR-022 #4 "코드 수정 0줄" 실제 검증)** | **P0 권장** | ~3-4h | `packages/tenant-jobboard/` 신설 — manifest.ts + fragment.prisma + 1 cron handler + 1 route 만으로 router/cron/schema 자동 통합 가능 여부 검증. 가설 검증이 Track E 100% 의 진짜 의미. |
+| **ALMANAC-V11** | **Almanac v1.1 frontend + 308 alias 제거** | P1 | ~1-2h | `/api/v1/almanac/[...path]/route.ts` 44줄 삭제 + Almanac frontend (almanac-flame.vercel.app) 가 새 URL `/api/v1/t/almanac/...` 사용하도록 cutover. 본 cutover 가 production cross-origin CORS preflight 정상 작동 검증. |
+| **S88-USER-VERIFY** | **사용자 휴대폰 stylelucky4u.com/notes 재검증** | **P0 사용자** | 1분 | 누적 carry-over. |
+| **S86-SEC-1** | **GitHub repo public/private 확인** | **P0 사용자** | 30초 | (S86~S99 미수행) Settings 확인. |
+| **S87-RSS-ACTIVATE** | **anthropic-news active=true** | P2 운영자 | 30분 | 운영자 결정. |
+| **S87-TZ-MONITOR** | **24h+ TimeZone=UTC 모니터링** | P2 자연 관찰 | 5분 | 사용자 짬에. |
+| **CRON-MA-ENABLE** | **`messenger-attachments-deref` enabled=true** | P3 | 1분 | 운영자 결정, 30일 도달 시점. |
+| **FILE-UPLOAD-MIG** | filebox file-upload-zone → attachment-upload utility 통합 | P3 sweep | ~30분 | 결합 0 유지 마이그레이션. |
+| **STYLE-3** | sticky-note-card.tsx:114 endDrag stale closure | P3 sweep | ~15분 | 별도 PR. |
+| **DEBOUNCE-1** | M5 검색 300ms debounce | P3 sweep | ~30분 | UX 개선. |
+| **NEW-BLOCK-UI** | 대화 화면 hover → 차단 진입 메뉴 | P3 sweep | ~30분 | UX 보완. |
+| **WAVE-EVAL-5** | `kdywavecompletion --compare session-100` | P3 평가 | ~30분 | S100 후속 종료 후 적절 시점. PLUGIN-MIG-1~5 완료 + 2번째 컨슈머 검증 시 더 가치. |
+| ~~PLUGIN-MIG-4 본격~~ | ~~5 Content* 모델 fragment + tenantId backfill + RLS + 라이브 test~~ | — | — | ✅ **세션 100 후속 완료** (commit `67091d4`, handover `260516-session100-plugin-mig-4.md`, 가이드 추정 16h → 실제 ~3h, T1.6 사전 적용 발견) |
+| ~~/ypserver 운영 적용~~ | ~~PLUGIN-MIG-3 cutover production~~ | — | — | ✅ **세션 100 후속 완료** (PM2 ↺=26, HTTP 307, 에러 0) |
+
+### S101 진입 시 첫 행동
+
+1. `git status --short` + `git log --oneline -5` (memory `feedback_concurrent_terminal_overlap`) — HEAD 가 `67091d4` (S100 후속) 또는 그 이상인지 확인. 다른 터미널 commit 흡수.
+2. `git pull origin spec/aggregator-fixes` (다른 터미널 commit 가능성)
+3. **S100 후속 인수인계서 read** — `docs/handover/260516-session100-plugin-mig-4.md` §"다음 작업 제안" 의 2nd-CONSUMER 가이드.
+4. **2nd-CONSUMER 자율 진입** (분기 질문 X) — `packages/tenant-jobboard/` 시범 신설. 본 시범이 ADR-022 #4 "코드 수정 0줄 신규 컨슈머" 의 진짜 검증.
+5. 또는 사용자 carry-over 처리 우선 (S88-USER-VERIFY 1분 + S86-SEC-1 30초 = 1.5분 비용으로 P0 carry-over 2건 해소)
+
+### 2nd-CONSUMER 시범 가이드 (S100 후속 → S101 권장 흐름)
+
+**Step 1 — `packages/tenant-jobboard/` 스캐폴드 (~30분):**
+1. `packages/tenant-jobboard/` 디렉토리 생성 (package.json + tsconfig + README + src/{lib,handlers,routes,admin}/.gitkeep)
+2. `tsconfig.json` alias 추가 (`@yangpyeon/tenant-jobboard/*`)
+3. `manifest.ts` 신설 — `defineTenant({ id: "jobboard", version: "0.1.0", displayName, enabled: false (or true 운영 토글), cronHandlers, routes, prismaFragment: "./prisma/fragment.prisma", envVarsRequired, dataApiAllowlist })`
+4. `prisma/fragment.prisma` 신설 — 도메인 모델 (예: JobListing + JobApplication 등) — tenantId 첫 컬럼 + RLS DEFAULT current_setting + composite unique. ADR-022 7원칙 #1 정합.
+
+**Step 2 — DB 마이그레이션 (~1h):**
+1. `prisma/migrations/<timestamp>_jobboard_models/` SQL 작성 — CREATE TABLE + tenant FK + RLS ENABLE/FORCE + tenant_isolation 정책 + GRANT app_admin/app_test_runtime ALL
+2. `npx prisma migrate deploy` 즉시 적용 (memory `feedback_migration_apply_directly`)
+3. `npm run prisma:assemble` + `npx prisma generate` 검증
+
+**Step 3 — manifest 등록 (~10분):**
+1. `src/lib/tenant-bootstrap.ts` 에 `import "@yangpyeon/tenant-jobboard/manifest"` 1줄 추가 (다른 변경 0)
+2. 검증: 운영 토글로 enabled=true 시 manifest.routes 가 catch-all dispatcher 의 routing table 에 자동 등록
+
+**Step 4 — 라이브 검증 (~1-2h):**
+1. tenants 테이블에 jobboard tenant row 추가 (admin pool)
+2. dev :3100 에서 `/api/v1/t/jobboard/<sub-path>` 호출 → manifest.routes lookup 정상 작동 확인
+3. tests/jobboard/ 신설 — cross-tenant 격리 + composite unique 검증
+
+**Step 5 — commit + push:**
+- commit message = `feat(tenant-jobboard): 2번째 컨슈머 스캐폴드 + manifest + RLS + 라이브 검증 = ADR-022 #4 코드 수정 0줄 정식 검증`
+- 본 시범이 통과하면 ADR-022 #4 가 종이가 아닌 코드 사실로 검증 완료. wave Track E 의 진짜 의미.
+
+### S101+ wave 평가 권장 시점
+
+`kdywavecompletion --compare session-100` — 2nd-CONSUMER 시범 완료 후 (~S102+). Track E 100% 의미 + ADR-022 #4 정식 검증 + plugin 격리 정량화.
+
+### 정책
+
+- 거버넌스 단언 [SUNSET 2026-05-10/S96] 후 → `feedback_autonomy.md` 일반 적용. 자율 진입.
+- /cs 6단계 (글로벌+프로젝트 CLAUDE.md 룰화) S100 후속 첫 적용 — wave-tracker.md §1 Track E + §8 row 갱신 필수.
+- ADR-024 옵션 D plugin 격리 **5/5 단계 완성** — 2nd-CONSUMER 시범이 진짜 의미 검증.
+- 메모리 룰 누적 = 18건 + MEMORY.md 색인. 본 세션 새 룰 추가 0 (실용 작업만).
+
+---
+
+## 이전 컨텍스트 (참고용 — S99 후속 PLUGIN-MIG-3 cutover, commit `33e6721` push)
+
+(S99 후속 PLUGIN-MIG-3 A+B+C cutover 종료 시점 — current.md 세션 99 후속 row 참조)
+
+---
 
 ---
 
