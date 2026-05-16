@@ -176,8 +176,11 @@ CLAUDE.md (루트 — 지금 이 파일)
 
 ## 세션 시작/종료
 - **시작**: `docs/status/current.md` + 최신 `docs/handover/` 인수인계서 확인
-- **종료** (4단계):
+- **종료** (5단계):
   1. `docs/status/current.md` 세션 요약표에 1행 추가
   2. 해당 날짜 아카이브에 상세 기록 (`docs/logs/`)
   3. 인수인계서 작성 (`docs/handover/`)
   4. `docs/handover/next-dev-prompt.md` 갱신
+  5. **`docs/research/baas-foundation/04-architecture-wave/wave-tracker.md` 갱신 강제** — `§1 4-Track 매트릭스` 의 Track별 % / 마지막 마일스톤 (commit) + `§8 갱신 이력` row 1행 추가. 신규 Track 출현 시 매트릭스에 row 추가.
+     - 근거: kdywavecompletion 평가에서 wave-tracker stale 패턴 4번 재발 (S91→S97→S99 → S100 룰화). 권고만으로는 차단 안 됨.
+     - 신규 Track 출현 시 가중치 재조정도 함께 (예: S100 Track E Plugin Migration 출현으로 A=25/B=20/C=25/D=5/E=25 재조정).
